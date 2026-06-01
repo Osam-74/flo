@@ -1,0 +1,246 @@
+import React, { useState } from 'react';
+import { FileText, Printer } from 'lucide-react';
+import { toast } from 'sonner';
+import type { Transaction, Person } from '../types';
+import { fmtDate, fmtN } from '../utils';
+
+interface Props {
+  txs: Transaction[];
+  people: Person[];
+  currency: string;
+}
+
+export function ReportTab({ txs, people, currency }: Props) {
+  const today = new Date().toISOString().split('T')[0];
+  const [from, setFrom]       = useState(today.slice(0, 7) + '-01');
+  const [to, setTo]           = useState(today);
+  const [pId, setPId]         = useState('all');
+  const [rType, setRType]     = useState('all');
+  const [reportHtml, setReportHtml] = useState('');
+  const [generated, setGenerated]   = useState(false);
+
+  function esc(s: any): string {
+    const d = document.createElement('div');
+    d.textContent = String(s ?? '');
+    return d.innerHTML;
+  }
+
+  function generate() {
+    let f = [...txs];
+    if (from)          f = f.filter(t => t.date >= from);
+    if (to)            f = f.filter(t => t.date <= to);
+    if (pId !== 'all') f = f.filter(t => t.person === pId);
+    if (rType !== 'all') f = f.filter(t => t.type === rType);
+    f.sort((a, b) => a.date < b.date ? -1 : 1);
+
+    const expenseTxs = f.filter(t => ['expense', 'salary', 'fund-return'].includes(t.type));
+    const salesTxs   = f.filter(t => ['income', 'credit'].includes(t.type));
+    const ownerFunds = f.filter(t => t.type === 'owner-fund');
+
+    const totalExpenses   = expenseTxs.reduce((s, t) => s + (t.amount || 0), 0);
+    const totalShopSales  = salesTxs.reduce((s, t) => { const src = t.source || (t.type === 'income' ? 'shop' : 'farm'); return src === 'shop' ? s + (t.type === 'income' ? (t.amount || 0) : (t.creditPaid || 0)) : s; }, 0);
+    const totalFarmSales  = salesTxs.reduce((s, t) => { const src = t.source || (t.type === 'income' ? 'shop' : 'farm'); return src === 'farm' ? s + (t.type === 'income' ? (t.amount || 0) : (t.creditPaid || 0)) : s; }, 0);
+    const totalSales      = totalShopSales + totalFarmSales;
+    const cashInjection   = ownerFunds.reduce((s, t) => s + (t.amount || 0), 0);
+    const totalOutstanding = salesTxs.reduce((s, t) => { if (t.type === 'credit') { const owe = Math.max(0, (t.creditTotal || 0) - (t.creditPaid || 0)); return s + owe; } return s; }, 0);
+    const dateLabel = (from && to) ? fmtDate(from) + ' – ' + fmtDate(to) : 'All Dates';
+
+    function makeExpenseTable(rows: Transaction[], title: string, subtitle: string) {
+      if (!rows.length) return '';
+      const total = rows.reduce((s, t) => s + (t.amount || 0), 0);
+      return `<div class="pdf-section">
+        <div class="pdf-section-title">${esc(title)}</div>
+        <div class="pdf-section-sub">${esc(subtitle)}</div>
+        <table class="pdf-table"><thead><tr>
+          <th style="width:18%">Date</th><th>Description</th><th style="width:22%">Amount (${esc(currency)})</th>
+        </tr></thead><tbody>
+        ${rows.map(t => `<tr><td>${esc(fmtDate(t.date))}</td><td>${esc(t.desc)}${t.note ? '<br><span style="font-size:0.7em;color:#9a9fb8;">' + esc(t.note) + '</span>' : ''}</td><td>${fmtN(t.amount || 0)}</td></tr>`).join('')}
+        </tbody><tfoot><tr class="pdf-total"><td></td><td>TOTAL</td><td>${fmtN(total)}</td></tr></tfoot></table>
+      </div>`;
+    }
+
+    function makeSalesTable(rows: Transaction[], title: string, subtitle: string, showOutstanding: boolean) {
+      if (!rows.length) return '';
+      let shopTotal = 0, farmTotal = 0, outstanding = 0;
+      rows.forEach(t => {
+        const src = t.source || (t.type === 'income' ? 'shop' : 'farm');
+        if (t.type === 'income') { if (src === 'shop') shopTotal += t.amount || 0; else farmTotal += t.amount || 0; }
+        else if (t.type === 'credit') {
+          const collected = t.creditPaid || 0;
+          const owe = Math.max(0, (t.creditTotal || 0) - (t.creditPaid || 0));
+          if (src === 'shop') shopTotal += collected; else farmTotal += collected;
+          outstanding += owe;
+        }
+      });
+      const grandTotal = shopTotal + farmTotal;
+      return `<div class="pdf-section">
+        <div class="pdf-section-title">${esc(title)}</div>
+        <div class="pdf-section-sub">${esc(subtitle)}</div>
+        <table class="pdf-table"><thead><tr>
+          <th>Source</th><th style="width:30%">Amount (${esc(currency)})</th>
+        </tr></thead><tbody>
+        ${shopTotal > 0 ? `<tr><td>Shop Sales</td><td>${fmtN(shopTotal)}</td></tr>` : ''}
+        ${farmTotal > 0 ? `<tr><td>Farm Dispatch</td><td>${fmtN(farmTotal)}</td></tr>` : ''}
+        </tbody><tfoot>
+          <tr class="pdf-total"><td>TOTAL COLLECTED</td><td>${fmtN(grandTotal)}</td></tr>
+          ${showOutstanding && outstanding > 0.005 ? `<tr class="pdf-outstanding"><td>Outstanding – Credit Sales</td><td>${fmtN(outstanding)}</td></tr>` : ''}
+        </tfoot></table>
+      </div>`;
+    }
+
+    function makeSummaryTable(sections: { label: string; amount: number; isTotal?: boolean; prefix?: string }[]) {
+      return `<div class="pdf-section">
+        <div class="pdf-section-title">Summary</div>
+        <div class="pdf-section-sub">${esc(dateLabel)}</div>
+        <table class="pdf-summary-table"><thead><tr><th></th><th style="width:30%">Amount (${esc(currency)})</th></tr></thead>
+        <tbody>${sections.map(s => `<tr${s.isTotal ? ' class="pdf-total"' : ''}><td>${esc(s.label)}</td><td>${s.prefix || ''}${fmtN(s.amount)}</td></tr>`).join('')}
+        </tbody></table>
+      </div>`;
+    }
+
+    let html = '';
+    if (rType === 'all' || rType === 'expense' || rType === 'salary') html += makeExpenseTable(expenseTxs, 'Expenses', dateLabel);
+    if (rType === 'all' || rType === 'income'  || rType === 'credit') html += makeSalesTable(salesTxs, 'Sales / Dispatch', dateLabel, true);
+    if (rType === 'all' && (expenseTxs.length || salesTxs.length)) {
+      html += `<hr class="pdf-divider">`;
+      const rows: { label: string; amount: number; isTotal?: boolean; prefix?: string }[] = [];
+      if (totalShopSales > 0) rows.push({ label: 'Shop Sales', amount: totalShopSales });
+      if (totalFarmSales > 0) rows.push({ label: 'Farm Dispatch', amount: totalFarmSales });
+      if (totalOutstanding > 0) rows.push({ label: 'Outstanding – Credit Sales', amount: totalOutstanding });
+      rows.push({ label: 'Total Sales / Dispatch', amount: totalSales, isTotal: true });
+      if (totalExpenses > 0) rows.push({ label: 'Total Expenses', amount: totalExpenses });
+      if (cashInjection > 0) rows.push({ label: 'Cash Injection', amount: cashInjection, prefix: '+ ' });
+      html += makeSummaryTable(rows);
+    }
+    if (rType === 'owner-fund' && ownerFunds.length) html += makeExpenseTable(ownerFunds, 'Cash Injections', dateLabel);
+    if (!html) html = `<div style="text-align:center;padding:40px;font-size:0.82rem;color:#9a9fb8;">No transactions found for the selected filters.</div>`;
+
+    setReportHtml(html);
+    setGenerated(true);
+    toast.success('Report ready');
+    setTimeout(() => document.getElementById('report-preview')?.scrollIntoView({ behavior: 'smooth' }), 100);
+  }
+
+  return (
+    <div style={{ padding: '16px 16px 100px' }}>
+      <style>{printStyles}</style>
+
+      {/* Controls */}
+      <div className="no-print" style={{ background: '#fff', borderRadius: 18, padding: 18, marginBottom: 14, boxShadow: '0 1px 3px rgba(0,0,0,0.07), 0 4px 16px rgba(0,0,0,0.04)', border: '1px solid rgba(0,0,0,0.05)' }}>
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 10 }}>
+          <Field label="From Date"><input style={inp} type="date" value={from} onChange={e => setFrom(e.target.value)} /></Field>
+          <Field label="To Date"><input style={inp} type="date" value={to} onChange={e => setTo(e.target.value)} /></Field>
+        </div>
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 14 }}>
+          <Field label="Person">
+            <Select value={pId} onChange={setPId}>
+              <option value="all">All People</option>
+              {people.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
+            </Select>
+          </Field>
+          <Field label="Type">
+            <Select value={rType} onChange={setRType}>
+              <option value="all">All Types</option>
+              <option value="income">Sales</option>
+              <option value="expense">Expenses</option>
+              <option value="salary">Salary</option>
+              <option value="transfer">Transfers</option>
+              <option value="credit">Credit Sales</option>
+              <option value="owner-fund">Owner Funds</option>
+              <option value="fund-return">Fund Returns</option>
+            </Select>
+          </Field>
+        </div>
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+          <button onClick={generate} style={{ ...primaryBtn, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8 }}>
+            <FileText size={16} /> Generate
+          </button>
+          <button onClick={() => window.print()} style={{ ...primaryBtn, background: 'linear-gradient(135deg, #2a4a9a, #3d6bdf)', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8 }}>
+            <Printer size={16} /> Print
+          </button>
+        </div>
+      </div>
+
+      {/* Report preview */}
+      {generated && (
+        <div id="report-preview" className="report-preview">
+          <div
+            className="pdf-doc"
+            style={{ background: '#fff', borderRadius: 12, padding: '24px 22px 32px', boxShadow: '0 4px 24px rgba(0,0,0,0.1)', fontFamily: 'Plus Jakarta Sans, sans-serif', color: '#1a1a2e' }}
+            dangerouslySetInnerHTML={{ __html: reportHtml }}
+          />
+        </div>
+      )}
+    </div>
+  );
+}
+
+function Field({ label, children }: { label: string; children: React.ReactNode }) {
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
+      <label style={{ fontSize: '0.6rem', fontWeight: 700, letterSpacing: '0.1em', textTransform: 'uppercase', color: '#9A9FB8' }}>{label}</label>
+      {children}
+    </div>
+  );
+}
+
+function Select({ value, onChange, children }: { value: string; onChange: (v: string) => void; children: React.ReactNode }) {
+  return (
+    <select
+      value={value} onChange={e => onChange(e.target.value)}
+      style={{ ...inp, backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath d='M1 1l5 5 5-5' stroke='%239a9fb8' stroke-width='1.5' fill='none' stroke-linecap='round'/%3E%3C/svg%3E")`, backgroundRepeat: 'no-repeat', backgroundPosition: 'right 12px center', appearance: 'none' as any }}
+    >
+      {children}
+    </select>
+  );
+}
+
+const inp: React.CSSProperties = {
+  background: '#F5F7FF', border: '1.5px solid rgba(0,0,0,0.08)',
+  borderRadius: 10, padding: '10px 13px', fontSize: '0.88rem',
+  color: '#1A1D2E', width: '100%', fontFamily: "'DM Mono',monospace",
+  outline: 'none',
+};
+
+const primaryBtn: React.CSSProperties = {
+  padding: '13px', borderRadius: 12, fontSize: '0.78rem', fontWeight: 700,
+  letterSpacing: '0.06em', textTransform: 'uppercase',
+  background: 'linear-gradient(135deg, #3D6BDF, #5A84FF)', color: '#fff',
+  border: 'none', cursor: 'pointer', boxShadow: '0 4px 16px rgba(61,107,223,0.35)',
+};
+
+const printStyles = `
+@media print {
+  .no-print, #app .topbar, nav, .overlay { display: none !important; }
+  html, body { background: #fff !important; }
+  .report-preview { display: block !important; }
+  .pdf-doc { box-shadow: none !important; border-radius: 0 !important; padding: 12mm 14mm 16mm !important; }
+  .pdf-table th, .pdf-summary-table th { background: #1a1a2e !important; color: #fff !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+  .pdf-table tr.pdf-total td, .pdf-summary-table tr.pdf-total td { background: #e8f4e8 !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+  .pdf-table tr.pdf-outstanding td { background: #fff8f0 !important; color: #cc5500 !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+  .pdf-table tr:nth-child(even) td, .pdf-summary-table tr:nth-child(even) td { background: #f5f5f5 !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+  .pdf-divider { border-top: 2px solid #1a1a2e !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+  .pdf-section { page-break-inside: avoid; }
+}
+.pdf-section { margin-bottom: 28px; }
+.pdf-section-title { font-size: 1rem; font-weight: 800; color: #1a1a2e; margin-bottom: 2px; letter-spacing: -0.01em; }
+.pdf-section-sub { font-size: 0.7rem; color: #9a9fb8; margin-bottom: 10px; font-weight: 500; }
+.pdf-divider { border: none; border-top: 2px solid #1a1a2e; margin: 28px 0; }
+.pdf-table { width: 100%; border-collapse: collapse; font-size: 0.8rem; }
+.pdf-table th { background: #1a1a2e; color: #fff; font-size: 0.68rem; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; padding: 8px; text-align: left; }
+.pdf-table th:last-child { text-align: right; }
+.pdf-table td { padding: 7px 8px; border: 0.5px solid #ccc; vertical-align: middle; color: #1a1a2e; }
+.pdf-table td:last-child { text-align: right; font-family: 'DM Mono', monospace; font-size: 0.78rem; }
+.pdf-table tr:nth-child(even) td { background: #f5f5f5; }
+.pdf-table tr:nth-child(odd) td { background: #fff; }
+.pdf-table tr.pdf-total td { background: #e8f4e8 !important; font-weight: 700; border-top: 1.5px solid #1a1a2e; }
+.pdf-table tr.pdf-outstanding td { background: #fff8f0 !important; color: #cc5500; }
+.pdf-summary-table { width: 100%; border-collapse: collapse; font-size: 0.8rem; }
+.pdf-summary-table th { background: #1a1a2e; color: #fff; font-size: 0.68rem; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; padding: 8px; text-align: left; }
+.pdf-summary-table th:last-child { text-align: right; }
+.pdf-summary-table td { padding: 7px 8px; border: 0.5px solid #ccc; color: #1a1a2e; }
+.pdf-summary-table td:last-child { text-align: right; font-family: 'DM Mono', monospace; }
+.pdf-summary-table tr:nth-child(even) td { background: #f5f5f5; }
+.pdf-summary-table tr:nth-child(odd) td { background: #fff; }
+.pdf-summary-table tr.pdf-total td { background: #e8f4e8 !important; font-weight: 700; border-top: 1.5px solid #1a1a2e; }
+`;
