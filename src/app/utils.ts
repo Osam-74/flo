@@ -1,31 +1,33 @@
 import type { Person, Transaction, ColorDef } from './types';
 
+// All person colors now use blue shades
 export const COLORS: Record<string, ColorDef> = {
-  green:  { bg: 'rgba(0,184,122,0.14)',   text: '#00B87A' },
-  blue:   { bg: 'rgba(61,107,223,0.14)',  text: '#3D6BDF' },
-  gold:   { bg: 'rgba(232,160,32,0.14)',  text: '#E8A020' },
-  red:    { bg: 'rgba(232,62,92,0.14)',   text: '#E83E5C' },
-  purple: { bg: 'rgba(139,92,246,0.14)',  text: '#8B5CF6' },
+  green:  { bg: 'rgba(61,107,223,0.14)',  text: '#3D6BDF' },  // blue (was green)
+  blue:   { bg: 'rgba(26,47,168,0.14)',   text: '#1A2FA8' },  // deep blue
+  gold:   { bg: 'rgba(107,143,255,0.18)', text: '#4A6FD4' },  // mid blue (was gold)
+  red:    { bg: 'rgba(232,62,92,0.14)',   text: '#E83E5C' },  // keep red for negative context
+  purple: { bg: 'rgba(90,132,255,0.16)',  text: '#2A50B8' },  // blue-purple shade
 };
 
+// TX icon colors — all blue shades, red only for expense/fund-return (outflows)
 export const TX_COLORS: Record<string, string> = {
-  income:       '#00B87A',
-  expense:      '#E83E5C',
-  salary:       '#3D6BDF',
-  transfer:     '#E8A020',
-  credit:       '#8B5CF6',
-  'owner-fund': '#F07030',
-  'fund-return':'#00A8A0',
+  income:        '#3D6BDF',   // blue
+  expense:       '#E83E5C',   // red (outflow warning)
+  salary:        '#1A2FA8',   // deep blue
+  transfer:      '#5A84FF',   // light blue
+  credit:        '#2A50B8',   // mid blue
+  'owner-fund':  '#6B8FFF',   // soft blue
+  'fund-return': '#C0392B',   // dark red (outflow)
 };
 
 export const TX_BG: Record<string, string> = {
-  income:       'rgba(0,184,122,0.12)',
-  expense:      'rgba(232,62,92,0.12)',
-  salary:       'rgba(61,107,223,0.12)',
-  transfer:     'rgba(232,160,32,0.12)',
-  credit:       'rgba(139,92,246,0.12)',
-  'owner-fund': 'rgba(240,112,48,0.12)',
-  'fund-return':'rgba(0,168,160,0.12)',
+  income:        'rgba(61,107,223,0.13)',
+  expense:       'rgba(232,62,92,0.12)',
+  salary:        'rgba(26,47,168,0.13)',
+  transfer:      'rgba(90,132,255,0.13)',
+  credit:        'rgba(42,80,184,0.13)',
+  'owner-fund':  'rgba(107,143,255,0.13)',
+  'fund-return': 'rgba(192,57,43,0.12)',
 };
 
 export const TX_EMOJI: Record<string, string> = {
@@ -76,7 +78,7 @@ export function pStats(pid: string, txs: Transaction[]) {
     }
     if (t.type === 'transfer') {
       if (t.transferFrom === pid) pOut += t.amount;
-      if (t.transferTo === pid)   pIn  += t.amount;
+      if (t.transferTo   === pid) pIn  += t.amount;
     }
     if (t.type === 'credit') {
       if (t.payments?.length) {
