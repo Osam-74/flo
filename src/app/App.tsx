@@ -516,7 +516,7 @@ const globalCss = `
   input[type="number"]::-webkit-inner-spin-button { -webkit-appearance: none; }
 
   /* Responsive container: mobile unchanged, desktop centered with max width */
-  .app-container { width: 100%; max-width: 980px; margin: 0 auto; padding: 0 16px; box-sizing: border-box; display: flex; flex-direction: column; height: 100%; }
+  .app-container { width: 100%; max-width: 980px; margin: 0 auto; padding: 0; box-sizing: border-box; display: flex; flex-direction: column; height: 100%; }
   @media (min-width: 900px) {
     .app-container { padding: 18px 24px; }
     /* Slight visual adjustments on desktop */
