@@ -236,11 +236,13 @@ export function AddEntrySheet({ open, onClose, people, currency, onSave, initial
             {/* ── STANDARD (income / expense / salary) ── */}
             {isStandard && (
               <div style={card}>
-                <Field label={`Amount (${currency}) *`}>
-                  <input style={{ ...inp, fontSize: '1.5rem', fontFamily: "'DM Mono',monospace" }}
-                    type="number" placeholder="0.00" min="0" step="0.01"
-                    value={amount} onChange={e => setAmount(e.target.value)} />
-                </Field>
+                <div style={{ marginBottom: 14 }}>
+                  <Field label={`Amount (${currency}) *`}>
+                    <input style={{ ...inp, fontSize: '1.5rem', fontFamily: "'DM Mono',monospace" }}
+                      type="number" placeholder="0.00" min="0" step="0.01"
+                      value={amount} onChange={e => setAmount(e.target.value)} />
+                  </Field>
+                </div>
 
                 {type === 'income' && (
                   <Row>
@@ -364,13 +366,11 @@ export function AddEntrySheet({ open, onClose, people, currency, onSave, initial
                       {no.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
                     </Select>
                   </Field>
-                  {crPaidAmt > 0 && (
-                    <Field label="Money Received By">
-                      <Select value={crReceiver} onChange={setCrReceiver}>
-                        {no.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
-                      </Select>
-                    </Field>
-                  )}
+                  <Field label="Money Received By">
+                    <Select value={crReceiver} onChange={setCrReceiver}>
+                      {no.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
+                    </Select>
+                  </Field>
                 </Row>
                 <Row>
                   <Field label="Category">
