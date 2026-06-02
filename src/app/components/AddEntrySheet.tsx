@@ -39,6 +39,7 @@ export function AddEntrySheet({ open, onClose, people, currency, onSave, initial
   const [source, setSource]     = useState('shop');
   const [note, setNote]         = useState('');
   const [buyer, setBuyer]       = useState('');
+  const [receiver, setReceiver] = useState('');
   // Transfer
   const [tfAmt, setTfAmt]       = useState('');
   const [tfFrom, setTfFrom]     = useState('');
@@ -85,6 +86,7 @@ export function AddEntrySheet({ open, onClose, people, currency, onSave, initial
       if (!ofReceiver)  setOfReceiver(no[0].id);
       if (!frSender)    setFrSender(no[0].id);
       if (!salPaidBy)   setSalPaidBy(no[0].id);
+      if (!receiver)    setReceiver(no[0].id);
     }
     const ow = owners(people);
     if (ow.length > 0) {
@@ -115,7 +117,7 @@ export function AddEntrySheet({ open, onClose, people, currency, onSave, initial
       const desc = type === 'income'
         ? `Sale${buyer ? ' — to ' + buyer : ''}${pn ? ' by ' + pn : ''}${cat ? ' — ' + cat : ''}`
         : `Expense${pn ? ' by ' + pn : ''}`;
-      onSave({ id, ts, type, amount: amt, person, date, cat, note, source, buyer: buyer || undefined, desc });
+      onSave({ id, ts, type, amount: amt, person, date, cat, note, source, buyer: buyer || undefined, receiver: receiver || undefined, desc });
     }
     if (type === 'salary') {
       const amt = parseFloat(amount) || 0;
@@ -244,6 +246,14 @@ export function AddEntrySheet({ open, onClose, people, currency, onSave, initial
                   <Field label="Buyer Name">
                     <input style={inp} type="text" placeholder="Buyer's name (optional)"
                       value={buyer} onChange={e => setBuyer(e.target.value)} />
+                  </Field>
+                )}
+
+                {type === 'income' && (
+                  <Field label="Money Received By">
+                    <Select value={receiver} onChange={setReceiver}>
+                      {nonOwners(people).map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
+                    </Select>
                   </Field>
                 )}
 
