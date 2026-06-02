@@ -1,10 +1,10 @@
-const CACHE_NAME = 'cashbook-v5';
+const CACHE_NAME = 'cashbook-v6';
+const BASE = '/flo';
 
-// Core files to pre-cache for offline use (use relative paths for GitHub Pages)
 const PRECACHE = [
-  './',
-  './index.html',
-  './manifest.json'
+  BASE + '/',
+  BASE + '/index.html',
+  BASE + '/manifest.json',
 ];
 
 self.addEventListener('install', event => {
@@ -50,7 +50,9 @@ self.addEventListener('fetch', event => {
         })
         .catch(() => caches.match(event.request).then(cached => {
           if (cached) return cached;
-          if (event.request.mode === 'navigate') return caches.match('./index.html');
+          if (event.request.mode === 'navigate') {
+            return caches.match(BASE + '/index.html') || caches.match(BASE + '/');
+          }
           return new Response('Offline — resource unavailable', { status: 503 });
         }))
     );
