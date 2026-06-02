@@ -29,15 +29,18 @@ export function PeopleTab({ people, txs, currency, isReadOnly, onAdd, onDelete }
     setName(''); setRole(''); setColor('green');
   };
 
+  // Exclude biz account from the people list — it has its own display on Dashboard
+  const displayPeople = people.filter(p => p.id !== 'biz');
+
   return (
     <div style={{ padding: '16px 16px 100px' }}>
       <div style={sh}>Team Members</div>
 
-      {people.length === 0 ? (
+      {displayPeople.length === 0 ? (
         <p style={{ fontSize: '0.78rem', color: '#9A9FB8', marginBottom: 16 }}>No people added yet.</p>
       ) : (
         <div style={{ display: 'grid', gap: 8, marginBottom: 20 }}>
-          {people.map(p => {
+          {displayPeople.map(p => {
             const c = pColor(p);
             const { pIn, pOut, pBal } = pStats(p.id, txs);
             return (
@@ -72,7 +75,7 @@ export function PeopleTab({ people, txs, currency, isReadOnly, onAdd, onDelete }
                     </span>
                   </div>
                 </div>
-                {!isReadOnly && (
+                {!isReadOnly && !isOwner(p) && (
                   <button
                     onClick={() => onDelete(p.id)}
                     style={{
