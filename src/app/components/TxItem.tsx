@@ -12,18 +12,24 @@ interface Props {
   onDelete?: (id: string, desc: string) => void;
 }
 
-const TX_ICON: Record<string, string> = {
-  income: '↑', expense: '↓', salary: '₵', transfer: '⇄',
-  credit: '◎', 'owner-fund': '⊕', 'fund-return': '⊖',
+// All circle icons — different fill levels as visual distinction
+const TX_CIRCLE: Record<string, React.ReactNode> = {
+  income:        <svg viewBox="0 0 20 20" width="18" height="18"><circle cx="10" cy="10" r="9" fill="currentColor" opacity="1"/></svg>,
+  expense:       <svg viewBox="0 0 20 20" width="18" height="18"><circle cx="10" cy="10" r="9" fill="none" stroke="currentColor" strokeWidth="2.5"/><circle cx="10" cy="10" r="4" fill="currentColor"/></svg>,
+  salary:        <svg viewBox="0 0 20 20" width="18" height="18"><circle cx="10" cy="10" r="9" fill="currentColor" opacity="0.9"/><circle cx="10" cy="10" r="4" fill="white" opacity="0.5"/></svg>,
+  transfer:      <svg viewBox="0 0 20 20" width="18" height="18"><circle cx="10" cy="10" r="9" fill="currentColor" opacity="0.7"/><circle cx="10" cy="10" r="5.5" fill="none" stroke="white" strokeWidth="1.5"/></svg>,
+  credit:        <svg viewBox="0 0 20 20" width="18" height="18"><circle cx="10" cy="10" r="9" fill="none" stroke="currentColor" strokeWidth="2"/><circle cx="10" cy="10" r="6.5" fill="currentColor" opacity="0.6"/></svg>,
+  'owner-fund':  <svg viewBox="0 0 20 20" width="18" height="18"><circle cx="10" cy="10" r="9" fill="currentColor" opacity="0.5"/><circle cx="10" cy="10" r="5" fill="currentColor"/></svg>,
+  'fund-return': <svg viewBox="0 0 20 20" width="18" height="18"><circle cx="10" cy="10" r="9" fill="none" stroke="currentColor" strokeWidth="2.5"/></svg>,
 };
 
 export function TxItem({ tx, people, currency, showActions, onEdit, onDelete }: Props) {
   const person = people.find(p => p.id === tx.person);
-  const c = person ? pColor(person) : { bg: 'rgba(0,184,122,0.12)', text: '#00B87A' };
+  const c = person ? pColor(person) : { bg: 'rgba(61,107,223,0.12)', text: '#3D6BDF' };
 
   const isIn = tx.type === 'income' || tx.type === 'owner-fund';
-  const iconColor = TX_COLORS[tx.type] || '#9A9FB8';
-  const iconBg = TX_BG[tx.type] || 'rgba(154,159,184,0.12)';
+  const iconColor = TX_COLORS[tx.type] || '#3D6BDF';
+  const iconBg    = TX_BG[tx.type]    || 'rgba(61,107,223,0.12)';
 
   let amountEl: React.ReactNode;
   if (tx.type === 'credit') {
@@ -31,7 +37,7 @@ export function TxItem({ tx, people, currency, showActions, onEdit, onDelete }: 
     const total = tx.creditTotal || 0;
     amountEl = (
       <div className="text-right flex-shrink-0">
-        <div style={{ fontFamily: "'DM Mono',monospace", fontSize: '0.88rem', fontWeight: 600, color: '#00B87A' }}>
+        <div style={{ fontFamily: "'DM Mono',monospace", fontSize: '0.88rem', fontWeight: 600, color: '#3D6BDF' }}>
           +{currency} {paid.toFixed(2)}
         </div>
         <div style={{ fontSize: '0.62rem', color: '#9A9FB8' }}>of {currency} {total.toFixed(2)}</div>
@@ -39,13 +45,13 @@ export function TxItem({ tx, people, currency, showActions, onEdit, onDelete }: 
     );
   } else if (tx.type === 'transfer') {
     amountEl = (
-      <div style={{ fontFamily: "'DM Mono',monospace", fontSize: '0.88rem', fontWeight: 600, color: '#E8A020', flexShrink: 0 }}>
+      <div style={{ fontFamily: "'DM Mono',monospace", fontSize: '0.88rem', fontWeight: 600, color: '#5A84FF', flexShrink: 0 }}>
         ⇄ {currency} {tx.amount.toFixed(2)}
       </div>
     );
   } else {
     const sign = isIn ? '+' : '−';
-    const col  = isIn ? '#00B87A' : '#E83E5C';
+    const col  = isIn ? '#1A2FA8' : '#E83E5C';
     amountEl = (
       <div style={{ fontFamily: "'DM Mono',monospace", fontSize: '0.88rem', fontWeight: 600, color: col, flexShrink: 0 }}>
         {sign}{currency} {tx.amount.toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g, ',')}
@@ -74,7 +80,7 @@ export function TxItem({ tx, people, currency, showActions, onEdit, onDelete }: 
       );
     } else if ((tx.creditTotal || 0) > 0) {
       extraMeta.push(
-        <span key="settled" style={{ fontSize: '0.6rem', fontWeight: 700, padding: '1px 7px', borderRadius: 6, background: 'rgba(0,184,122,0.12)', color: '#00B87A' }}>
+        <span key="settled" style={{ fontSize: '0.6rem', fontWeight: 700, padding: '1px 7px', borderRadius: 6, background: 'rgba(61,107,223,0.12)', color: '#3D6BDF' }}>
           Settled ✓
         </span>
       );
@@ -105,14 +111,14 @@ export function TxItem({ tx, people, currency, showActions, onEdit, onDelete }: 
       boxShadow: '0 1px 3px rgba(0,0,0,0.07), 0 4px 12px rgba(0,0,0,0.04)',
       marginBottom: 8, border: '1px solid rgba(0,0,0,0.05)',
     }}>
-      {/* Icon */}
+      {/* Circle icon */}
       <div style={{
-        width: 40, height: 40, borderRadius: 12,
+        width: 40, height: 40, borderRadius: '50%',
         background: iconBg, color: iconColor,
         display: 'flex', alignItems: 'center', justifyContent: 'center',
-        fontSize: '1.1rem', fontWeight: 700, flexShrink: 0,
+        flexShrink: 0,
       }}>
-        {TX_ICON[tx.type] || '?'}
+        {TX_CIRCLE[tx.type] || <svg viewBox="0 0 20 20" width="18" height="18"><circle cx="10" cy="10" r="9" fill="currentColor"/></svg>}
       </div>
 
       {/* Body */}
