@@ -223,7 +223,7 @@ export function AddEntrySheet({ open, onClose, people, currency, onSave, initial
           <div style={{ overflowY: 'auto', flex: 1, padding: '0 16px 32px', WebkitOverflowScrolling: 'touch' }}>
 
             {/* Type switcher */}
-            <div style={{ display: 'flex', gap: 7, overflowX: 'auto', paddingBottom: 12, scrollbarWidth: 'none' as any }}>
+            <div style={{ display: 'flex', gap: 7, overflowX: 'auto', paddingTop: 10, paddingBottom: 12, scrollbarWidth: 'none' as any }}>
               {TYPE_OPTS.map(opt => {
                 const active = type === opt.id;
                 return (
