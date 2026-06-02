@@ -15,6 +15,10 @@ interface Props {
 
 const nonOwners = (people: Person[]) => people.filter(p => !p.role?.toLowerCase().includes('owner'));
 const owners    = (people: Person[]) => people.filter(p =>  p.role?.toLowerCase().includes('owner'));
+const humans    = (people: Person[]) => people.filter(p => {
+  const r = (p.role || '').toLowerCase();
+  return !r.includes('owner') && !r.includes('biz');
+});
 
 const today = () => new Date().toISOString().split('T')[0];
 
@@ -77,16 +81,20 @@ export function AddEntrySheet({ open, onClose, people, currency, onSave, initial
     const t = today();
     setDate(t); setTfDate(t); setCrDate(t); setOfDate(t); setFrDate(t);
     const no = nonOwners(people);
+    const hu = humans(people);
     if (no.length > 0) {
-      if (!person)      setPerson(no[0].id);
-      if (!tfFrom)      setTfFrom(no[0].id);
-      if (!tfTo)        setTfTo(no[0].id);
-      if (!crSeller)    setCrSeller(no[0].id);
+      if (!receiver)    setReceiver(no[0].id);
       if (!crReceiver)  setCrReceiver(no[0].id);
       if (!ofReceiver)  setOfReceiver(no[0].id);
-      if (!frSender)    setFrSender(no[0].id);
       if (!salPaidBy)   setSalPaidBy(no[0].id);
-      if (!receiver)    setReceiver(no[0].id);
+    }
+    if (hu.length > 0) {
+      if (!person)      setPerson(hu[0].id);
+      if (!tfFrom)      setTfFrom(hu[0].id);
+      if (!tfTo)        setTfTo(hu[0].id);
+      if (!crSeller)    setCrSeller(hu[0].id);
+      if (!frSender)    setFrSender(hu[0].id);
+      
     }
     const ow = owners(people);
     if (ow.length > 0) {
@@ -110,14 +118,20 @@ export function AddEntrySheet({ open, onClose, people, currency, onSave, initial
 
     if (type === 'income' || type === 'expense') {
       const amt = parseFloat(amount) || 0;
-      if (!person)  { toast.error('Select a person'); return; }
       if (!date)    { toast.error('Select a date'); return; }
       if (amt <= 0) { toast.error('Enter a valid amount'); return; }
-      const pn = people.find(p => p.id === person)?.name || '';
-      const desc = type === 'income'
-        ? `Sale${buyer ? ' — to ' + buyer : ''}${pn ? ' by ' + pn : ''}${cat ? ' — ' + cat : ''}`
-        : `Expense${pn ? ' by ' + pn : ''}`;
-      onSave({ id, ts, type, amount: amt, person, date, cat, note, source, buyer: buyer || undefined, receiver: receiver || undefined, desc });
+      if (type === 'income') {
+        if (!person) { toast.error('Select who made the sale'); return; }
+        if (!receiver) { toast.error('Select who received the money'); return; }
+        const sellerName = people.find(p => p.id === person)?.name || '';
+        const desc = `Sale${buyer ? ' — to ' + buyer : ''}${sellerName ? ' by ' + sellerName : ''}${cat ? ' — ' + cat : ''}`;
+        onSave({ id, ts, type, amount: amt, person: receiver, seller: person, sellerName, date, cat, note, source, buyer: buyer || undefined, receiver: receiver || undefined, desc });
+      } else {
+        if (!person)  { toast.error('Select a person'); return; }
+        const pn = people.find(p => p.id === person)?.name || '';
+        const desc = `Expense${pn ? ' by ' + pn : ''}`;
+        onSave({ id, ts, type, amount: amt, person, date, cat, note, source, buyer: buyer || undefined, receiver: receiver || undefined, desc });
+      }
     }
     if (type === 'salary') {
       const amt = parseFloat(amount) || 0;
@@ -261,7 +275,9 @@ export function AddEntrySheet({ open, onClose, people, currency, onSave, initial
                 <Row>
                   <Field label={type === 'income' ? 'Sale Made By *' : type === 'salary' ? 'Employee *' : 'Paid By *'}>
                     <Select value={person} onChange={setPerson}>
-                      {no.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
+                      {(type === 'income' || type === 'salary')
+                        ? humans(people).map(p => <option key={p.id} value={p.id}>{p.name}</option>)
+                        : no.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
                     </Select>
                   </Field>
                   <Field label="Date *">
@@ -363,7 +379,7 @@ export function AddEntrySheet({ open, onClose, people, currency, onSave, initial
                 <Row>
                   <Field label="Sale Made By *">
                     <Select value={crSeller} onChange={setCrSeller}>
-                      {no.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
+                      {humans(people).map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
                     </Select>
                   </Field>
                   <Field label="Money Received By">

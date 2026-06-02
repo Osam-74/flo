@@ -52,6 +52,8 @@ export interface Transaction {
   creditReceiver?: string;
   creditReceiverName?: string;
   payments?: Payment[];
+  seller?: string;
+  sellerName?: string;
   ownerSender?: string;
   ownerReceiver?: string;
   ownerName?: string;
