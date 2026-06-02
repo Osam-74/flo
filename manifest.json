@@ -1,7 +1,7 @@
 {
-  "name": "Cashbook — Farm Expense Tracker",
-  "short_name": "Cashbook",
-  "description": "Farm expense and income tracker with per-person balances, synced to cloud.",
+  "name": "Cashflow — A better tracking option for operations",
+  "short_name": "Cashflow",
+  "description": "A better tracking option for operations.",
   "start_url": "./index.html",
   "scope": "./",
   "display": "standalone",

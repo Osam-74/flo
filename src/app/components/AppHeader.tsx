@@ -25,8 +25,8 @@ export function AppHeader({ appMode, installReady, onLock, onInstall, onTab }: P
     }}>
       {/* Brand */}
       <div style={{ fontSize: '1.15rem', fontWeight: 800, letterSpacing: '-0.03em', color: '#fff' }}>
-        Cash<span style={{ color: '#6B8FFF' }}>book</span>
-      </div>
+            Cash<span style={{ color: '#6B8FFF' }}>flow</span>
+          </div>
 
       {/* Actions */}
       <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>

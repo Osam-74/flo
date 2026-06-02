@@ -6,11 +6,11 @@
 <meta name="theme-color" content="#e8eaf0"/>
 <meta name="apple-mobile-web-app-capable" content="yes"/>
 <meta name="apple-mobile-web-app-status-bar-style" content="light"/>
-<meta name="apple-mobile-web-app-title" content="Cashbook"/>
+<meta name="apple-mobile-web-app-title" content="Cashflow"/>
 <link rel="manifest" href="./manifest.json"/>
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><text y='28' font-size='28'>💰</text></svg>"/>
 <link rel="apple-touch-icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 192 192'><rect width='192' height='192' rx='32' fill='%233d6bdf'/><text y='148' x='16' font-size='148'>💰</text></svg>"/>
-<title>Cashbook</title>
+<title>Cashflow</title>
 <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet"/>
 <style>
 :root{
@@ -312,7 +312,7 @@ input,select,textarea{font-family:'DM Mono',monospace;outline:none;}
 <div id="pinScreen">
   <div class="pin-logo-wrap">&#x1F4B0;</div>
   <div class="pin-brand">Cash<span>book</span></div>
-  <div class="pin-tagline">Farm Expense Tracker</div>
+  <div class="pin-tagline">A better tracking option for operations</div>
   <div class="pin-dots" id="pinDots">
     <div class="pd" id="pd0"></div><div class="pd" id="pd1"></div>
     <div class="pd" id="pd2"></div><div class="pd" id="pd3"></div>
