@@ -22,15 +22,40 @@ export function Dashboard({ txs, people, currency, onPersonFilter, onEdit, onDel
     else if (t.type === 'fund-return') { totalOut += t.amount; ownerOut += t.amount; }
     else if (t.type === 'credit') totalIn += (t.creditPaid || 0);
     else if (t.type === 'transfer') {
-      // Treat transfers to the business account as remittances (count as business in)
-      if (t.transferTo === 'biz') totalIn += t.amount;
+      // Only count transfer to biz as business-in if it came from the owner (fund injection context).
+      // A transfer from a regular user (non-owner) to biz is just internal remittance — do NOT add to totalIn.
+      // A transfer FROM biz to someone is still an outflow.
+      if (t.transferTo === 'biz') {
+        const sender = people.find(p => p.id === t.transferFrom);
+        const senderIsOwner = sender?.role?.toLowerCase().includes('owner');
+        if (senderIsOwner) {
+          totalIn += t.amount;
+        }
+        // Non-owner → biz: money is just moving internally, no net change to main balance
+      }
       if (t.transferFrom === 'biz') totalOut += t.amount;
     }
   }
   const bal = totalIn - totalOut;
   const netOwner = ownerIn - ownerOut;
 
-  const nonOwners = people.filter(p => !(p.role?.toLowerCase().includes('owner')));
+  // Biz account balance: credits from non-owner transfers + owner fund injections received, minus outflows from biz
+  let bizBalance = 0;
+  for (const t of txs) {
+    if (t.type === 'transfer') {
+      if (t.transferTo === 'biz') bizBalance += t.amount;
+      if (t.transferFrom === 'biz') bizBalance -= t.amount;
+    }
+    if (t.type === 'owner-fund' && t.ownerReceiver === 'biz') bizBalance += t.amount;
+    if (t.type === 'fund-return' && t.frSender === 'biz') bizBalance -= t.amount;
+  }
+
+  // Members: exclude owner and biz account
+  const members = people.filter(p => {
+    const r = (p.role || '').toLowerCase();
+    return !r.includes('owner') && p.id !== 'biz';
+  });
+
   const recent = [...txs].sort((a, b) => (b.ts || 0) - (a.ts || 0)).slice(0, 5);
 
   const byBuyer: Record<string, { total: number; paid: number }> = {};
@@ -111,6 +136,34 @@ export function Dashboard({ txs, people, currency, onPersonFilter, onEdit, onDel
         )}
       </div>
 
+      {/* Biz Account standalone strip */}
+      <div style={{
+        background: 'linear-gradient(135deg, #2A2200 0%, #5C4A00 100%)',
+        borderRadius: 14, padding: '12px 16px',
+        marginBottom: 16,
+        boxShadow: '0 4px 16px rgba(180,140,0,0.18)',
+        display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+        border: '1px solid rgba(255,200,60,0.18)',
+      }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+          <div style={{
+            width: 32, height: 32, borderRadius: 9,
+            background: 'rgba(255,200,60,0.18)', border: '1.5px solid rgba(255,200,60,0.35)',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            fontSize: '0.78rem', fontWeight: 800, color: '#FFD060',
+          }}>
+            BIZ
+          </div>
+          <div>
+            <div style={{ fontSize: '0.7rem', fontWeight: 800, color: '#FFD060', letterSpacing: '0.06em' }}>Biz Account</div>
+            <div style={{ fontSize: '0.55rem', color: 'rgba(255,200,60,0.55)', letterSpacing: '0.08em', textTransform: 'uppercase', marginTop: 1 }}>Internal funds held</div>
+          </div>
+        </div>
+        <div style={{ fontFamily: "'DM Mono',monospace", fontSize: '1rem', fontWeight: 600, color: bizBalance >= 0 ? '#7FFFD4' : '#FFB3C0' }}>
+          {fmtAmt(bizBalance, currency)}
+        </div>
+      </div>
+
       {/* Owing list */}
       {owing.length > 0 && (
         <div style={{
@@ -129,13 +182,13 @@ export function Dashboard({ txs, people, currency, onPersonFilter, onEdit, onDel
         </div>
       )}
 
-      {/* People Grid */}
+      {/* People Grid — members only (no biz, no owner) */}
       <div style={sh}>Balances by Person</div>
-      {nonOwners.length === 0 ? (
+      {members.length === 0 ? (
         <p style={{ fontSize: '0.78rem', color: '#9A9FB8', marginBottom: 16 }}>No staff added yet.</p>
       ) : (
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 16 }}>
-          {nonOwners.map(p => {
+          {members.map(p => {
             const { pIn, pOut, pBal } = pStats(p.id, txs);
             const c = pColor(p);
             return (
