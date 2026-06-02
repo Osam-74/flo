@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Drawer } from 'vaul';
 import { X, Info } from 'lucide-react';
 import { toast } from 'sonner';
@@ -75,6 +75,25 @@ export function AddEntrySheet({ open, onClose, people, currency, onSave, initial
   // Salary
   const [salPaidBy, setSalPaidBy] = useState('');
 
+  // Keyboard / viewport fix: track visualViewport to avoid form disappearing when keyboard closes
+  const scrollRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (!open) return;
+    const vv = (window as any).visualViewport;
+    if (!vv) return;
+    const onResize = () => {
+      if (scrollRef.current) {
+        scrollRef.current.style.maxHeight = `${vv.height - 80}px`;
+      }
+    };
+    vv.addEventListener('resize', onResize);
+    vv.addEventListener('scroll', onResize);
+    return () => {
+      vv.removeEventListener('resize', onResize);
+      vv.removeEventListener('scroll', onResize);
+    };
+  }, [open]);
+
   useEffect(() => { setType(initialType); }, [initialType]);
 
   useEffect(() => {
@@ -94,7 +113,6 @@ export function AddEntrySheet({ open, onClose, people, currency, onSave, initial
       if (!tfTo)        setTfTo(hu[0].id);
       if (!crSeller)    setCrSeller(hu[0].id);
       if (!frSender)    setFrSender(hu[0].id);
-      
     }
     const ow = owners(people);
     if (ow.length > 0) {
@@ -114,7 +132,6 @@ export function AddEntrySheet({ open, onClose, people, currency, onSave, initial
   const handleSave = () => {
     const id = 'tx_' + Date.now();
     const ts = Date.now();
-    const t = today();
 
     if (type === 'income' || type === 'expense') {
       const amt = parseFloat(amount) || 0;
@@ -220,8 +237,10 @@ export function AddEntrySheet({ open, onClose, people, currency, onSave, initial
           </div>
 
           {/* Scrollable body */}
-          <div style={{ overflowY: 'auto', flex: 1, padding: '0 16px 32px', WebkitOverflowScrolling: 'touch' }}>
-
+          <div
+            ref={scrollRef}
+            style={{ overflowY: 'auto', flex: 1, padding: '0 16px 32px', WebkitOverflowScrolling: 'touch' }}
+          >
             {/* Type switcher */}
             <div style={{ display: 'flex', gap: 7, overflowX: 'auto', paddingTop: 10, paddingBottom: 12, scrollbarWidth: 'none' as any }}>
               {TYPE_OPTS.map(opt => {
