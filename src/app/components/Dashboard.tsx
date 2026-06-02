@@ -98,7 +98,7 @@ export function Dashboard({ txs, people, currency, onPersonFilter, onEdit, onDel
         {/* Stats row */}
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 8, position: 'relative', zIndex: 1 }}>
           {[
-            { lbl: 'Total In',  val: fmtAmt(totalIn, ''),  col: '#7FFFD4', icon: <TrendingUp size={12} /> },
+            { lbl: 'Total In',  val: fmtAmt(totalIn, ''),  col: '#A8C4FF', icon: <TrendingUp size={12} /> },
             { lbl: 'Total Out', val: fmtAmt(totalOut, ''), col: '#FFB3C0', icon: <TrendingDown size={12} /> },
             { lbl: 'Entries',   val: String(txs.length),   col: '#B3D4FF', icon: <Hash size={12} /> },
           ].map(s => (
@@ -159,7 +159,7 @@ export function Dashboard({ txs, people, currency, onPersonFilter, onEdit, onDel
             <div style={{ fontSize: '0.55rem', color: 'rgba(255,200,60,0.55)', letterSpacing: '0.08em', textTransform: 'uppercase', marginTop: 1 }}>Internal funds held</div>
           </div>
         </div>
-        <div style={{ fontFamily: "'DM Mono',monospace", fontSize: '1rem', fontWeight: 600, color: bizBalance >= 0 ? '#7FFFD4' : '#FFB3C0' }}>
+        <div style={{ fontFamily: "'DM Mono',monospace", fontSize: '1rem', fontWeight: 600, color: bizBalance >= 0 ? '#A8C4FF' : '#FFB3C0' }}>
           {fmtAmt(bizBalance, currency)}
         </div>
       </div>
@@ -214,11 +214,11 @@ export function Dashboard({ txs, people, currency, onPersonFilter, onEdit, onDel
                 </div>
                 <div style={{ fontSize: '0.82rem', fontWeight: 700, color: '#1A1D2E', marginBottom: 2, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{p.name}</div>
                 <div style={{ fontSize: '0.58rem', color: '#9A9FB8', letterSpacing: '0.06em', textTransform: 'uppercase', marginBottom: 8 }}>{p.role}</div>
-                <div style={{ fontFamily: "'DM Mono',monospace", fontSize: '1rem', fontWeight: 600, color: pBal >= 0 ? '#00B87A' : '#E83E5C' }}>
+                <div style={{ fontFamily: "'DM Mono',monospace", fontSize: '1rem', fontWeight: 600, color: pBal >= 0 ? '#1A2FA8' : '#E83E5C' }}>
                   {fmtAmt(pBal, currency)}
                 </div>
                 <div style={{ display: 'flex', gap: 6, marginTop: 6, flexWrap: 'wrap' }}>
-                  <span style={{ fontSize: '0.56rem', fontWeight: 700, padding: '2px 8px', borderRadius: 6, background: 'rgba(0,184,122,0.12)', color: '#00B87A' }}>
+                  <span style={{ fontSize: '0.56rem', fontWeight: 700, padding: '2px 8px', borderRadius: 6, background: 'rgba(61,107,223,0.12)', color: '#3D6BDF' }}>
                     ↑ {fmtAmt(pIn, currency)}
                   </span>
                   <span style={{ fontSize: '0.56rem', fontWeight: 700, padding: '2px 8px', borderRadius: 6, background: 'rgba(232,62,92,0.12)', color: '#E83E5C' }}>
