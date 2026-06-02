@@ -243,18 +243,17 @@ export function AddEntrySheet({ open, onClose, people, currency, onSave, initial
                 </Field>
 
                 {type === 'income' && (
-                  <Field label="Buyer Name">
-                    <input style={inp} type="text" placeholder="Buyer's name (optional)"
-                      value={buyer} onChange={e => setBuyer(e.target.value)} />
-                  </Field>
-                )}
-
-                {type === 'income' && (
-                  <Field label="Money Received By">
-                    <Select value={receiver} onChange={setReceiver}>
-                      {nonOwners(people).map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
-                    </Select>
-                  </Field>
+                  <Row>
+                    <Field label="Buyer Name">
+                      <input style={inp} type="text" placeholder="Buyer's name (optional)"
+                        value={buyer} onChange={e => setBuyer(e.target.value)} />
+                    </Field>
+                    <Field label="Money Received By">
+                      <Select value={receiver} onChange={setReceiver}>
+                        {nonOwners(people).map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
+                      </Select>
+                    </Field>
+                  </Row>
                 )}
 
                 <Row>
