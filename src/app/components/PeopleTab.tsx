@@ -13,7 +13,7 @@ interface Props {
   onDelete: (id: string) => void;
 }
 
-const COLOR_OPTS = ['green', 'blue', 'gold', 'red', 'purple'];
+const COLOR_OPTS = ['green', 'blue', 'gold', 'purple', 'red'];
 
 export function PeopleTab({ people, txs, currency, isReadOnly, onAdd, onDelete }: Props) {
   const [name, setName]   = useState('');
