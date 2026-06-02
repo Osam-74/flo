@@ -62,8 +62,14 @@ export default function App() {
 
   /* ── PWA install ───────────────────────────── */
   useEffect(() => {
-    // removed PWA install prompt handling per site settings
-    return () => {};
+    const onBefore = (e: any) => { e.preventDefault(); promptRef.current = e; setInstallReady(true); };
+    const onInstalled = () => { promptRef.current = null; setInstallReady(false); toast.success('App installed!'); };
+    window.addEventListener('beforeinstallprompt', onBefore);
+    window.addEventListener('appinstalled', onInstalled);
+    return () => {
+      window.removeEventListener('beforeinstallprompt', onBefore);
+      window.removeEventListener('appinstalled', onInstalled);
+    };
   }, []);
 
   /* ── Service Worker ───────────────────────── */
@@ -368,10 +374,20 @@ export default function App() {
       {/* Header */}
       <AppHeader
         appMode={appMode}
-        installReady={false}
+        installReady={installReady}
         activeTab={activeTab}
         onLock={lock}
-        onInstall={() => { /* no-op */ }}
+        onInstall={async () => {
+          const p = promptRef.current;
+          if (!p) { toast('Open browser menu to install'); return; }
+          try {
+            p.prompt();
+            const choice = await p.userChoice;
+            if (choice && choice.outcome === 'accepted') toast.success('Thanks — app installed');
+            else toast('Install dismissed');
+          } catch (e) { console.warn('[Install]', e); }
+          promptRef.current = null; setInstallReady(false);
+        }}
         onTab={handleTab}
       />
 
