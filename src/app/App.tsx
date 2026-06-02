@@ -17,17 +17,17 @@ import { DeleteModal, EditModal, PaymentModal, ClearModal } from './components/M
 import type { Transaction, Person, Tab, AppMode, TxType } from './types';
 import { gs, ss, isOwner } from './utils';
 
-/* ── Firebase config (from environment) ───────── */
+/* ── Firebase config ──────────────────────────── */
 const FB = {
-  apiKey: import.meta.env.VITE_FIREBASE_API_KEY,
-  authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN,
-  projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID,
-  storageBucket: import.meta.env.VITE_FIREBASE_STORAGE_BUCKET,
-  messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID,
-  appId: import.meta.env.VITE_FIREBASE_APP_ID,
+  apiKey: "AIzaSyDEl6cN6IYqAZrbwIxW36tFudj8OzxVbpQ",
+  authDomain: "expense-4d9f5.firebaseapp.com",
+  projectId: "expense-4d9f5",
+  storageBucket: "expense-4d9f5.firebasestorage.app",
+  messagingSenderId: "323704270723",
+  appId: "1:323704270723:web:f5d7d6a2695d332937d0b6",
 };
-const FS_DOC = ['cashbook', 'main'] as const;
-const H_MASTER = import.meta.env.VITE_MASTER_HASH || '';
+const FS_DOC = ['cashbook','main'] as const;
+const H_MASTER = '84b2a5d834daee2fff7eb5e31f44ba68eb860d86d2cf8e37606a26fa775cf23b';
 
 export default function App() {
   /* ── Auth / session ──────────────────────── */
@@ -62,11 +62,8 @@ export default function App() {
 
   /* ── PWA install ───────────────────────────── */
   useEffect(() => {
-    const handler = (e: Event) => { e.preventDefault(); promptRef.current = e; setInstallReady(true); };
-    const installed = () => { promptRef.current = null; setInstallReady(false); toast.success('App installed!'); };
-    window.addEventListener('beforeinstallprompt', handler as any);
-    window.addEventListener('appinstalled', installed);
-    return () => { window.removeEventListener('beforeinstallprompt', handler as any); window.removeEventListener('appinstalled', installed); };
+    // removed PWA install prompt handling per site settings
+    return () => {};
   }, []);
 
   /* ── Service Worker ───────────────────────── */
@@ -327,6 +324,36 @@ export default function App() {
     </>
   );
 
+  // Export / Import handlers for settings
+  const exportData = () => {
+    const payload = { people, txs, currency };
+    const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url; a.download = 'cashbook-export.json'; document.body.appendChild(a); a.click(); a.remove(); URL.revokeObjectURL(url);
+  };
+
+  const importData = (file: File | null) => {
+    if (!file) return;
+    const fr = new FileReader();
+    fr.onload = () => {
+      try {
+        const obj = JSON.parse(String(fr.result || '{}'));
+        if (obj.people && obj.txs) {
+          setPeople(obj.people);
+          setTxs(obj.txs);
+          setCurrency(obj.currency || 'GHS');
+          ss('cb_people', obj.people); ss('cb_txs', obj.txs); ss('cb_currency', obj.currency || 'GHS');
+          dbSync(obj.people, obj.txs, obj.currency || 'GHS');
+          toast.success('Imported data');
+        } else {
+          toast.error('Invalid import file');
+        }
+      } catch (e) { toast.error('Import failed'); }
+    };
+    fr.readAsText(file);
+  };
+
   return (
     <div style={{
       position: 'fixed', inset: 0,
@@ -341,10 +368,10 @@ export default function App() {
       {/* Header */}
       <AppHeader
         appMode={appMode}
-        installReady={installReady}
+        installReady={false}
         activeTab={activeTab}
         onLock={lock}
-        onInstall={() => promptRef.current?.prompt()}
+        onInstall={() => { /* no-op */ }}
         onTab={handleTab}
       />
 
@@ -391,6 +418,8 @@ export default function App() {
             onSaveCurrency={saveCurrency}
             onPull={manualPull} onPush={manualPush}
             onClearAll={() => { if (!guardWrite()) return; setClearModal(true); }}
+            onExport={exportData}
+            onImport={(file) => { if (!guardWrite()) return; importData(file); }}
           />
         )}
       </div>

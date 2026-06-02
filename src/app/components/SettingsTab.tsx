@@ -9,6 +9,8 @@ interface Props {
   onPull: () => void;
   onPush: () => void;
   onClearAll: () => void;
+  onExport?: () => void;
+  onImport?: (file: File | null) => void;
 }
 
 export function SettingsTab({ currency, dbStatus, onSaveCurrency, onPull, onPush, onClearAll }: Props) {
@@ -63,14 +65,19 @@ export function SettingsTab({ currency, dbStatus, onSaveCurrency, onPull, onPush
         </button>
 
         <div style={{ background: '#F5F7FF', borderRadius: 12, padding: '14px', border: '1px solid rgba(0,0,0,0.06)' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
-            <Smartphone size={16} color="#3D6BDF" />
-            <span style={{ fontSize: '0.76rem', fontWeight: 700, color: '#1A1D2E' }}>Install as App</span>
+          <div style={{ display: 'flex', gap: 10, marginBottom: 8 }}>
+            <button onClick={() => onExport && onExport()} style={{ ...primaryBtn, flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8 }}>
+              <CloudDownload size={16} /> Export Data
+            </button>
+            <label style={{ flex: 1 }}>
+              <input type="file" accept="application/json" style={{ display: 'none' }} onChange={e => onImport && onImport(e.target.files ? e.target.files[0] : null)} />
+              <button style={{ ...primaryBtn, width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8 }}>
+                <CloudUpload size={16} /> Import Data
+              </button>
+            </label>
           </div>
           <div style={{ fontSize: '0.7rem', color: '#5A5F7A', lineHeight: 1.8 }}>
-            <strong>Desktop:</strong> Use the Install button in the header (Chrome/Edge).<br />
-            <strong>iOS Safari:</strong> Share → Add to Home Screen<br />
-            <strong>Android Chrome:</strong> Menu → Add to Home Screen
+            Use export to download a JSON backup of your data. Import will replace current data with the selected file.
           </div>
         </div>
       </div>
