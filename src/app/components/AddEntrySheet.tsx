@@ -24,7 +24,7 @@ const TYPE_OPTS: { id: TxType; emoji: string; label: string; color: string }[] =
   { id: 'salary',      emoji: '💙', label: 'Salary',      color: '#3D6BDF' },
   { id: 'transfer',    emoji: '🟡', label: 'Transfer',    color: '#E8A020' },
   { id: 'credit',      emoji: '🟣', label: 'Credit Sale', color: '#8B5CF6' },
-  { id: 'owner-fund',  emoji: '🟠', label: 'Owner Fund',  color: '#F07030' },
+  { id: 'owner-fund',  emoji: '🟠', label: 'Fund Injection',  color: '#F07030' },
   { id: 'fund-return', emoji: '🔵', label: 'Fund Return', color: '#00A8A0' },
 ];
 
@@ -153,7 +153,7 @@ export function AddEntrySheet({ open, onClose, people, currency, onSave, initial
       if (amt <= 0)    { toast.error('Enter amount'); return; }
       const sn = people.find(p => p.id === ofSender)?.name || 'Owner';
       const rn = people.find(p => p.id === ofReceiver)?.name || '?';
-      onSave({ id, ts, type, amount: amt, date: ofDate, ownerSender: ofSender, ownerReceiver: ofReceiver, person: ofReceiver, ownerName: sn, cat: 'Owner Fund', note: ofNote, desc: `Owner fund: ${sn} → ${rn}` });
+      onSave({ id, ts, type, amount: amt, date: ofDate, ownerSender: ofSender, ownerReceiver: ofReceiver, person: ofReceiver, ownerName: sn, cat: 'Fund Injection', note: ofNote, desc: `Fund injection: ${sn} → ${rn}` });
     }
     if (type === 'fund-return') {
       const amt = parseFloat(frAmt) || 0;
@@ -396,7 +396,7 @@ export function AddEntrySheet({ open, onClose, people, currency, onSave, initial
             {/* ── OWNER FUND ── */}
             {type === 'owner-fund' && (
               <div style={card}>
-                <InfoBox>🟠 Record money sent by an owner into the business.</InfoBox>
+                <InfoBox>🟠 Fund Injection — record money sent by an owner into the business.</InfoBox>
                 <Field label={`Amount (${currency}) *`}>
                   <input style={{ ...inp, fontSize: '1.5rem', fontFamily: "'DM Mono',monospace" }}
                     type="number" placeholder="0.00" min="0" step="0.01"

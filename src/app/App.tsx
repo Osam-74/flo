@@ -29,6 +29,8 @@ const FB = {
 const FS_DOC = ['cashbook','main'] as const;
 const H_MASTER = '84b2a5d834daee2fff7eb5e31f44ba68eb860d86d2cf8e37606a26fa775cf23b';
 
+const BIZ_ACCOUNT = { id: 'biz', name: 'Biz Account', role: 'biz', color: 'gold' };
+
 export default function App() {
   /* ── Auth / session ──────────────────────── */
   const [appMode, setAppMode] = useState<AppMode>('locked');
@@ -100,10 +102,13 @@ export default function App() {
   /* ── Firebase ─────────────────────────────── */
   const applyRemote = useCallback((r: any) => {
     const p = r.people ?? gs('cb_people', []);
+    // Ensure a Business Account entry exists so it can be selected as a receiver
+    const ppl = Array.isArray(p) ? p : [];
+    const withBiz = ppl.find((x: any) => x?.id === BIZ_ACCOUNT.id) ? ppl : [...ppl, BIZ_ACCOUNT];
     const t = r.txs    ?? gs('cb_txs',    []);
     const c = r.currency ?? gs('cb_currency', 'GHS');
-    setPeople(p); setTxs(t); setCurrency(c);
-    ss('cb_people', p); ss('cb_txs', t); ss('cb_currency', c);
+    setPeople(withBiz); setTxs(t); setCurrency(c);
+    ss('cb_people', withBiz); ss('cb_txs', t); ss('cb_currency', c);
     setDbStatus('✅ Live sync active. Last update: ' + new Date().toLocaleTimeString());
   }, []);
 
@@ -117,7 +122,10 @@ export default function App() {
       const ref = fs.doc(dbRef.current, ...FS_DOC);
       fs.onSnapshot(ref, (snap: any) => {
         if (!snap.exists()) {
-          setPeople(gs('cb_people', [])); setTxs(gs('cb_txs', [])); setCurrency(gs('cb_currency', 'GHS'));
+          const ppl = gs('cb_people', []);
+          const withBiz = (Array.isArray(ppl) && ppl.find((x: any) => x?.id === BIZ_ACCOUNT.id)) ? ppl : [...(Array.isArray(ppl) ? ppl : []), BIZ_ACCOUNT];
+          setPeople(withBiz); setTxs(gs('cb_txs', [])); setCurrency(gs('cb_currency', 'GHS'));
+          ss('cb_people', withBiz);
           setDbStatus('⚠️ No cloud data yet. Use ↑ Push Local to upload existing data.');
         } else {
           applyRemote(snap.data());
@@ -139,9 +147,12 @@ export default function App() {
     clearTimeout(syncRef.current);
     syncRef.current = setTimeout(async () => {
       try {
+        // Ensure Business account persists in cloud people list
+        const ppl = Array.isArray(nextPeople) ? nextPeople : [];
+        const withBiz = ppl.find(p => p.id === BIZ_ACCOUNT.id) ? ppl : [...ppl, BIZ_ACCOUNT];
         await fsRef.current.setDoc(
           fsRef.current.doc(dbRef.current, ...FS_DOC),
-          { txs: nextTxs, people: nextPeople, currency: nextCurrency, ts: Date.now(), _pinHash: H_MASTER }
+          { txs: nextTxs, people: withBiz, currency: nextCurrency, ts: Date.now(), _pinHash: H_MASTER }
         );
         setDbStatus('✅ Last sync: ' + new Date().toLocaleTimeString());
       } catch (e: any) {
@@ -243,6 +254,7 @@ export default function App() {
 
   const deletePerson = useCallback((id: string) => {
     if (!guardWrite()) return;
+    if (id === BIZ_ACCOUNT.id) { toast.error('Cannot delete Business Account'); return; }
     if (txs.some(t =>
       t.person === id || t.transferFrom === id || t.transferTo === id ||
       t.ownerSender === id || t.ownerReceiver === id || t.frSender === id ||
@@ -290,10 +302,11 @@ export default function App() {
 
   /* ── Clear all ────────────────────────────── */
   const executeFullClear = useCallback(() => {
-    const empty: Person[] = []; const emptyTxs: Transaction[] = [];
-    setPeople(empty); setTxs(emptyTxs); setCurrency('GHS');
-    ss('cb_people', empty); ss('cb_txs', emptyTxs); ss('cb_currency', 'GHS');
-    dbSync(empty, emptyTxs, 'GHS');
+    const emptyTxs: Transaction[] = [];
+    const peopleWithBiz: Person[] = [BIZ_ACCOUNT as any];
+    setPeople(peopleWithBiz); setTxs(emptyTxs); setCurrency('GHS');
+    ss('cb_people', peopleWithBiz); ss('cb_txs', emptyTxs); ss('cb_currency', 'GHS');
+    dbSync(peopleWithBiz, emptyTxs, 'GHS');
     toast.success('All data cleared');
   }, [dbSync]);
 
@@ -346,11 +359,13 @@ export default function App() {
       try {
         const obj = JSON.parse(String(fr.result || '{}'));
         if (obj.people && obj.txs) {
-          setPeople(obj.people);
+          const ppl = Array.isArray(obj.people) ? obj.people : [];
+          const withBiz = ppl.find((x: any) => x?.id === BIZ_ACCOUNT.id) ? ppl : [...ppl, BIZ_ACCOUNT];
+          setPeople(withBiz);
           setTxs(obj.txs);
           setCurrency(obj.currency || 'GHS');
-          ss('cb_people', obj.people); ss('cb_txs', obj.txs); ss('cb_currency', obj.currency || 'GHS');
-          dbSync(obj.people, obj.txs, obj.currency || 'GHS');
+          ss('cb_people', withBiz); ss('cb_txs', obj.txs); ss('cb_currency', obj.currency || 'GHS');
+          dbSync(withBiz, obj.txs, obj.currency || 'GHS');
           toast.success('Imported data');
         } else {
           toast.error('Invalid import file');

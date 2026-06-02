@@ -21,6 +21,11 @@ export function Dashboard({ txs, people, currency, onPersonFilter, onEdit, onDel
     else if (t.type === 'owner-fund')  { totalIn  += t.amount; ownerIn  += t.amount; }
     else if (t.type === 'fund-return') { totalOut += t.amount; ownerOut += t.amount; }
     else if (t.type === 'credit') totalIn += (t.creditPaid || 0);
+    else if (t.type === 'transfer') {
+      // Treat transfers to the business account as remittances (count as business in)
+      if (t.transferTo === 'biz') totalIn += t.amount;
+      if (t.transferFrom === 'biz') totalOut += t.amount;
+    }
   }
   const bal = totalIn - totalOut;
   const netOwner = ownerIn - ownerOut;
@@ -97,7 +102,7 @@ export function Dashboard({ txs, people, currency, onPersonFilter, onEdit, onDel
             display: 'flex', justifyContent: 'space-between', alignItems: 'center',
           }}>
             <span style={{ fontSize: '0.56rem', fontWeight: 700, letterSpacing: '0.1em', textTransform: 'uppercase', color: 'rgba(255,255,255,0.6)' }}>
-              🟠 Owner Cash Injected (net)
+              🟠 Fund Injection (net)
             </span>
             <span style={{ fontFamily: "'DM Mono',monospace", fontSize: '0.78rem', fontWeight: 500, color: '#FFD080' }}>
               {fmtAmt(netOwner, currency)}

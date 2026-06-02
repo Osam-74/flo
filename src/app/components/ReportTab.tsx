@@ -146,7 +146,7 @@ export function ReportTab({ txs, people, currency }: Props) {
               <option value="salary">Salary</option>
               <option value="transfer">Transfers</option>
               <option value="credit">Credit Sales</option>
-              <option value="owner-fund">Owner Funds</option>
+              <option value="owner-fund">Fund Injection</option>
               <option value="fund-return">Fund Returns</option>
             </Select>
           </Field>

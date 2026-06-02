@@ -108,7 +108,7 @@ export function PeopleTab({ people, txs, currency, isReadOnly, onAdd, onDelete }
             </div>
 
             <div style={{ background: '#F5F7FF', borderRadius: 10, padding: '10px 13px', fontSize: '0.72rem', color: '#5A5F7A', lineHeight: 1.6, marginBottom: 12 }}>
-              💡 Role <strong>"Owner"</strong> → appears only in Owner Fund & Fund Return fields.
+              💡 Role <strong>"Owner"</strong> → appears only in Fund Injection & Fund Return fields.
             </div>
 
             <div style={{ display: 'flex', gap: 8, marginBottom: 14, alignItems: 'center' }}>

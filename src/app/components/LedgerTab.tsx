@@ -22,7 +22,7 @@ const TYPE_FILTERS: { id: FilterType; label: string }[] = [
   { id: 'salary',      label: '💙 Salary' },
   { id: 'transfer',    label: '🟡 Transfer' },
   { id: 'credit',      label: '🟣 Credit' },
-  { id: 'owner-fund',  label: '🟠 Owner Fund' },
+  { id: 'owner-fund',  label: '🟠 Fund Injection' },
   { id: 'fund-return', label: '🔵 Fund Return' },
 ];
 
