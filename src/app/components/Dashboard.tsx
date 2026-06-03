@@ -78,8 +78,8 @@ export function Dashboard({ txs, people, currency, onPersonFilter, onEdit, onDel
     return !r.includes('owner') && p.id !== 'biz';
   });
 
-  // Total cash available: sum of positive balances only (exclude negative balances/debts)
-  let totalCashAvailable = 0;
+  // Total cash available: sum of positive member balances + biz account balance
+  let totalCashAvailable = bizBalance; // Include biz account
   for (const m of members) {
     const { pBal } = pStats(m.id, txs);
     if (pBal > 0) {
