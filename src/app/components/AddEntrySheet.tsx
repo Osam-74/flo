@@ -599,7 +599,7 @@ const inp: React.CSSProperties = {
 };
 
 const infoBox: React.CSSProperties = {
-  background: '#ffffff',
+  background: 'linear-gradient(135deg, #EEF2FF 0%, #DBEAFE 100%)',
   border: '1px solid rgba(61,107,223,0.18)',
   borderRadius: 10, padding: '10px 13px',
   fontSize: '0.72rem', color: '#1A2FA8', lineHeight: 1.6,
