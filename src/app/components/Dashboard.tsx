@@ -78,6 +78,15 @@ export function Dashboard({ txs, people, currency, onPersonFilter, onEdit, onDel
     return !r.includes('owner') && p.id !== 'biz';
   });
 
+  // Total cash available: sum of positive balances only (exclude negative balances/debts)
+  let totalCashAvailable = 0;
+  for (const m of members) {
+    const { pBal } = pStats(m.id, txs);
+    if (pBal > 0) {
+      totalCashAvailable += pBal;
+    }
+  }
+
   const recent = [...txs].sort((a, b) => (b.ts || 0) - (a.ts || 0)).slice(0, 5);
 
   const byBuyer: Record<string, { total: number; paid: number }> = {};
@@ -110,11 +119,11 @@ export function Dashboard({ txs, people, currency, onPersonFilter, onEdit, onDel
         </div>
         <div style={{
           fontFamily: "'DM Mono', monospace",
-          fontSize: bal < 0 ? '2rem' : '2.6rem',
-          fontWeight: 500, color: bal < 0 ? '#FFB3C0' : '#fff',
+          fontSize: totalCashAvailable < 0 ? '2rem' : '2.6rem',
+          fontWeight: 500, color: totalCashAvailable < 0 ? '#FFB3C0' : '#fff',
           letterSpacing: '-0.02em', lineHeight: 1, marginBottom: 20, position: 'relative', zIndex: 1,
         }}>
-          {fmtAmt(bal, currency)}
+          {fmtAmt(totalCashAvailable, currency)}
         </div>
 
         {/* Stats row */}
