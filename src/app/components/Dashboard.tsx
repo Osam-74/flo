@@ -178,7 +178,7 @@ export function Dashboard({ txs, people, currency, onPersonFilter, onEdit, onDel
           </div>
           <div>
             <div style={{ fontSize: '0.7rem', fontWeight: 800, color: '#1A2FA8', letterSpacing: '0.06em' }}>Biz Account</div>
-            <div style={{ fontSize: '0.55rem', color: '#7A8FC4', letterSpacing: '0.08em', textTransform: 'uppercase', marginTop: 1 }}>Internal funds held</div>
+            <div style={{ fontSize: '0.55rem', color: '#7A8FC4', letterSpacing: '0.08em', textTransform: 'uppercase', marginTop: 1 }}></div>
           </div>
         </div>
         <div style={{ fontFamily: "'DM Mono',monospace", fontSize: '1rem', fontWeight: 600, color: bizBalance >= 0 ? '#1A2FA8' : '#E83E5C' }}>
