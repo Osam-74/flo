@@ -600,7 +600,7 @@ const card: React.CSSProperties = {
 };
 
 const inp: React.CSSProperties = {
-  background: 'rgba(202,240,248,0.4)',
+  background: 'rgb(247, 248, 255, 0.4)',
   border: '1.5px solid rgba(0,119,182,0.2)',
   borderRadius: 10, padding: '10px 13px',
   fontSize: '0.88rem', color: '#03045E',
@@ -609,7 +609,7 @@ const inp: React.CSSProperties = {
 };
 
 const infoBox: React.CSSProperties = {
-  background: 'rgba(144,224,239,0.25)',
+  background: 'rgba(0,119,182,0.2)',
   border: '1px solid rgba(0,180,216,0.2)',
   borderRadius: 10, padding: '10px 13px',
   fontSize: '0.72rem', color: '#0077B6', lineHeight: 1.6,
