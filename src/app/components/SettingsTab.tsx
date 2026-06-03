@@ -46,10 +46,10 @@ export function SettingsTab({ currency, dbStatus, onSaveCurrency, onPull, onPush
         </div>
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
           <button onClick={onPull} style={{ ...primaryBtn, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 7 }}>
-            <CloudDownload size={16} /> Pull Cloud
+            <CloudDownload size={14} /> Pull Cloud
           </button>
           <button onClick={onPush} style={{ ...primaryBtn, background: 'linear-gradient(135deg, #2a4a9a, #3d6bdf)', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 7 }}>
-            <CloudUpload size={16} /> Push Local
+            <CloudUpload size={14} /> Push Local
           </button>
         </div>
       </div>
@@ -61,18 +61,18 @@ export function SettingsTab({ currency, dbStatus, onSaveCurrency, onPull, onPush
           onClick={onClearAll}
           style={{ ...primaryBtn, background: 'linear-gradient(135deg, #c0203a, #e83e5c)', marginBottom: 16, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8 }}
         >
-          <Trash2 size={16} /> Clear All Data
+          <Trash2 size={14} /> Clear All Data
         </button>
 
         <div style={{ background: '#F5F7FF', borderRadius: 12, padding: '14px', border: '1px solid rgba(0,0,0,0.06)' }}>
           <div style={{ display: 'flex', gap: 10, marginBottom: 8 }}>
             <button onClick={() => onExport && onExport()} style={{ ...primaryBtn, flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8 }}>
-              <CloudDownload size={16} /> Export Data
+              <CloudDownload size={14} /> Export Data
             </button>
             <label style={{ flex: 1 }}>
               <input type="file" accept="application/json" style={{ display: 'none' }} onChange={e => onImport && onImport(e.target.files ? e.target.files[0] : null)} />
               <button style={{ ...primaryBtn, width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8 }}>
-                <CloudUpload size={16} /> Import Data
+                <CloudUpload size={14} /> Import Data
               </button>
             </label>
           </div>
