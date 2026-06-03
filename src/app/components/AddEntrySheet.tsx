@@ -376,7 +376,7 @@ export function AddEntrySheet({ open, onClose, people, currency, onSave, initial
                     type="number" placeholder="0.00" min="0" step="0.01"
                     value={tfAmt} onChange={e => setTfAmt(e.target.value)} />
                 </Field>
-                <Row>
+                <Row gap={14}>
                   <Field label="Sent By *">
                     <Select value={tfFrom} onChange={setTfFrom}>
                       {no.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
@@ -465,12 +465,14 @@ export function AddEntrySheet({ open, onClose, people, currency, onSave, initial
             {type === 'owner-fund' && (
               <div style={card}>
                 <InfoBox>Record money sent by an owner into the business.</InfoBox>
-                <Field label={`Amount (${currency}) *`}>
-                  <input style={{ ...inp, fontSize: '1.5rem', fontFamily: "'DM Mono',monospace" }}
-                    type="number" placeholder="0.00" min="0" step="0.01"
-                    value={ofAmt} onChange={e => setOfAmt(e.target.value)} />
-                </Field>
-                <Row>
+                <div style={{ marginBottom: 14 }}>
+                  <Field label={`Amount (${currency}) *`}>
+                    <input style={{ ...inp, fontSize: '1.5rem', fontFamily: "'DM Mono',monospace" }}
+                      type="number" placeholder="0.00" min="0" step="0.01"
+                      value={ofAmt} onChange={e => setOfAmt(e.target.value)} />
+                  </Field>
+                </div>
+                <Row gap={14}>
                   <Field label="Date *">
                     <input style={inp} type="date" value={ofDate} onChange={e => setOfDate(e.target.value)} />
                   </Field>
@@ -479,7 +481,7 @@ export function AddEntrySheet({ open, onClose, people, currency, onSave, initial
                       value={ofNote} onChange={e => setOfNote(e.target.value)} />
                   </Field>
                 </Row>
-                <Row>
+                <Row gap={14}>
                   <Field label="Sent By (Owner) *">
                     <Select value={ofSender} onChange={setOfSender}>
                       {ow.length ? ow.map(p => <option key={p.id} value={p.id}>{p.name}</option>) : <option value="">— No owners —</option>}
@@ -498,12 +500,14 @@ export function AddEntrySheet({ open, onClose, people, currency, onSave, initial
             {type === 'fund-return' && (
               <div style={card}>
                 <InfoBox>Record unused money returned from the business back to an owner.</InfoBox>
-                <Field label={`Amount (${currency}) *`}>
-                  <input style={{ ...inp, fontSize: '1.5rem', fontFamily: "'DM Mono',monospace" }}
-                    type="number" placeholder="0.00" min="0" step="0.01"
-                    value={frAmt} onChange={e => setFrAmt(e.target.value)} />
-                </Field>
-                <Row>
+                <div style={{ marginBottom: 14 }}>
+                  <Field label={`Amount (${currency}) *`}>
+                    <input style={{ ...inp, fontSize: '1.5rem', fontFamily: "'DM Mono',monospace" }}
+                      type="number" placeholder="0.00" min="0" step="0.01"
+                      value={frAmt} onChange={e => setFrAmt(e.target.value)} />
+                  </Field>
+                </div>
+                <Row gap={14}>
                   <Field label="Date *">
                     <input style={inp} type="date" value={frDate} onChange={e => setFrDate(e.target.value)} />
                   </Field>
@@ -512,7 +516,7 @@ export function AddEntrySheet({ open, onClose, people, currency, onSave, initial
                       value={frNote} onChange={e => setFrNote(e.target.value)} />
                   </Field>
                 </Row>
-                <Row>
+                <Row gap={14}>
                   <Field label="Returned By *">
                     <Select value={frSender} onChange={setFrSender}>
                       {no.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
@@ -561,8 +565,8 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
   );
 }
 
-function Row({ children }: { children: React.ReactNode }) {
-  return <div style={{ display: 'flex', gap: 10, marginBottom: 10, flexWrap: 'wrap' }}>{children}</div>;
+function Row({ children, gap = 10 }: { children: React.ReactNode; gap?: number }) {
+  return <div style={{ display: 'flex', gap, marginBottom: 10, flexWrap: 'wrap' }}>{children}</div>;
 }
 
 function Select({ value, onChange, children }: { value: string; onChange: (v: string) => void; children: React.ReactNode }) {
