@@ -5,12 +5,13 @@ import type { Transaction, Person } from '../types';
 import { fmtDate, fmtN } from '../utils';
 
 interface Props {
+  businessName: string;
   txs: Transaction[];
   people: Person[];
   currency: string;
 }
 
-export function ReportTab({ txs, people, currency }: Props) {
+export function ReportTab({ businessName, txs, people, currency }: Props) {
   const today = new Date().toISOString().split('T')[0];
   const [from, setFrom]       = useState(today.slice(0, 7) + '-01');
   const [to, setTo]           = useState(today);
@@ -99,6 +100,9 @@ export function ReportTab({ txs, people, currency }: Props) {
     }
 
     let html = '';
+    if (businessName) {
+      html += `<div class="pdf-header">${esc(businessName)}</div>`;
+    }
     if (rType === 'all' || rType === 'expense' || rType === 'salary') html += makeExpenseTable(expenseTxs, 'Expenses', dateLabel);
     if (rType === 'all' || rType === 'income'  || rType === 'credit') html += makeSalesTable(salesTxs, 'Sales / Dispatch', dateLabel, true);
     if (rType === 'all' && (expenseTxs.length || salesTxs.length)) {
@@ -223,6 +227,7 @@ const printStyles = `
   .pdf-section { page-break-inside: avoid; }
 }
 .pdf-section { margin-bottom: 28px; }
+.pdf-header { font-size: 1.6rem; font-weight: 800; color: #1a2fa8; margin-bottom: 20px; letter-spacing: -0.01em; }
 .pdf-section-title { font-size: 1rem; font-weight: 800; color: #1a1a2e; margin-bottom: 2px; letter-spacing: -0.01em; }
 .pdf-section-sub { font-size: 0.7rem; color: #9a9fb8; margin-bottom: 10px; font-weight: 500; }
 .pdf-divider { border: none; border-top: 2px solid #1a1a2e; margin: 28px 0; }

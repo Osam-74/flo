@@ -371,11 +371,13 @@ export function AddEntrySheet({ open, onClose, people, currency, onSave, initial
             {type === 'transfer' && (
               <div style={card}>
                 <InfoBox>Record a mobile money or bank transfer made on behalf of the business.</InfoBox>
-                <Field label={`Amount (${currency}) *`}>
-                  <input style={{ ...inp, fontSize: '1.5rem', fontFamily: "'DM Mono',monospace" }}
-                    type="number" placeholder="0.00" min="0" step="0.01"
-                    value={tfAmt} onChange={e => setTfAmt(e.target.value)} />
-                </Field>
+                <div style={{ marginBottom: 14 }}>
+                  <Field label={`Amount (${currency}) *`}>
+                    <input style={{ ...inp, fontSize: '1.5rem', fontFamily: "'DM Mono',monospace" }}
+                      type="number" placeholder="0.00" min="0" step="0.01"
+                      value={tfAmt} onChange={e => setTfAmt(e.target.value)} />
+                  </Field>
+                </div>
                 <Row gap={14}>
                   <Field label="Sent By *">
                     <Select value={tfFrom} onChange={setTfFrom}>

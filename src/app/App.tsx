@@ -39,6 +39,7 @@ export default function App() {
   const [people,   setPeople]   = useState<Person[]>([]);
   const [txs,      setTxs]      = useState<Transaction[]>([]);
   const [currency, setCurrency] = useState('GHS');
+  const [businessName, setBusinessName] = useState('');
 
   /* ── UI state ─────────────────────────────── */
   const [activeTab,   setActiveTab]   = useState<Tab>('dashboard');
@@ -106,8 +107,9 @@ export default function App() {
     const withBiz = ppl.find((x: any) => x?.id === BIZ_ACCOUNT.id) ? ppl : [...ppl, BIZ_ACCOUNT];
     const t = r.txs    ?? gs('cb_txs',    []);
     const c = r.currency ?? gs('cb_currency', 'GHS');
-    setPeople(withBiz); setTxs(t); setCurrency(c);
-    ss('cb_people', withBiz); ss('cb_txs', t); ss('cb_currency', c);
+    const b = r.businessName ?? gs('cb_businessName', '');
+    setPeople(withBiz); setTxs(t); setCurrency(c); setBusinessName(b);
+    ss('cb_people', withBiz); ss('cb_txs', t); ss('cb_currency', c); ss('cb_businessName', b);
     setDbStatus('✅ Live sync active. Last update: ' + new Date().toLocaleTimeString());
   }, []);
 
@@ -123,7 +125,7 @@ export default function App() {
         if (!snap.exists()) {
           const ppl = gs('cb_people', []);
           const withBiz = (Array.isArray(ppl) && ppl.find((x: any) => x?.id === BIZ_ACCOUNT.id)) ? ppl : [...(Array.isArray(ppl) ? ppl : []), BIZ_ACCOUNT];
-          setPeople(withBiz); setTxs(gs('cb_txs', [])); setCurrency(gs('cb_currency', 'GHS'));
+          setPeople(withBiz); setTxs(gs('cb_txs', [])); setCurrency(gs('cb_currency', 'GHS')); setBusinessName(gs('cb_businessName', ''));
           ss('cb_people', withBiz);
           setDbStatus('⚠️ No cloud data yet. Use ↑ Push Local to upload existing data.');
         } else {
@@ -132,7 +134,7 @@ export default function App() {
       }, (err: any) => {
         console.warn('[DB]', err);
         setDbStatus('❌ Sync error: ' + err.code);
-        setPeople(gs('cb_people', [])); setTxs(gs('cb_txs', [])); setCurrency(gs('cb_currency', 'GHS'));
+        setPeople(gs('cb_people', [])); setTxs(gs('cb_txs', [])); setCurrency(gs('cb_currency', 'GHS')); setBusinessName(gs('cb_businessName', ''));
       });
     } catch (e) {
       console.warn('[DB] Firebase failed:', e);
@@ -277,6 +279,14 @@ export default function App() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [people, txs, dbSync, isReadOnly]);
 
+  /* ── Business Name ────────────────────────── */
+  const saveBusinessName = useCallback((name: string) => {
+    if (!guardWrite()) return;
+    setBusinessName(name);
+    ss('cb_businessName', name);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isReadOnly]);
+
   /* ── Cloud ────────────────────────────────── */
   const manualPull = async () => {
     if (!dbRef.current || !fsRef.current) { toast.error('Not connected'); return; }
@@ -408,7 +418,7 @@ export default function App() {
         <div style={{ flex: 1, overflowY: 'auto', WebkitOverflowScrolling: 'touch' as any }}>
           {activeTab === 'dashboard' && (
             <Dashboard
-              txs={txs} people={people} currency={currency}
+              businessName={businessName} txs={txs} people={people} currency={currency}
               onPersonFilter={handlePersonFilter}
               onEdit={tx => { if (!guardWrite()) return; setEditModal({ open: true, tx }); }}
               onDelete={(id, desc) => { if (!guardWrite()) return; setDeleteModal({ open: true, id, desc }); }}
@@ -439,12 +449,12 @@ export default function App() {
             />
           )}
           {activeTab === 'report' && (
-            <ReportTab txs={txs} people={people} currency={currency} />
+            <ReportTab businessName={businessName} txs={txs} people={people} currency={currency} />
           )}
           {activeTab === 'settings' && (
             <SettingsTab
-              currency={currency} dbStatus={dbStatus}
-              onSaveCurrency={saveCurrency}
+              currency={currency} businessName={businessName} dbStatus={dbStatus}
+              onSaveCurrency={saveCurrency} onSaveBusinessName={saveBusinessName}
               onPull={manualPull} onPush={manualPush}
               onClearAll={() => { if (!guardWrite()) return; setClearModal(true); }}
               onExport={exportData}

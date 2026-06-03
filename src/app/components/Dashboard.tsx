@@ -5,6 +5,7 @@ import { pColor, pInit, fmtAmt, pStats } from '../utils';
 import { TxItem } from './TxItem';
 
 interface Props {
+  businessName: string;
   txs: Transaction[];
   people: Person[];
   currency: string;
@@ -13,7 +14,7 @@ interface Props {
   onDelete: (id: string, desc: string) => void;
 }
 
-export function Dashboard({ txs, people, currency, onPersonFilter, onEdit, onDelete }: Props) {
+export function Dashboard({ businessName, txs, people, currency, onPersonFilter, onEdit, onDelete }: Props) {
   let totalIn = 0, totalOut = 0, ownerIn = 0, ownerOut = 0;
   for (const t of txs) {
     if (t.type === 'income')  totalIn  += t.amount;
@@ -102,6 +103,12 @@ export function Dashboard({ txs, people, currency, onPersonFilter, onEdit, onDel
 
   return (
     <div style={{ padding: '16px 16px 100px' }}>
+      {/* Business Name */}
+      {businessName && (
+        <div style={{ fontSize: '1.4rem', fontWeight: 800, color: '#1A2FA8', marginBottom: 16, letterSpacing: '-0.01em' }}>
+          {businessName}
+        </div>
+      )}
       {/* Balance Card */}
       <div style={{
         background: 'linear-gradient(135deg, #1A2FA8 0%, #3D6BDF 55%, #5580F0 100%)',

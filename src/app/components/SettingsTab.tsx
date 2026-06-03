@@ -4,8 +4,10 @@ import { CloudDownload, CloudUpload, Trash2, Smartphone } from 'lucide-react';
 
 interface Props {
   currency: string;
+  businessName: string;
   dbStatus: string;
   onSaveCurrency: (c: string) => void;
+  onSaveBusinessName: (name: string) => void;
   onPull: () => void;
   onPush: () => void;
   onClearAll: () => void;
@@ -13,8 +15,9 @@ interface Props {
   onImport?: (file: File | null) => void;
 }
 
-export function SettingsTab({ currency, dbStatus, onSaveCurrency, onPull, onPush, onClearAll }: Props) {
+export function SettingsTab({ currency, businessName, dbStatus, onSaveCurrency, onSaveBusinessName, onPull, onPush, onClearAll }: Props) {
   const [cur, setCur] = useState(currency);
+  const [bizName, setBizName] = useState(businessName);
 
   return (
     <div style={{ padding: '16px 16px 100px' }}>
@@ -31,6 +34,21 @@ export function SettingsTab({ currency, dbStatus, onSaveCurrency, onPull, onPush
           style={primaryBtn}
         >
           Save Currency
+        </button>
+      </div>
+
+      {/* Business Name */}
+      <div style={sh}>Business</div>
+      <div style={card}>
+        <Field label="Business Name">
+          <input style={inp} placeholder="e.g. My Farm, Smith Trading"
+            value={bizName} onChange={e => setBizName(e.target.value)} />
+        </Field>
+        <button
+          onClick={() => { onSaveBusinessName(bizName.trim()); toast.success('Business name updated'); }}
+          style={primaryBtn}
+        >
+          Save Business Name
         </button>
       </div>
 
@@ -113,7 +131,7 @@ const inp: React.CSSProperties = {
 };
 
 const primaryBtn: React.CSSProperties = {
-  width: '100%', padding: '13px', borderRadius: 12, fontSize: '0.78rem',
+  width: '100%', padding: '13px', borderRadius: 12, fontSize: '0.75rem',
   fontWeight: 700, letterSpacing: '0.06em', textTransform: 'uppercase',
   background: 'linear-gradient(135deg, #3D6BDF, #5A84FF)', color: '#fff',
   border: 'none', cursor: 'pointer', boxShadow: '0 4px 16px rgba(61,107,223,0.3)',
