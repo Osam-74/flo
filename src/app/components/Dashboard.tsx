@@ -81,8 +81,12 @@ export function Dashboard({ txs, people, currency, businessName, onPersonFilter,
 
   const recent = [...txs].sort((a, b) => (b.ts || 0) - (a.ts || 0)).slice(0, 5);
 
+  const todayStr = new Date().toISOString().split('T')[0];
   const byBuyer: Record<string, { total: number; paid: number }> = {};
   for (const t of txs.filter(t => t.type === 'credit')) {
+    // Skip future pickups — they haven't happened yet, amount may be unknown,
+    // and the buyer might pay on pickup, so don't count as outstanding yet.
+    if (t.isPickup && t.date > todayStr) continue;
     const b = t.creditBuyer || 'Unknown';
     if (!byBuyer[b]) byBuyer[b] = { total: 0, paid: 0 };
     byBuyer[b].total += t.creditTotal || 0;
@@ -93,7 +97,6 @@ export function Dashboard({ txs, people, currency, businessName, onPersonFilter,
     .filter(x => x.o > 0.005);
 
   // Upcoming egg pickups: credit txs with a future date and isPickup flag
-  const todayStr = new Date().toISOString().split('T')[0];
   const upcomingPickups = txs
     .filter(t => t.type === 'credit' && t.isPickup && t.date > todayStr)
     .sort((a, b) => (a.date || '').localeCompare(b.date || ''));
@@ -204,7 +207,7 @@ export function Dashboard({ txs, people, currency, businessName, onPersonFilter,
           background: 'rgba(61,107,223,0.06)', borderRadius: 14, padding: '12px 14px', marginBottom: 16,
           border: '1px solid rgba(61,107,223,0.18)',
         }}>
-          <div style={{ ...sh, color: '#1A2FA8' }}>📦 Awaiting Pickup</div>
+          <div style={{ ...sh, color: '#1A2FA8' }}>🥚 Awaiting Pickup</div>
           {upcomingPickups.map(t => (
             <div key={t.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6, padding: '6px 0', borderBottom: '1px solid rgba(61,107,223,0.08)' }}>
               <div>
