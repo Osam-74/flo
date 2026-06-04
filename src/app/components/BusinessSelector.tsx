@@ -6,8 +6,7 @@ import {
 } from 'lucide-react';
 import { sha256 } from '../utils';
 
-export const MASTER_ADMIN_HASH = '8d146af9e9ac06938e5292116f80ececf77541427baf0b9fd7b2483d23fe6577';
-export const BUSINESSES: any[] = [];
+const MASTER_ADMIN_HASH = '8d146af9e9ac06938e5292116f80ececf77541427baf0b9fd7b2483d23fe6577';
 
 export interface BizRecord {
   id: string;
