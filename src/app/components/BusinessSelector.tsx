@@ -527,9 +527,9 @@ export function BusinessSelector({
       ) : (
         /* ══ NORMAL SELECTOR ══ */
         <div style={{ width: '100%', maxWidth: 300, marginBottom: 16 }}>
-          <div style={{ fontSize: '0.6rem', fontWeight: 700, letterSpacing: '0.12em', textTransform: 'uppercase', color: '#9A9FB8', marginBottom: 8, textAlign: 'center' }}>Select Business</div>
+          <div style={{ fontSize: '0.6rem', fontWeight: 700, letterSpacing: '0.12em', textTransform: 'uppercase', color: '#9A9FB8', marginBottom: 8, textAlign: 'center' }}>Select Farm</div>
           {businesses.length === 0 ? (
-            <div style={{ textAlign: 'center', color: '#9A9FB8', fontSize: '0.82rem', padding: '20px 0' }}>No businesses registered yet</div>
+            <div style={{ textAlign: 'center', color: '#9A9FB8', fontSize: '0.82rem', padding: '20px 0' }}>No farm registered yet</div>
           ) : (
             <>
               <div style={{ position: 'relative' }}>
