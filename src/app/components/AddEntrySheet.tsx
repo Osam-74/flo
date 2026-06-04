@@ -12,6 +12,7 @@ interface Props {
   currency: string;
   onSave: (tx: Omit<Transaction, 'id' | 'ts'> & { id: string; ts: number }) => void;
   initialType?: TxType;
+  isReadOnly?: boolean;
 }
 
 const nonOwners = (people: Person[]) => people.filter(p => !p.role?.toLowerCase().includes('owner'));
@@ -36,7 +37,7 @@ const TYPE_OPTS: { id: TxType; emoji: string; label: string; color: string }[] =
 
 const CATS = ['', 'Feed & Supplies', 'Transport', 'Utilities', 'Equipment', 'Medical / Vet', 'Labour', 'Sales Revenue', 'Loan / Advance', 'Salary', 'Other'];
 
-export function AddEntrySheet({ open, onClose, people, currency, onSave, initialType = 'income' }: Props) {
+export function AddEntrySheet({ open, onClose, people, currency, onSave, initialType = 'income', isReadOnly = false }: Props) {
   const [type, setType] = useState<TxType>(initialType);
   const [amount, setAmount]     = useState('');
   const [person, setPerson]     = useState('');
@@ -329,8 +330,17 @@ export function AddEntrySheet({ open, onClose, people, currency, onSave, initial
               padding: '0 16px 40px',
               WebkitOverflowScrolling: 'touch',
               paddingBottom: 'max(40px, env(keyboard-inset-height, 0px))',
+              position: 'relative',
             }}
           >
+            {/* Read-only overlay — blocks all input interaction when in view mode */}
+            {isReadOnly && (
+              <div style={{
+                position: 'absolute', inset: 0, zIndex: 10,
+                cursor: 'not-allowed',
+                background: 'transparent',
+              }} />
+            )}
 
             {/* ── STANDARD (income / expense / salary) ── */}
             {isStandard && (
@@ -569,24 +579,38 @@ export function AddEntrySheet({ open, onClose, people, currency, onSave, initial
               </div>
             )}
 
-            {/* Save button */}
-            <button
-              onClick={handleSave}
-              style={{
+            {/* Save button — hidden/disabled in read-only mode */}
+            {isReadOnly ? (
+              <div style={{
                 width: '100%', padding: '15px', borderRadius: 14,
-                background: 'linear-gradient(135deg, #03045E, #0077B6)',
-                color: '#fff', border: 'none', cursor: 'pointer',
+                background: 'rgba(3,4,94,0.08)',
+                color: 'rgba(3,4,94,0.3)', border: 'none',
                 fontSize: '0.82rem', fontWeight: 800, letterSpacing: '0.06em', textTransform: 'uppercase',
-                boxShadow: '0 6px 20px rgba(0,119,182,0.45)',
-                marginTop: 8, transition: 'opacity 0.15s, transform 0.15s',
-              }}
-              onMouseEnter={e => { e.currentTarget.style.opacity = '0.9'; }}
-              onMouseLeave={e => { e.currentTarget.style.opacity = '1'; }}
-              onMouseDown={e => { e.currentTarget.style.transform = 'scale(0.98)'; }}
-              onMouseUp={e => { e.currentTarget.style.transform = 'scale(1)'; }}
-            >
-              Save Transaction
-            </button>
+                marginTop: 8, textAlign: 'center',
+                cursor: 'not-allowed',
+                boxShadow: 'none',
+              }}>
+                🔒 View Only
+              </div>
+            ) : (
+              <button
+                onClick={handleSave}
+                style={{
+                  width: '100%', padding: '15px', borderRadius: 14,
+                  background: 'linear-gradient(135deg, #03045E, #0077B6)',
+                  color: '#fff', border: 'none', cursor: 'pointer',
+                  fontSize: '0.82rem', fontWeight: 800, letterSpacing: '0.06em', textTransform: 'uppercase',
+                  boxShadow: '0 6px 20px rgba(0,119,182,0.45)',
+                  marginTop: 8, transition: 'opacity 0.15s, transform 0.15s',
+                }}
+                onMouseEnter={e => { e.currentTarget.style.opacity = '0.9'; }}
+                onMouseLeave={e => { e.currentTarget.style.opacity = '1'; }}
+                onMouseDown={e => { e.currentTarget.style.transform = 'scale(0.98)'; }}
+                onMouseUp={e => { e.currentTarget.style.transform = 'scale(1)'; }}
+              >
+                Save Transaction
+              </button>
+            )}
           </div>
         </Drawer.Content>
       </Drawer.Portal>
@@ -647,4 +671,5 @@ const infoBox: React.CSSProperties = {
   fontSize: '0.72rem', color: '#1A2FA8', lineHeight: 1.6,
   marginBottom: 10,
 };
+
 
