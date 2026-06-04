@@ -493,12 +493,10 @@ export default function App() {
 
   /* ── Tab switch ──────────────────────────────────── */
   const handleTab = (tab: Tab) => {
-    if (isReadOnly && tab === 'settings') { toast.error('🔒 View-only mode'); return; }
     setActiveTab(tab);
   };
 
   const openAdd = () => {
-    if (!guardWrite()) return;
     setAddInitType('income');
     setIsAddOpen(true);
   };
@@ -743,6 +741,7 @@ export default function App() {
           currency={currency}
           initialType={addInitType}
           onSave={saveTx}
+          isReadOnly={isReadOnly}
         />
 
         <DeleteModal
@@ -797,4 +796,5 @@ const globalCss = `
   ::-webkit-scrollbar-track { background: transparent; }
   ::-webkit-scrollbar-thumb { background: rgba(61,107,223,0.25); border-radius: 10px; }
 `;
+
 
