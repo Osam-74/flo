@@ -2,7 +2,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import {
   ChevronDown, Plus, Trash2, LogIn, ShieldCheck, X, Delete,
   Lock, Building2, Clock, KeyRound, CloudDownload, CloudUpload,
-  Settings2, RefreshCw
+  Settings2, RefreshCw, Pencil, Check
 } from 'lucide-react';
 import { sha256 } from '../utils';
 
@@ -26,6 +26,7 @@ interface Props {
   onCreateBusiness: (name: string, masterPin: string, viewPin?: string) => Promise<void>;
   onDeleteBusiness: (id: string) => Promise<void>;
   onResetPin: (bizId: string, newMasterPin: string, newViewPin?: string) => Promise<void>;
+  onRenameBusiness?: (bizId: string, newName: string) => Promise<void>;
   onExport?: (bizId: string) => void;
   onImport?: (bizId: string, file: File) => void;
   onClearData?: (bizId: string) => void;
@@ -344,7 +345,7 @@ function LiveClock() {
 ══════════════════════════════════════════════════ */
 export function BusinessSelector({
   onSelectBusiness, onMasterAdmin, onLogoutMasterAdmin,
-  businesses, onCreateBusiness, onDeleteBusiness, onResetPin,
+  businesses, onCreateBusiness, onDeleteBusiness, onResetPin, onRenameBusiness,
   onExport, onImport, onClearData, onPull, onPush,
   isMasterAdmin,
 }: Props) {
@@ -362,6 +363,9 @@ export function BusinessSelector({
   const [resetPinBiz, setResetPinBiz]         = useState<BizRecord | null>(null);
   const [settingsBiz, setSettingsBiz]         = useState<BizRecord | null>(null);
   const [deleteId, setDeleteId]               = useState<string | null>(null);
+  const [renameId, setRenameId]               = useState<string | null>(null);
+  const [renameName, setRenameName]           = useState('');
+  const [renaming, setRenaming]               = useState(false);
 
   useEffect(() => {
     if (businesses.length > 0 && !selected) setSelected(businesses[0].id);
@@ -448,7 +452,50 @@ export function BusinessSelector({
                       {biz.name.slice(0, 2).toUpperCase()}
                     </div>
                     <div>
-                      <div style={{ fontSize: '0.88rem', fontWeight: 700, color: '#1A1D2E' }}>{biz.name}</div>
+                      {renameId === biz.id ? (
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                          <input
+                            autoFocus
+                            value={renameName}
+                            onChange={e => setRenameName(e.target.value)}
+                            onKeyDown={async e => {
+                              if (e.key === 'Enter' && renameName.trim() && !renaming) {
+                                setRenaming(true);
+                                await onRenameBusiness?.(biz.id, renameName.trim());
+                                setRenaming(false); setRenameId(null);
+                              }
+                              if (e.key === 'Escape') setRenameId(null);
+                            }}
+                            style={{ fontSize: '0.84rem', fontWeight: 700, color: '#1A1D2E', border: '1.5px solid rgba(61,107,223,0.35)', borderRadius: 8, padding: '3px 8px', outline: 'none', width: 130, fontFamily: 'Plus Jakarta Sans, sans-serif' }}
+                          />
+                          <button
+                            disabled={renaming || !renameName.trim()}
+                            onClick={async () => {
+                              if (!renameName.trim() || renaming) return;
+                              setRenaming(true);
+                              await onRenameBusiness?.(biz.id, renameName.trim());
+                              setRenaming(false); setRenameId(null);
+                            }}
+                            style={{ background: 'rgba(61,107,223,0.12)', border: 'none', borderRadius: 7, padding: '4px 7px', cursor: 'pointer', display: 'flex', alignItems: 'center' }}
+                          >
+                            <Check size={13} color="#3D6BDF" />
+                          </button>
+                          <button onClick={() => setRenameId(null)} style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '4px 4px', display: 'flex', alignItems: 'center' }}>
+                            <X size={13} color="#9A9FB8" />
+                          </button>
+                        </div>
+                      ) : (
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
+                          <div style={{ fontSize: '0.88rem', fontWeight: 700, color: '#1A1D2E' }}>{biz.name}</div>
+                          <button
+                            onClick={() => { setRenameId(biz.id); setRenameName(biz.name); }}
+                            title="Rename business"
+                            style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '2px 3px', display: 'flex', alignItems: 'center', opacity: 0.55 }}
+                          >
+                            <Pencil size={11} color="#5A5F7A" />
+                          </button>
+                        </div>
+                      )}
                       <div style={{ display: 'flex', gap: 4, marginTop: 2 }}>
                         {biz.hasViewAccess && <span style={{ fontSize: '0.58rem', background: 'rgba(61,107,223,0.1)', color: '#3D6BDF', padding: '1px 6px', borderRadius: 4, fontWeight: 700 }}>+ view</span>}
                         {biz.createdAt && <span style={{ fontSize: '0.58rem', color: '#C0C5D8' }}>{new Date(biz.createdAt).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: '2-digit' })}</span>}
