@@ -1,13 +1,13 @@
 import React, { useState } from 'react';
 import { toast } from 'sonner';
-import { CloudDownload, CloudUpload, Trash2, Smartphone } from 'lucide-react';
+import { CloudDownload, CloudUpload, Trash2, Building2 } from 'lucide-react';
 
 interface Props {
   currency: string;
   businessName: string;
   dbStatus: string;
   onSaveCurrency: (c: string) => void;
-  onSaveBusinessName: (name: string) => void;
+  onSaveBusinessName: (name: string) => void; // kept for compat, not used in UI
   onPull: () => void;
   onPush: () => void;
   onClearAll: () => void;
@@ -15,19 +15,45 @@ interface Props {
   onImport?: (file: File | null) => void;
 }
 
-export function SettingsTab({ currency, businessName, dbStatus, onSaveCurrency, onSaveBusinessName, onPull, onPush, onClearAll }: Props) {
+export function SettingsTab({ currency, businessName, dbStatus, onSaveCurrency, onPull, onPush, onClearAll, onExport, onImport }: Props) {
   const [cur, setCur] = useState(currency);
-  const [bizName, setBizName] = useState(businessName);
 
   return (
     <div style={{ padding: '16px 16px 100px' }}>
+
+      {/* Active Business (read-only info) */}
+      <div style={sh}>Business</div>
+      <div style={card}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+          <div style={{
+            width: 40, height: 40, borderRadius: 12,
+            background: 'linear-gradient(135deg, #1A2FA8, #3D6BDF)',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            flexShrink: 0,
+          }}>
+            <Building2 size={18} color="#fff" />
+          </div>
+          <div>
+            <div style={{ fontSize: '0.9rem', fontWeight: 700, color: '#1A1D2E' }}>
+              {businessName || 'Unknown Business'}
+            </div>
+            <div style={{ fontSize: '0.68rem', color: '#9A9FB8', marginTop: 2 }}>
+              Business name is managed by the master admin
+            </div>
+          </div>
+        </div>
+      </div>
 
       {/* Currency */}
       <div style={sh}>Currency</div>
       <div style={card}>
         <Field label="Currency Symbol">
-          <input style={inp} placeholder="e.g. GHS, NGN, USD"
-            value={cur} onChange={e => setCur(e.target.value)} />
+          <input
+            style={inp}
+            placeholder="e.g. GHS, NGN, USD"
+            value={cur}
+            onChange={e => setCur(e.target.value)}
+          />
         </Field>
         <button
           onClick={() => { if (cur.trim()) { onSaveCurrency(cur.trim()); toast.success('Currency updated to ' + cur.trim()); } }}
@@ -37,28 +63,13 @@ export function SettingsTab({ currency, businessName, dbStatus, onSaveCurrency, 
         </button>
       </div>
 
-      {/* Business Name */}
-      <div style={sh}>Business</div>
-      <div style={card}>
-        <Field label="Business Name">
-          <input style={inp} placeholder="e.g. My Farm, Smith Trading"
-            value={bizName} onChange={e => setBizName(e.target.value)} />
-        </Field>
-        <button
-          onClick={() => { onSaveBusinessName(bizName.trim()); toast.success('Business name updated'); }}
-          style={primaryBtn}
-        >
-          Save Business Name
-        </button>
-      </div>
-
       {/* Cloud Sync */}
       <div style={sh}>Cloud Sync</div>
       <div style={card}>
         <div style={{
           fontSize: '0.78rem', color: '#5A5F7A', marginBottom: 14, lineHeight: 1.7,
           padding: '10px 12px', background: '#F5F7FF', borderRadius: 10,
-          border: '1px solid rgba(0,0,0,0.06)',
+          border: '1px solid rgba(61,107,223,0.1)',
         }}>
           {dbStatus}
         </div>
@@ -72,7 +83,7 @@ export function SettingsTab({ currency, businessName, dbStatus, onSaveCurrency, 
         </div>
       </div>
 
-      {/* Data */}
+      {/* Data Management */}
       <div style={sh}>Data Management</div>
       <div style={card}>
         <button
@@ -82,20 +93,29 @@ export function SettingsTab({ currency, businessName, dbStatus, onSaveCurrency, 
           <Trash2 size={14} /> Clear All Data
         </button>
 
-        <div style={{ background: '#F5F7FF', borderRadius: 12, padding: '14px', border: '1px solid rgba(0,0,0,0.06)' }}>
+        <div style={{ background: '#F5F7FF', borderRadius: 12, padding: '14px', border: '1px solid rgba(61,107,223,0.08)' }}>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 8 }}>
-            <button onClick={() => onExport && onExport()} style={{ ...primaryBtn, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8 }}>
-              <CloudDownload size={14} /> Export Data
+            <button
+              onClick={() => onExport && onExport()}
+              style={{ ...primaryBtn, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8 }}
+            >
+              <CloudDownload size={14} /> Export
             </button>
             <label style={{ width: '100%' }}>
-              <input type="file" accept="application/json" style={{ display: 'none' }} onChange={e => onImport && onImport(e.target.files ? e.target.files[0] : null)} />
-              <button style={{ ...primaryBtn, width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8 }}>
-                <CloudUpload size={14} /> Import Data
+              <input
+                type="file" accept="application/json" style={{ display: 'none' }}
+                onChange={e => onImport && onImport(e.target.files ? e.target.files[0] : null)}
+              />
+              <button
+                style={{ ...primaryBtn, width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8 }}
+                onClick={e => { (e.currentTarget.previousElementSibling as HTMLInputElement)?.click(); }}
+              >
+                <CloudUpload size={14} /> Import
               </button>
             </label>
           </div>
           <div style={{ fontSize: '0.7rem', color: '#5A5F7A', lineHeight: 1.8 }}>
-            Use export to download a JSON backup of your data. Import will replace current data with the selected file.
+            Export downloads a JSON backup. Import replaces current data.
           </div>
         </div>
       </div>
@@ -116,20 +136,17 @@ const sh: React.CSSProperties = {
   fontSize: '0.62rem', fontWeight: 800, letterSpacing: '0.14em',
   textTransform: 'uppercase', color: '#9A9FB8', marginBottom: 10,
 };
-
 const card: React.CSSProperties = {
   background: '#fff', borderRadius: 18, padding: 18, marginBottom: 20,
   boxShadow: '0 1px 3px rgba(0,0,0,0.07), 0 4px 16px rgba(0,0,0,0.04)',
-  border: '1px solid rgba(0,0,0,0.05)',
+  border: '1px solid rgba(61,107,223,0.08)',
 };
-
 const inp: React.CSSProperties = {
-  background: '#F5F7FF', border: '1.5px solid rgba(0,0,0,0.08)',
+  background: '#ffffff', border: '1.5px solid rgba(61,107,223,0.2)',
   borderRadius: 10, padding: '10px 13px', fontSize: '0.88rem',
-  color: '#1A1D2E', width: '100%', fontFamily: "'DM Mono',monospace",
+  color: '#1A1D2E', width: '100%', fontFamily: "'DM Mono', monospace",
   outline: 'none',
 };
-
 const primaryBtn: React.CSSProperties = {
   width: '100%', padding: '13px', borderRadius: 12, fontSize: '0.75rem',
   fontWeight: 700, letterSpacing: '0.06em', textTransform: 'uppercase',

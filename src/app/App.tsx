@@ -3,7 +3,8 @@ import { Toaster, toast } from 'sonner';
 import '../styles/fonts.css';
 
 import { PinScreen }      from './components/PinScreen';
-import { BusinessSelector, BUSINESSES } from './components/BusinessSelector';
+import { BusinessSelector, MASTER_ADMIN_HASH } from './components/BusinessSelector';
+import type { BizRecord } from './components/BusinessSelector';
 import { AppHeader }      from './components/AppHeader';
 import { BottomNav }      from './components/BottomNav';
 import { Dashboard }      from './components/Dashboard';
@@ -16,9 +17,9 @@ import { SettingsTab }    from './components/SettingsTab';
 import { DeleteModal, EditModal, PaymentModal, ClearModal } from './components/Modals';
 
 import type { Transaction, Person, Tab, AppMode, TxType } from './types';
-import { gs, ss, isOwner } from './utils';
+import { gs, ss, sha256 } from './utils';
 
-/* ── Firebase config ──────────────────────────── */
+/* ── Firebase config ───────────────────────────────── */
 const FB = {
   apiKey: "AIzaSyDEl6cN6IYqAZrbwIxW36tFudj8OzxVbpQ",
   authDomain: "expense-4d9f5.firebaseapp.com",
@@ -27,22 +28,34 @@ const FB = {
   messagingSenderId: "323704270723",
   appId: "1:323704270723:web:f5d7d6a2695d332937d0b6",
 };
-// FS_DOC is now dynamic per business — resolved in initFirebase
-const H_MASTER = '84b2a5d834daee2fff7eb5e31f44ba68eb860d86d2cf8e37606a26fa775cf23b';
+
+/* Firestore collection for the business registry */
+const REGISTRY_DOC = ['cashbook_meta', 'businesses'];
 
 const BIZ_ACCOUNT = { id: 'biz', name: 'Biz Account', role: 'biz', color: 'gold' };
 
-export default function App() {
-  /* ── Auth / session ──────────────────────── */
-  const [appMode, setAppMode] = useState<AppMode>('locked');
-  const [selectedBusinessId, setSelectedBusinessId] = useState<string | null>(null);
+/* ── Screen states ─────────────────────────────────── */
+type Screen = 'selector' | 'pin' | 'app';
 
-  /* ── Data ──────────────────────────────────── */
+export default function App() {
+  /* ── Screen / session ────────────────────────── */
+  const [screen, setScreen] = useState<Screen>('selector');
+  const [appMode, setAppMode] = useState<AppMode>('locked');
+  const [isMasterAdmin, setIsMasterAdmin] = useState(false);
+
+  /* ── Business registry (loaded from Firestore) ── */
+  const [businesses, setBusinesses] = useState<BizRecord[]>([]);
+  const [bizLoading, setBizLoading] = useState(true);
+
+  /* ── Selected business ─────────────────────────── */
+  const [selectedBiz, setSelectedBiz] = useState<BizRecord | null>(null);
+
+  /* ── Business data ─────────────────────────────── */
   const [people,   setPeople]   = useState<Person[]>([]);
   const [txs,      setTxs]      = useState<Transaction[]>([]);
   const [currency, setCurrency] = useState('GHS');
 
-  /* ── UI state ─────────────────────────────── */
+  /* ── UI state ──────────────────────────────────── */
   const [activeTab,   setActiveTab]   = useState<Tab>('dashboard');
   const [isAddOpen,   setIsAddOpen]   = useState(false);
   const [addInitType, setAddInitType] = useState<TxType>('income');
@@ -50,21 +63,23 @@ export default function App() {
   const [installReady, setInstallReady] = useState(false);
   const [personFilterForLedger, setPersonFilterForLedger] = useState('all');
 
-  /* ── Modal states ─────────────────────────── */
+  /* ── Modal states ──────────────────────────────── */
   const [deleteModal, setDeleteModal] = useState<{ open: boolean; id: string; desc: string }>({ open: false, id: '', desc: '' });
   const [editModal,   setEditModal]   = useState<{ open: boolean; tx: Transaction | null }>({ open: false, tx: null });
   const [payModal,    setPayModal]    = useState<{ open: boolean; buyer: string }>({ open: false, buyer: '' });
   const [clearModal,  setClearModal]  = useState(false);
 
-  /* ── Refs ─────────────────────────────────── */
-  const dbRef   = useRef<any>(null);
-  const fsRef   = useRef<any>(null);
-  const syncRef = useRef<ReturnType<typeof setTimeout>>();
+  /* ── Refs ──────────────────────────────────────── */
+  const dbRef    = useRef<any>(null);
+  const fsRef    = useRef<any>(null);
+  const syncRef  = useRef<ReturnType<typeof setTimeout>>();
   const promptRef = useRef<any>(null);
+  const bizUnsubRef = useRef<any>(null); // unsubscribe for biz data listener
+  const regUnsubRef = useRef<any>(null); // unsubscribe for registry listener
 
   const isReadOnly = appMode === 'view';
 
-  /* ── PWA install ───────────────────────────── */
+  /* ── PWA install ────────────────────────────────── */
   useEffect(() => {
     const onBefore = (e: any) => { e.preventDefault(); promptRef.current = e; setInstallReady(true); };
     const onInstalled = () => { promptRef.current = null; setInstallReady(false); };
@@ -76,7 +91,7 @@ export default function App() {
     };
   }, []);
 
-  /* ── Service Worker ───────────────────────── */
+  /* ── Service Worker ─────────────────────────────── */
   useEffect(() => {
     if ('serviceWorker' in navigator) {
       navigator.serviceWorker.register('/flo/sw.js', { scope: '/flo/' })
@@ -94,103 +109,183 @@ export default function App() {
     }
   }, []);
 
-  /* ── Auto-restore session ─────────────────── */
-  useEffect(() => {
-    const s = sessionStorage.getItem('cb_s');
-    const bId = sessionStorage.getItem('cb_biz') || BUSINESSES[0].id;
-    if (s === 'master' || s === 'view') {
-      setSelectedBusinessId(bId);
-      unlock(s === 'master' ? 'master' : 'view', bId);
-    }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-
-  /* ── Firebase ─────────────────────────────── */
-  const applyRemote = useCallback((r: any) => {
-    const p = r.people ?? gs('cb_people', []);
-    const ppl = Array.isArray(p) ? p : [];
-    const withBiz = ppl.find((x: any) => x?.id === BIZ_ACCOUNT.id) ? ppl : [...ppl, BIZ_ACCOUNT];
-    const t = r.txs    ?? gs('cb_txs',    []);
-    const c = r.currency ?? gs('cb_currency', 'GHS');
-    setPeople(withBiz); setTxs(t); setCurrency(c);
-    ss('cb_people', withBiz); ss('cb_txs', t); ss('cb_currency', c);
-    setDbStatus('✅ Live sync active. Last update: ' + new Date().toLocaleTimeString());
-  }, []);
-
-  const initFirebase = useCallback(async (bizId?: string) => {
+  /* ── Init Firebase & load business registry ─────── */
+  const initFirebase = useCallback(async () => {
     try {
       const { initializeApp, getApps } = await import('https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js' as any);
       const fs = await import('https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js' as any);
       fsRef.current = fs;
       const app = getApps().length === 0 ? initializeApp(FB) : getApps()[0];
       dbRef.current = fs.getFirestore(app);
-      const activeBiz = BUSINESSES.find(b => b.id === (bizId || selectedBusinessId)) || BUSINESSES[0];
-      const [col, doc] = activeBiz.fsDoc.split('/');
-      const ref = fs.doc(dbRef.current, col, doc);
-      fs.onSnapshot(ref, (snap: any) => {
-        if (!snap.exists()) {
-          const ppl = gs('cb_people', []);
-          const withBiz = (Array.isArray(ppl) && ppl.find((x: any) => x?.id === BIZ_ACCOUNT.id)) ? ppl : [...(Array.isArray(ppl) ? ppl : []), BIZ_ACCOUNT];
-          setPeople(withBiz); setTxs(gs('cb_txs', [])); setCurrency(gs('cb_currency', 'GHS'));
-          ss('cb_people', withBiz);
-          setDbStatus('⚠️ No cloud data yet. Use ↑ Push Local to upload existing data.');
+
+      // Listen to business registry
+      const regRef = fs.doc(dbRef.current, REGISTRY_DOC[0], REGISTRY_DOC[1]);
+      if (regUnsubRef.current) regUnsubRef.current();
+      regUnsubRef.current = fs.onSnapshot(regRef, (snap: any) => {
+        if (snap.exists()) {
+          const data = snap.data();
+          const list: BizRecord[] = data.businesses ?? [];
+          setBusinesses(list);
         } else {
-          applyRemote(snap.data());
+          setBusinesses([]);
         }
-      }, (err: any) => {
-        console.warn('[DB]', err);
-        setDbStatus('❌ Sync error: ' + err.code);
-        setPeople(gs('cb_people', [])); setTxs(gs('cb_txs', [])); setCurrency(gs('cb_currency', 'GHS'));
-      });
+        setBizLoading(false);
+      }, () => setBizLoading(false));
+
     } catch (e) {
       console.warn('[DB] Firebase failed:', e);
-      setDbStatus('⚠️ Cloud unavailable — working offline.');
-      setPeople(gs('cb_people', [])); setTxs(gs('cb_txs', [])); setCurrency(gs('cb_currency', 'GHS'));
+      setBizLoading(false);
     }
+  }, []);
+
+  useEffect(() => {
+    initFirebase();
+    return () => {
+      if (regUnsubRef.current) regUnsubRef.current();
+      if (bizUnsubRef.current) bizUnsubRef.current();
+    };
+  }, [initFirebase]);
+
+  /* ── Auto-restore session ────────────────────────── */
+  useEffect(() => {
+    if (bizLoading) return;
+    const s   = sessionStorage.getItem('cb_s');
+    const bId = sessionStorage.getItem('cb_biz');
+    const master = sessionStorage.getItem('cb_master');
+    if (master === '1') {
+      setIsMasterAdmin(true);
+      return;
+    }
+    if ((s === 'master' || s === 'view') && bId) {
+      const biz = businesses.find(b => b.id === bId);
+      if (biz) {
+        setSelectedBiz(biz);
+        unlockBiz(biz, s === 'master' ? 'master' : 'view');
+      }
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [bizLoading]);
+
+  /* ── Apply remote data ───────────────────────────── */
+  const applyRemote = useCallback((r: any) => {
+    const p = r.people ?? gs('cb_people', []);
+    const ppl = Array.isArray(p) ? p : [];
+    const withBiz = ppl.find((x: any) => x?.id === BIZ_ACCOUNT.id) ? ppl : [...ppl, BIZ_ACCOUNT];
+    const t = r.txs     ?? gs('cb_txs', []);
+    const c = r.currency ?? gs('cb_currency', 'GHS');
+    setPeople(withBiz); setTxs(t); setCurrency(c);
+    ss('cb_people', withBiz); ss('cb_txs', t); ss('cb_currency', c);
+    setDbStatus('✅ Live sync active. Last update: ' + new Date().toLocaleTimeString());
+  }, []);
+
+  /* ── Subscribe to business data ──────────────────── */
+  const subscribeToBiz = useCallback((biz: BizRecord) => {
+    if (!dbRef.current || !fsRef.current) return;
+    if (bizUnsubRef.current) bizUnsubRef.current();
+    const [col, doc] = biz.fsDoc.split('/');
+    const ref = fsRef.current.doc(dbRef.current, col, doc);
+    bizUnsubRef.current = fsRef.current.onSnapshot(ref, (snap: any) => {
+      if (!snap.exists()) {
+        const ppl = gs('cb_people', []);
+        const withBiz = (Array.isArray(ppl) && ppl.find((x: any) => x?.id === BIZ_ACCOUNT.id)) ? ppl : [...(Array.isArray(ppl) ? ppl : []), BIZ_ACCOUNT];
+        setPeople(withBiz); setTxs(gs('cb_txs', [])); setCurrency(gs('cb_currency', 'GHS'));
+        ss('cb_people', withBiz);
+        setDbStatus('⚠️ No cloud data yet.');
+      } else {
+        applyRemote(snap.data());
+      }
+    }, (err: any) => {
+      console.warn('[DB]', err);
+      setDbStatus('❌ Sync error: ' + err.code);
+      setPeople(gs('cb_people', [])); setTxs(gs('cb_txs', [])); setCurrency(gs('cb_currency', 'GHS'));
+    });
   }, [applyRemote]);
 
+  /* ── DB sync (debounced write) ───────────────────── */
   const dbSync = useCallback((nextPeople: Person[], nextTxs: Transaction[], nextCurrency: string) => {
-    if (!dbRef.current || !fsRef.current) return;
+    if (!dbRef.current || !fsRef.current || !selectedBiz) return;
     clearTimeout(syncRef.current);
     syncRef.current = setTimeout(async () => {
       try {
         const ppl = Array.isArray(nextPeople) ? nextPeople : [];
         const withBiz = ppl.find(p => p.id === BIZ_ACCOUNT.id) ? ppl : [...ppl, BIZ_ACCOUNT];
-        const activeBiz = BUSINESSES.find(b => b.id === selectedBusinessId) || BUSINESSES[0];
-        const [col, doc] = activeBiz.fsDoc.split('/');
+        const [col, doc] = selectedBiz.fsDoc.split('/');
         await fsRef.current.setDoc(
           fsRef.current.doc(dbRef.current, col, doc),
-          { txs: nextTxs, people: withBiz, currency: nextCurrency, ts: Date.now(), _pinHash: H_MASTER }
+          { txs: nextTxs, people: withBiz, currency: nextCurrency, ts: Date.now() }
         );
         setDbStatus('✅ Last sync: ' + new Date().toLocaleTimeString());
       } catch (e: any) {
         setDbStatus('❌ Sync failed: ' + e.message);
       }
     }, 800);
-  }, []);
+  }, [selectedBiz]);
 
-  /* ── Unlock ───────────────────────────────── */
-  const unlock = useCallback((mode: 'master' | 'view', bizId?: string) => {
+  /* ── Unlock a business ───────────────────────────── */
+  const unlockBiz = useCallback((biz: BizRecord, mode: 'master' | 'view') => {
     setAppMode(mode);
-    initFirebase(bizId || selectedBusinessId || BUSINESSES[0].id);
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [initFirebase, selectedBusinessId]);
+    setScreen('app');
+    subscribeToBiz(biz);
+    sessionStorage.setItem('cb_s',   mode);
+    sessionStorage.setItem('cb_biz', biz.id);
+  }, [subscribeToBiz]);
 
   const lock = useCallback(() => {
-    sessionStorage.removeItem('cb_s');
-    sessionStorage.removeItem('cb_biz');
+    sessionStorage.clear();
+    setScreen('selector');
     setAppMode('locked');
-    setSelectedBusinessId(null);
+    setIsMasterAdmin(false);
+    setSelectedBiz(null);
     setPeople([]); setTxs([]); setCurrency('GHS');
+    if (bizUnsubRef.current) bizUnsubRef.current();
   }, []);
 
-  /* ── Guard ────────────────────────────────── */
+  /* ── Guard write ─────────────────────────────────── */
   const guardWrite = (): boolean => {
     if (isReadOnly) { toast.error('🔒 View-only mode'); return false; }
     return true;
   };
 
-  /* ── Save transaction ─────────────────────── */
+  /* ── Save business registry to Firestore ─────────── */
+  const saveRegistry = useCallback(async (list: BizRecord[]) => {
+    if (!dbRef.current || !fsRef.current) return;
+    const ref = fsRef.current.doc(dbRef.current, REGISTRY_DOC[0], REGISTRY_DOC[1]);
+    await fsRef.current.setDoc(ref, { businesses: list });
+  }, []);
+
+  /* ── Create business ─────────────────────────────── */
+  const handleCreateBusiness = useCallback(async (name: string, masterPin: string, viewPin?: string) => {
+    const masterHash = await sha256(masterPin);
+    const viewHash   = viewPin ? await sha256(viewPin) : undefined;
+    const id = 'biz_' + Date.now();
+    const fsDoc = `cashbook/${id}`;
+    const newBiz: BizRecord = {
+      id, name, masterHash, viewHash, fsDoc,
+      hasViewAccess: !!viewPin,
+      createdAt: Date.now(),
+    };
+    const updated = [...businesses, newBiz];
+    await saveRegistry(updated);
+    toast.success(`"${name}" created!`);
+  }, [businesses, saveRegistry]);
+
+  /* ── Delete business ─────────────────────────────── */
+  const handleDeleteBusiness = useCallback(async (bizId: string) => {
+    const biz = businesses.find(b => b.id === bizId);
+    if (!biz) return;
+    // Delete Firestore data document
+    if (dbRef.current && fsRef.current) {
+      try {
+        const [col, doc] = biz.fsDoc.split('/');
+        await fsRef.current.deleteDoc(fsRef.current.doc(dbRef.current, col, doc));
+      } catch (e) { console.warn('Delete data failed:', e); }
+    }
+    const updated = businesses.filter(b => b.id !== bizId);
+    await saveRegistry(updated);
+    toast.success(`"${biz.name}" deleted`);
+  }, [businesses, saveRegistry]);
+
+  /* ── Transactions ────────────────────────────────── */
   const saveTx = useCallback((tx: Transaction) => {
     if (!guardWrite()) return;
     setTxs(prev => {
@@ -204,7 +299,6 @@ export default function App() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [people, currency, dbSync, isReadOnly]);
 
-  /* ── Delete transaction ───────────────────── */
   const confirmDelete = useCallback(() => {
     setTxs(prev => {
       const next = prev.filter(t => t.id !== deleteModal.id);
@@ -216,7 +310,6 @@ export default function App() {
     toast.success('Transaction deleted');
   }, [deleteModal.id, people, currency, dbSync]);
 
-  /* ── Edit transaction ─────────────────────── */
   const confirmEdit = useCallback((id: string, updates: Partial<Transaction>) => {
     setTxs(prev => {
       const next = prev.map(t => t.id === id ? { ...t, ...updates } : t);
@@ -224,32 +317,43 @@ export default function App() {
       dbSync(people, next, currency);
       return next;
     });
-    toast.success('Updated');
   }, [people, currency, dbSync]);
 
-  /* ── Credit payment ───────────────────────── */
-  const confirmPayment = useCallback((amount: number, date: string, receiver: string) => {
-    const rName = people.find(p => p.id === receiver)?.name || '?';
+  /* ── Credit payment ──────────────────────────────── */
+  const confirmPayment = useCallback((buyer: string, amount: number, receiver: string, receiverName: string, note: string) => {
+    const date = new Date().toISOString().slice(0, 10);
     setTxs(prev => {
-      let remaining = amount;
       const next = prev.map(t => {
-        if (t.type !== 'credit' || (t.creditBuyer || 'Unknown') !== payModal.buyer) return t;
-        if (remaining <= 0) return t;
-        const owed = Math.max(0, (t.creditTotal || 0) - (t.creditPaid || 0));
-        if (owed <= 0) return t;
-        const alloc = Math.min(owed, remaining);
-        remaining -= alloc;
-        const payments = [...(t.payments || []), { amount: alloc, receiver, receiverName: rName, date, note: 'Balance payment' }];
-        return { ...t, creditPaid: (t.creditPaid || 0) + alloc, amount: (t.creditPaid || 0) + alloc, payments, creditReceiver: receiver, creditReceiverName: rName };
+        if (t.type !== 'credit') return t;
+        const tBuyer = t.creditBuyer || 'Unknown';
+        if (tBuyer !== buyer) return t;
+        const alreadyPaid  = t.creditPaid  || 0;
+        const total        = t.creditTotal || 0;
+        const outstanding  = Math.max(0, total - alreadyPaid);
+        if (outstanding <= 0) return t;
+        const payAmt = Math.min(amount, outstanding);
+        const newPayments = [
+          ...(t.payments || []),
+          { amount: payAmt, receiver, receiverName, date, note },
+        ];
+        const newPaid = alreadyPaid + payAmt;
+        return {
+          ...t,
+          creditPaid: newPaid,
+          creditReceiver: receiver,
+          creditReceiverName: receiverName,
+          payments: newPayments,
+        };
       });
       ss('cb_txs', next);
       dbSync(people, next, currency);
       return next;
     });
+    setPayModal(s => ({ ...s, open: false }));
     toast.success('Payment recorded');
-  }, [payModal.buyer, people, currency, dbSync]);
+  }, [people, currency, dbSync]);
 
-  /* ── People ───────────────────────────────── */
+  /* ── People ──────────────────────────────────────── */
   const addPerson = useCallback((name: string, role: string, color: string) => {
     if (!guardWrite()) return;
     const p: Person = { id: 'p_' + Date.now(), name, role, color };
@@ -281,7 +385,7 @@ export default function App() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [txs, currency, dbSync, isReadOnly]);
 
-  /* ── Currency ─────────────────────────────── */
+  /* ── Currency ────────────────────────────────────── */
   const saveCurrency = useCallback((c: string) => {
     if (!guardWrite()) return;
     setCurrency(c);
@@ -290,28 +394,30 @@ export default function App() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [people, txs, dbSync, isReadOnly]);
 
-  /* ── Cloud ────────────────────────────────── */
+  /* ── Cloud pull / push ───────────────────────────── */
   const manualPull = async () => {
-    if (!dbRef.current || !fsRef.current) { toast.error('Not connected'); return; }
+    if (!dbRef.current || !fsRef.current || !selectedBiz) { toast.error('Not connected'); return; }
     toast.loading('Pulling…');
-    const s = await fsRef.current.getDoc(fsRef.current.doc(dbRef.current, ...FS_DOC));
+    const [col, doc] = selectedBiz.fsDoc.split('/');
+    const s = await fsRef.current.getDoc(fsRef.current.doc(dbRef.current, col, doc));
     toast.dismiss();
     if (s.exists()) { applyRemote(s.data()); toast.success('Pulled from cloud'); }
     else toast.info('No cloud data');
   };
 
   const manualPush = async () => {
-    if (!dbRef.current || !fsRef.current) { toast.error('Not connected'); return; }
+    if (!dbRef.current || !fsRef.current || !selectedBiz) { toast.error('Not connected'); return; }
     toast.loading('Pushing…');
     try {
-      await fsRef.current.setDoc(fsRef.current.doc(dbRef.current, ...FS_DOC), { txs, people, currency, ts: Date.now(), _pinHash: H_MASTER });
+      const [col, doc] = selectedBiz.fsDoc.split('/');
+      await fsRef.current.setDoc(fsRef.current.doc(dbRef.current, col, doc), { txs, people, currency, ts: Date.now() });
       toast.dismiss();
       toast.success('Pushed to cloud');
       setDbStatus('✅ Pushed: ' + new Date().toLocaleTimeString());
     } catch (e: any) { toast.dismiss(); toast.error('Push failed'); }
   };
 
-  /* ── Clear all ────────────────────────────── */
+  /* ── Clear all ───────────────────────────────────── */
   const executeFullClear = useCallback(() => {
     const emptyTxs: Transaction[] = [];
     const peopleWithBiz: Person[] = [BIZ_ACCOUNT as any];
@@ -321,57 +427,24 @@ export default function App() {
     toast.success('All data cleared');
   }, [dbSync]);
 
-  /* ── Tab switch ───────────────────────────── */
+  /* ── Tab switch ──────────────────────────────────── */
   const handleTab = (tab: Tab) => {
-    if (isReadOnly && ['settings'].includes(tab)) { toast.error('🔒 View-only mode'); return; }
+    if (isReadOnly && tab === 'settings') { toast.error('🔒 View-only mode'); return; }
     setActiveTab(tab);
   };
 
-  /* ── FAB open ─────────────────────────────── */
   const openAdd = () => {
     if (!guardWrite()) return;
     setAddInitType('income');
     setIsAddOpen(true);
   };
 
-  /* ── Person filter link from dashboard ────── */
   const handlePersonFilter = (pid: string) => {
     setPersonFilterForLedger(pid);
     setActiveTab('ledger');
   };
 
-  /* ── Outstanding for payment modal ─────────── */
-  const outstandingForBuyer = (buyer: string) => {
-    const relevant = txs.filter(t => t.type === 'credit' && (t.creditBuyer || 'Unknown') === buyer);
-    return Math.max(0, relevant.reduce((s, t) => s + (t.creditTotal || 0), 0) - relevant.reduce((s, t) => s + (t.creditPaid || 0), 0));
-  };
-
-  /* ── Render ───────────────────────────────── */
-  if (appMode === 'locked') {
-    // Step 1: choose business
-    if (!selectedBusinessId) return (
-      <>
-        <BusinessSelector onSelect={id => { setSelectedBusinessId(id); sessionStorage.setItem('cb_biz', id); }} />
-        <Toaster position="bottom-center" richColors />
-      </>
-    );
-    // Step 2: enter PIN for chosen business
-    const chosenBiz = BUSINESSES.find(b => b.id === selectedBusinessId) || BUSINESSES[0];
-    return (
-      <>
-        <PinScreen
-          onUnlock={(mode) => {
-            sessionStorage.setItem('cb_s', mode);
-            unlock(mode, selectedBusinessId);
-          }}
-          businessId={selectedBusinessId}
-          businessName={chosenBiz.name}
-        />
-        <Toaster position="bottom-center" richColors />
-      </>
-    );
-  }
-
+  /* ── Export / Import ─────────────────────────────── */
   const exportData = () => {
     const payload = { people, txs, currency };
     const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
@@ -389,33 +462,95 @@ export default function App() {
         if (obj.people && obj.txs) {
           const ppl = Array.isArray(obj.people) ? obj.people : [];
           const withBiz = ppl.find((x: any) => x?.id === BIZ_ACCOUNT.id) ? ppl : [...ppl, BIZ_ACCOUNT];
-          setPeople(withBiz);
-          setTxs(obj.txs);
-          setCurrency(obj.currency || 'GHS');
+          setPeople(withBiz); setTxs(obj.txs); setCurrency(obj.currency || 'GHS');
           ss('cb_people', withBiz); ss('cb_txs', obj.txs); ss('cb_currency', obj.currency || 'GHS');
           dbSync(withBiz, obj.txs, obj.currency || 'GHS');
           toast.success('Imported data');
-        } else {
-          toast.error('Invalid import file');
-        }
-      } catch (e) { toast.error('Import failed'); }
+        } else toast.error('Invalid import file');
+      } catch { toast.error('Import failed'); }
     };
     fr.readAsText(file);
   };
 
+  /* ════════════════════════════════════════════════
+     RENDER
+  ════════════════════════════════════════════════ */
+
+  /* Loading state while registry loads */
+  if (bizLoading) {
+    return (
+      <div style={{
+        position: 'fixed', inset: 0, background: '#F0F2F7',
+        display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
+        fontFamily: 'Plus Jakarta Sans, sans-serif',
+      }}>
+        <div style={{
+          width: 64, height: 64, borderRadius: 20,
+          background: 'linear-gradient(145deg, #2A4FCF, #6B8FFF)',
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          fontSize: '1.8rem', marginBottom: 16,
+          boxShadow: '0 8px 32px rgba(61,107,223,0.35)',
+        }}>💰</div>
+        <div style={{ fontSize: '1.6rem', fontWeight: 800, letterSpacing: '-0.04em', marginBottom: 12 }}>
+          Cash<span style={{ color: '#3D6BDF' }}>book</span>
+        </div>
+        <div style={{ fontSize: '0.75rem', color: '#9A9FB8' }}>Loading…</div>
+        <Toaster position="bottom-center" richColors />
+      </div>
+    );
+  }
+
+  /* Business selector / master admin */
+  if (screen === 'selector') {
+    return (
+      <>
+        <BusinessSelector
+          businesses={businesses}
+          isMasterAdmin={isMasterAdmin}
+          onMasterAdmin={() => {
+            setIsMasterAdmin(true);
+            sessionStorage.setItem('cb_master', '1');
+          }}
+          onSelectBusiness={(biz) => {
+            setSelectedBiz(biz);
+            setScreen('pin');
+          }}
+          onCreateBusiness={handleCreateBusiness}
+          onDeleteBusiness={handleDeleteBusiness}
+        />
+        <Toaster position="bottom-center" richColors />
+      </>
+    );
+  }
+
+  /* PIN screen */
+  if (screen === 'pin' && selectedBiz) {
+    return (
+      <>
+        <PinScreen
+          businessId={selectedBiz.id}
+          businessName={selectedBiz.name}
+          masterHash={selectedBiz.masterHash}
+          viewHash={selectedBiz.viewHash}
+          onUnlock={(mode) => unlockBiz(selectedBiz, mode)}
+          onBack={() => setScreen('selector')}
+        />
+        <Toaster position="bottom-center" richColors />
+      </>
+    );
+  }
+
+  /* Main app */
   return (
     <div style={{
-      position: 'fixed', inset: 0,
-      background: '#ffffff',
+      position: 'fixed', inset: 0, background: '#ffffff',
       display: 'flex', flexDirection: 'column',
-      fontFamily: "'Plus Jakarta Sans', sans-serif",
-      overflowX: 'hidden',
+      fontFamily: "'Plus Jakarta Sans', sans-serif", overflowX: 'hidden',
     }}>
       <style>{globalCss}</style>
       <div className="app-container">
         <Toaster position="bottom-center" richColors />
 
-        {/* Header */}
         <AppHeader
           appMode={appMode}
           installReady={installReady}
@@ -427,7 +562,7 @@ export default function App() {
             try {
               p.prompt();
               const choice = await p.userChoice;
-              if (choice && choice.outcome === 'accepted') toast.success('Thanks — app installed');
+              if (choice?.outcome === 'accepted') toast.success('App installed');
               else toast('Install dismissed');
             } catch (e) { console.warn('[Install]', e); }
             promptRef.current = null; setInstallReady(false);
@@ -435,7 +570,6 @@ export default function App() {
           onTab={handleTab}
         />
 
-        {/* Tab content */}
         <div style={{ flex: 1, overflowY: 'auto', WebkitOverflowScrolling: 'touch' as any }}>
           {activeTab === 'dashboard' && (
             <Dashboard
@@ -474,9 +608,13 @@ export default function App() {
           )}
           {activeTab === 'settings' && (
             <SettingsTab
-              currency={currency} dbStatus={dbStatus}
+              currency={currency}
+              businessName={selectedBiz?.name ?? ''}
+              dbStatus={dbStatus}
               onSaveCurrency={saveCurrency}
-              onPull={manualPull} onPush={manualPush}
+              onSaveBusinessName={() => {}} // name is managed via master admin
+              onPull={manualPull}
+              onPush={manualPush}
               onClearAll={() => { if (!guardWrite()) return; setClearModal(true); }}
               onExport={exportData}
               onImport={(file) => { if (!guardWrite()) return; importData(file); }}
@@ -484,7 +622,6 @@ export default function App() {
           )}
         </div>
 
-        {/* Bottom nav */}
         <BottomNav
           activeTab={activeTab}
           appMode={appMode}
@@ -492,7 +629,6 @@ export default function App() {
           onAdd={openAdd}
         />
 
-        {/* Add Entry Sheet */}
         <AddEntrySheet
           open={isAddOpen}
           onClose={() => setIsAddOpen(false)}
@@ -502,33 +638,33 @@ export default function App() {
           onSave={saveTx}
         />
 
-        {/* Modals */}
         <DeleteModal
           open={deleteModal.open}
           desc={deleteModal.desc}
-          onClose={() => setDeleteModal(s => ({ ...s, open: false }))}
           onConfirm={confirmDelete}
+          onCancel={() => setDeleteModal(s => ({ ...s, open: false }))}
         />
         <EditModal
           open={editModal.open}
           tx={editModal.tx}
           people={people}
-          onClose={() => setEditModal(s => ({ ...s, open: false }))}
-          onSave={confirmEdit}
+          currency={currency}
+          onConfirm={confirmEdit}
+          onCancel={() => setEditModal({ open: false, tx: null })}
         />
         <PaymentModal
           open={payModal.open}
           buyer={payModal.buyer}
-          outstanding={payModal.buyer ? outstandingForBuyer(payModal.buyer) : 0}
+          txs={txs}
           people={people}
           currency={currency}
-          onClose={() => setPayModal(s => ({ ...s, open: false }))}
-          onApply={confirmPayment}
+          onConfirm={confirmPayment}
+          onCancel={() => setPayModal(s => ({ ...s, open: false }))}
         />
         <ClearModal
           open={clearModal}
-          onClose={() => setClearModal(false)}
-          onConfirm={executeFullClear}
+          onConfirm={() => { executeFullClear(); setClearModal(false); }}
+          onCancel={() => setClearModal(false)}
         />
       </div>
     </div>
@@ -537,18 +673,15 @@ export default function App() {
 
 const globalCss = `
   * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
-  ::-webkit-scrollbar { width: 3px; }
-  ::-webkit-scrollbar-thumb { background: #90E0EF; border-radius: 3px; }
-  input, select, textarea { outline: none; }
-  button { font-family: 'Plus Jakarta Sans', sans-serif; cursor: pointer; border: none; }
-  input[type="number"]::-webkit-inner-spin-button { -webkit-appearance: none; }
-
+  body { margin: 0; overflow: hidden; }
   .app-container {
-    width: 100%; max-width: 980px; margin: 0 auto; padding: 0;
-    box-sizing: border-box; display: flex; flex-direction: column; height: 100%;
+    width: 100%; height: 100%;
+    display: flex; flex-direction: column;
+    max-width: 480px; margin: 0 auto;
+    box-shadow: 0 0 60px rgba(0,0,0,0.08);
+    position: relative; overflow: hidden;
   }
-  @media (min-width: 900px) {
-    .app-container { padding: 18px 24px; }
-    .AppHeader, header, .topbar { max-width: 980px; margin: 0 auto; }
-  }
+  ::-webkit-scrollbar { width: 3px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb { background: rgba(61,107,223,0.25); border-radius: 10px; }
 `;

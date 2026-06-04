@@ -1,18 +1,17 @@
 import React, { useState, useCallback, useEffect } from 'react';
-import { Delete } from 'lucide-react';
+import { Delete, ArrowLeft } from 'lucide-react';
 import { sha256 } from '../utils';
-import { BUSINESSES } from './BusinessSelector';
 
 interface Props {
   onUnlock: (mode: 'master' | 'view') => void;
+  onBack?: () => void;
   businessId: string;
   businessName: string;
+  masterHash: string;
+  viewHash?: string;
 }
 
-export function PinScreen({ onUnlock, businessId, businessName }: Props) {
-  const biz = BUSINESSES.find(b => b.id === businessId) || BUSINESSES[0];
-  const H_MASTER = biz.masterHash;
-  const H_VIEW   = biz.viewHash;
+export function PinScreen({ onUnlock, onBack, businessName, masterHash, viewHash }: Props) {
   const [entry, setEntry] = useState('');
   const [dotState, setDotState] = useState<'idle' | 'error'>('idle');
   const [shaking, setShaking] = useState(false);
@@ -21,10 +20,10 @@ export function PinScreen({ onUnlock, businessId, businessName }: Props) {
 
   const checkPin = useCallback(async (pin: string) => {
     const h = await sha256(pin);
-    if (h === H_MASTER) {
+    if (h === masterHash) {
       sessionStorage.setItem('cb_s', 'master');
       onUnlock('master');
-    } else if (h === H_VIEW) {
+    } else if (viewHash && h === viewHash) {
       sessionStorage.setItem('cb_s', 'view');
       onUnlock('view');
     } else {
@@ -38,16 +37,16 @@ export function PinScreen({ onUnlock, businessId, businessName }: Props) {
         setErrMsg('');
       }, 900);
     }
-  }, [onUnlock]);
+  }, [onUnlock, masterHash, viewHash]);
 
   const press = useCallback((d: string) => {
     const now = Date.now();
     if (now - lastPress < 40) return;
     setLastPress(now);
     setEntry(prev => {
-      if (prev.length >= 4) return prev;
+      if (prev.length >= 6) return prev;
       const next = prev + d;
-      if (next.length === 4) setTimeout(() => checkPin(next), 120);
+      if (next.length >= 4) setTimeout(() => checkPin(next), 120);
       return next;
     });
   }, [lastPress, checkPin]);
@@ -66,6 +65,7 @@ export function PinScreen({ onUnlock, businessId, businessName }: Props) {
   }, [press, del]);
 
   const KEYS = ['1','2','3','4','5','6','7','8','9','','0','del'];
+  const pinLen = Math.max(4, entry.length);
 
   return (
     <div style={{
@@ -82,6 +82,23 @@ export function PinScreen({ onUnlock, businessId, businessName }: Props) {
         .pin-shake { animation: shake 0.45s ease; }
       `}</style>
 
+      {/* Back button */}
+      {onBack && (
+        <button
+          onClick={onBack}
+          style={{
+            position: 'absolute', top: 24, left: 24,
+            background: 'rgba(255,255,255,0.8)', border: '1px solid rgba(0,0,0,0.08)',
+            borderRadius: 12, padding: '8px 14px', cursor: 'pointer',
+            display: 'flex', alignItems: 'center', gap: 6,
+            fontSize: '0.75rem', fontWeight: 700, color: '#5A5F7A',
+            fontFamily: 'Plus Jakarta Sans, sans-serif',
+          }}
+        >
+          <ArrowLeft size={14} /> Back
+        </button>
+      )}
+
       {/* Logo */}
       <div style={{
         width: 76, height: 76, borderRadius: 24,
@@ -89,11 +106,8 @@ export function PinScreen({ onUnlock, businessId, businessName }: Props) {
         boxShadow: '0 8px 32px rgba(61,107,223,0.45)',
         display: 'flex', alignItems: 'center', justifyContent: 'center',
         fontSize: '2.2rem', marginBottom: 20,
-      }}>
-        💰
-      </div>
+      }}>💰</div>
 
-      {/* Brand */}
       <div style={{ fontSize: '1.9rem', fontWeight: 800, letterSpacing: '-0.04em', marginBottom: 4, fontFamily: 'Plus Jakarta Sans, sans-serif' }}>
         Cash<span style={{ color: '#3D6BDF' }}>book</span>
       </div>
@@ -106,7 +120,7 @@ export function PinScreen({ onUnlock, businessId, businessName }: Props) {
 
       {/* Dots */}
       <div className={shaking ? 'pin-shake' : ''} style={{ display: 'flex', gap: 18, marginBottom: 40 }}>
-        {[0,1,2,3].map(i => {
+        {Array.from({ length: pinLen }).map((_, i) => {
           const filled = i < entry.length;
           const err = dotState === 'error';
           return (
@@ -143,7 +157,6 @@ export function PinScreen({ onUnlock, businessId, businessName }: Props) {
         })}
       </div>
 
-      {/* Error */}
       <div style={{ marginTop: 18, minHeight: 18, fontSize: '0.74rem', color: '#E83E5C', fontWeight: 700 }}>
         {errMsg}
       </div>
