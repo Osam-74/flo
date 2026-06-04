@@ -44,17 +44,19 @@ export function TxItem({ tx, people, currency, showActions, onEdit, onDelete }: 
       </div>
     );
   } else if (tx.type === 'transfer') {
+    const amt = Number(tx.amount) || 0;
     amountEl = (
       <div style={{ fontFamily: "'DM Mono',monospace", fontSize: '0.88rem', fontWeight: 600, color: '#5A84FF', flexShrink: 0 }}>
-        ⇄ {currency} {tx.amount.toFixed(2)}
+        ⇄ {currency} {amt.toFixed(2)}
       </div>
     );
   } else {
+    const amt  = Number(tx.amount) || 0;
     const sign = isIn ? '+' : '−';
     const col  = isIn ? '#1A2FA8' : '#E83E5C';
     amountEl = (
       <div style={{ fontFamily: "'DM Mono',monospace", fontSize: '0.88rem', fontWeight: 600, color: col, flexShrink: 0 }}>
-        {sign}{currency} {tx.amount.toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g, ',')}
+        {sign}{currency} {amt.toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g, ',')}
       </div>
     );
   }
