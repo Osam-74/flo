@@ -25,8 +25,8 @@ export function AppHeader({ appMode, installReady, onLock, onInstall, onTab }: P
     }}>
       {/* Brand */}
       <div style={{ fontSize: '1.15rem', fontWeight: 800, letterSpacing: '-0.03em', color: '#fff' }}>
-            Cash<span style={{ color: '#6B8FFF' }}>flow</span>
-          </div>
+        Cash<span style={{ color: '#6B8FFF' }}>flow</span>
+      </div>
 
       {/* Actions */}
       <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
@@ -37,23 +37,33 @@ export function AppHeader({ appMode, installReady, onLock, onInstall, onTab }: P
           </button>
         )}
 
+        {/* Report — always visible; disabled (no pointer) in view-only mode */}
         <button
-          onClick={() => onTab('report')}
+          onClick={isReadOnly ? undefined : () => onTab('report')}
           title="Report"
-          style={iconBtn}
+          style={{
+            ...iconBtn,
+            cursor: isReadOnly ? 'default' : 'pointer',
+            opacity: isReadOnly ? 0.45 : 1,
+            pointerEvents: isReadOnly ? 'none' : 'auto',
+          }}
         >
           <Printer size={18} strokeWidth={2} color="#C8CDE8" />
         </button>
 
-        {!isReadOnly && (
-          <button
-            onClick={() => onTab('settings')}
-            title="Settings"
-            style={iconBtn}
-          >
-            <Settings size={18} strokeWidth={2} color="#C8CDE8" />
-          </button>
-        )}
+        {/* Settings — always visible; disabled in view-only mode */}
+        <button
+          onClick={isReadOnly ? undefined : () => onTab('settings')}
+          title="Settings"
+          style={{
+            ...iconBtn,
+            cursor: isReadOnly ? 'default' : 'pointer',
+            opacity: isReadOnly ? 0.45 : 1,
+            pointerEvents: isReadOnly ? 'none' : 'auto',
+          }}
+        >
+          <Settings size={18} strokeWidth={2} color="#C8CDE8" />
+        </button>
 
         <button onClick={onLock} title="Lock" style={iconBtn}>
           <Lock size={18} strokeWidth={2} color="#C8CDE8" />
