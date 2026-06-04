@@ -171,7 +171,15 @@ export default function App() {
     const p = r.people ?? gs('cb_people', []);
     const ppl = Array.isArray(p) ? p : [];
     const withBiz = ppl.find((x: any) => x?.id === BIZ_ACCOUNT.id) ? ppl : [...ppl, BIZ_ACCOUNT];
-    const t = r.txs     ?? gs('cb_txs', []);
+    const rawTxs = r.txs ?? gs('cb_txs', []);
+    // Sanitize: coerce numeric fields to numbers so .toFixed() never crashes
+    const t = Array.isArray(rawTxs) ? rawTxs.map((tx: any) => ({
+      ...tx,
+      amount:      Number(tx.amount)      || 0,
+      creditTotal: Number(tx.creditTotal) || 0,
+      creditPaid:  Number(tx.creditPaid)  || 0,
+      ts:          Number(tx.ts)          || 0,
+    })) : [];
     const c = r.currency ?? gs('cb_currency', 'GHS');
     setPeople(withBiz); setTxs(t); setCurrency(c);
     ss('cb_people', withBiz); ss('cb_txs', t); ss('cb_currency', c);
@@ -688,7 +696,7 @@ export default function App() {
             />
           )}
           {activeTab === 'report' && (
-            <ReportTab txs={txs} people={people} currency={currency} />
+            <ReportTab txs={txs} people={people} currency={currency} businessName={selectedBiz?.name ?? ''} />
           )}
           {activeTab === 'settings' && (
             <SettingsTab
