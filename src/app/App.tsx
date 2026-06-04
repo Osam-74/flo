@@ -249,21 +249,30 @@ export default function App() {
   /* ── Save business registry to Firestore ─────────── */
   const saveRegistry = useCallback(async (list: BizRecord[]) => {
     if (!dbRef.current || !fsRef.current) return;
+    // Strip undefined values — Firestore rejects them
+    const clean = list.map(b => {
+      const obj: any = { ...b };
+      Object.keys(obj).forEach(k => { if (obj[k] === undefined) delete obj[k]; });
+      return obj;
+    });
     const ref = fsRef.current.doc(dbRef.current, REGISTRY_DOC[0], REGISTRY_DOC[1]);
-    await fsRef.current.setDoc(ref, { businesses: list });
+    await fsRef.current.setDoc(ref, { businesses: clean });
   }, []);
 
   /* ── Create business ─────────────────────────────── */
   const handleCreateBusiness = useCallback(async (name: string, masterPin: string, viewPin?: string) => {
     const masterHash = await sha256(masterPin);
-    const viewHash   = viewPin ? await sha256(viewPin) : undefined;
     const id = 'biz_' + Date.now();
     const fsDoc = `cashbook/${id}`;
-    const newBiz: BizRecord = {
-      id, name, masterHash, viewHash, fsDoc,
+    const newBiz: any = {
+      id, name, masterHash, fsDoc,
       hasViewAccess: !!viewPin,
       createdAt: Date.now(),
     };
+    // Only add viewHash if a view PIN was provided — Firestore rejects undefined fields
+    if (viewPin) {
+      newBiz.viewHash = await sha256(viewPin);
+    }
     const updated = [...businesses, newBiz];
     await saveRegistry(updated);
     toast.success(`"${name}" created!`);
