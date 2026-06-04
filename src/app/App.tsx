@@ -681,6 +681,7 @@ export default function App() {
           {activeTab === 'dashboard' && (
             <Dashboard
               txs={txs} people={people} currency={currency}
+              businessName={selectedBiz?.name}
               onPersonFilter={handlePersonFilter}
               onEdit={tx => { if (!guardWrite()) return; setEditModal({ open: true, tx }); }}
               onDelete={(id, desc) => { if (!guardWrite()) return; setDeleteModal({ open: true, id, desc }); }}
