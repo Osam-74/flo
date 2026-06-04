@@ -167,15 +167,14 @@ export default function App() {
   }, [bizLoading]);
 
   /* ── Apply remote data ───────────────────────────── */
-  const applyRemote = useCallback((r: any, bizId: string) => {
-    const p = r.people ?? gs(`cb_people_${bizId}`, []);
+  const applyRemote = useCallback((r: any, _bizId: string) => {
+    const p = r.people ?? [];
     const ppl = Array.isArray(p) ? p : [];
     const withBiz = ppl.find((x: any) => x?.id === BIZ_ACCOUNT.id) ? ppl : [...ppl, BIZ_ACCOUNT];
-    const rawTxs = r.txs ?? gs(`cb_txs_${bizId}`, []);
+    const rawTxs = r.txs ?? [];
     const t = sanitizeTxs(rawTxs);
-    const c = r.currency ?? gs(`cb_currency_${bizId}`, 'GHS');
+    const c = r.currency ?? 'GHS';
     setPeople(withBiz); setTxs(t); setCurrency(c);
-    ss(`cb_people_${bizId}`, withBiz); ss(`cb_txs_${bizId}`, t); ss(`cb_currency_${bizId}`, c);
     setDbStatus('✅ Live sync active. Last update: ' + new Date().toLocaleTimeString());
   }, []);
 
@@ -200,20 +199,14 @@ export default function App() {
     const ref = fsRef.current.doc(dbRef.current, col, doc);
     bizUnsubRef.current = fsRef.current.onSnapshot(ref, (snap: any) => {
       if (!snap.exists()) {
-        const ppl = gs(`cb_people_${biz.id}`, []);
-        const withBiz = (Array.isArray(ppl) && ppl.find((x: any) => x?.id === BIZ_ACCOUNT.id)) ? ppl : [...(Array.isArray(ppl) ? ppl : []), BIZ_ACCOUNT];
-        const rawTxs = gs(`cb_txs_${biz.id}`, []);
-        setPeople(withBiz); setTxs(sanitizeTxs(rawTxs)); setCurrency(gs(`cb_currency_${biz.id}`, 'GHS'));
-        ss(`cb_people_${biz.id}`, withBiz);
+        setPeople([BIZ_ACCOUNT]); setTxs([]); setCurrency('GHS');
         setDbStatus('⚠️ No cloud data yet — add your first transaction!');
       } else {
         applyRemote(snap.data(), biz.id);
       }
     }, (err: any) => {
       console.warn('[DB]', err);
-      setDbStatus('❌ Sync error: ' + err.code);
-      const rawTxs = gs(`cb_txs_${biz.id}`, []);
-      setPeople(gs(`cb_people_${biz.id}`, [])); setTxs(sanitizeTxs(rawTxs)); setCurrency(gs(`cb_currency_${biz.id}`, 'GHS'));
+      setDbStatus('❌ Sync error: ' + err.code + ' — check your connection and refresh.');
     });
   }, [applyRemote]);
 
@@ -356,7 +349,7 @@ export default function App() {
     if (!guardWrite()) return;
     setTxs(prev => {
       const next = [...prev, tx];
-      if (selectedBiz) ss(`cb_txs_${selectedBiz.id}`, next);
+      // if (selectedBiz) ss(`cb_txs_${selectedBiz.id}`, next); // removed: Firebase is source of truth
       dbSync(people, next, currency);
       return next;
     });
@@ -368,7 +361,7 @@ export default function App() {
   const confirmDelete = useCallback(() => {
     setTxs(prev => {
       const next = prev.filter(t => t.id !== deleteModal.id);
-      if (selectedBiz) ss(`cb_txs_${selectedBiz.id}`, next);
+      // if (selectedBiz) ss(`cb_txs_${selectedBiz.id}`, next); // removed: Firebase is source of truth
       dbSync(people, next, currency);
       return next;
     });
@@ -379,7 +372,7 @@ export default function App() {
   const confirmEdit = useCallback((id: string, updates: Partial<Transaction>) => {
     setTxs(prev => {
       const next = prev.map(t => t.id === id ? { ...t, ...updates } : t);
-      if (selectedBiz) ss(`cb_txs_${selectedBiz.id}`, next);
+      // if (selectedBiz) ss(`cb_txs_${selectedBiz.id}`, next); // removed: Firebase is source of truth
       dbSync(people, next, currency);
       return next;
     });
@@ -412,7 +405,7 @@ export default function App() {
           payments: newPayments,
         };
       });
-      if (selectedBiz) ss(`cb_txs_${selectedBiz.id}`, next);
+      // if (selectedBiz) ss(`cb_txs_${selectedBiz.id}`, next); // removed: Firebase is source of truth
       dbSync(people, next, currency);
       return next;
     });
@@ -426,7 +419,7 @@ export default function App() {
     const p: Person = { id: 'p_' + Date.now(), name, role, color };
     setPeople(prev => {
       const next = [...prev, p];
-      if (selectedBiz) ss(`cb_people_${selectedBiz.id}`, next);
+      // if (selectedBiz) ss(`cb_people_${selectedBiz.id}`, next); // removed: Firebase is source of truth
       dbSync(next, txs, currency);
       return next;
     });
@@ -444,7 +437,7 @@ export default function App() {
     )) { toast.error('Cannot delete — person has transactions'); return; }
     setPeople(prev => {
       const next = prev.filter(p => p.id !== id);
-      if (selectedBiz) ss(`cb_people_${selectedBiz.id}`, next);
+      // if (selectedBiz) ss(`cb_people_${selectedBiz.id}`, next); // removed: Firebase is source of truth
       dbSync(next, txs, currency);
       return next;
     });
@@ -456,7 +449,7 @@ export default function App() {
   const saveCurrency = useCallback((c: string) => {
     if (!guardWrite()) return;
     setCurrency(c);
-    if (selectedBiz) ss(`cb_currency_${selectedBiz.id}`, c);
+    // if (selectedBiz) ss(`cb_currency_${selectedBiz.id}`, c); // removed: Firebase is source of truth
     dbSync(people, txs, c);
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [people, txs, dbSync, isReadOnly]);
@@ -804,3 +797,4 @@ const globalCss = `
   ::-webkit-scrollbar-track { background: transparent; }
   ::-webkit-scrollbar-thumb { background: rgba(61,107,223,0.25); border-radius: 10px; }
 `;
+
