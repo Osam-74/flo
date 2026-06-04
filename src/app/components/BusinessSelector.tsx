@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { ChevronDown, Plus, Trash2, LogIn, ShieldCheck, X } from 'lucide-react';
+import { ChevronDown, Plus, Trash2, LogIn, ShieldCheck, X, Delete, Lock, Building2, TrendingUp, TrendingDown, Clock } from 'lucide-react';
 import { sha256 } from '../utils';
 
 /* ─────────────────────────────────────────────────────────────
@@ -25,6 +25,7 @@ export interface BizRecord {
 interface Props {
   onSelectBusiness: (biz: BizRecord) => void;
   onMasterAdmin: () => void;
+  onLogoutMasterAdmin?: () => void;
   businesses: BizRecord[];
   onCreateBusiness: (name: string, masterPin: string, viewPin?: string) => Promise<void>;
   onDeleteBusiness: (id: string) => Promise<void>;
@@ -44,9 +45,296 @@ function useSecretTap(onTriggered: () => void) {
   }, [onTriggered]);
 }
 
+/* ── Mini numeric keypad component ── */
+interface KeypadProps {
+  value: string;
+  onChange: (v: string) => void;
+  maxLen?: number;
+  label?: string;
+}
+function PinKeypad({ value, onChange, maxLen = 6, label }: KeypadProps) {
+  const KEYS = ['1','2','3','4','5','6','7','8','9','','0','del'];
+  const press = (k: string) => {
+    if (k === 'del') { onChange(value.slice(0, -1)); return; }
+    if (value.length >= maxLen) return;
+    onChange(value + k);
+  };
+  return (
+    <div>
+      {label && (
+        <div style={{ fontSize: '0.6rem', fontWeight: 700, letterSpacing: '0.1em', textTransform: 'uppercase', color: '#9A9FB8', marginBottom: 8, textAlign: 'center' }}>
+          {label}
+        </div>
+      )}
+      {/* Dots */}
+      <div style={{ display: 'flex', justifyContent: 'center', gap: 10, marginBottom: 14 }}>
+        {Array.from({ length: Math.max(4, value.length) }).map((_, i) => (
+          <div key={i} style={{
+            width: 11, height: 11, borderRadius: '50%',
+            background: i < value.length ? '#3D6BDF' : '#D4D8E8',
+            boxShadow: i < value.length ? '0 0 0 3px rgba(61,107,223,0.18)' : 'none',
+            transition: 'all 0.15s',
+          }} />
+        ))}
+      </div>
+      {/* Grid */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 8 }}>
+        {KEYS.map((k, i) => {
+          if (!k) return <div key={i} />;
+          if (k === 'del') {
+            return (
+              <button key="del" onClick={() => press('del')}
+                style={{ height: 52, borderRadius: 14, background: '#F5F7FF', border: '1px solid rgba(61,107,223,0.12)', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }}>
+                <Delete size={18} color="#5A5F7A" />
+              </button>
+            );
+          }
+          return (
+            <button key={k} onClick={() => press(k)}
+              style={{ height: 52, borderRadius: 14, background: '#FFFFFF', border: '1px solid rgba(61,107,223,0.12)', boxShadow: '0 1px 4px rgba(0,0,0,0.06)', cursor: 'pointer', fontSize: '1.3rem', fontWeight: 700, color: '#1A1D2E', fontFamily: 'Plus Jakarta Sans, sans-serif' }}>
+              {k}
+            </button>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+/* ── Create Business Wizard (3 steps) ── */
+type CreateStep = 'name' | 'masterPin' | 'viewPin';
+interface CreateWizardProps {
+  onClose: () => void;
+  onSubmit: (name: string, masterPin: string, viewPin?: string) => Promise<void>;
+}
+function CreateBusinessWizard({ onClose, onSubmit }: CreateWizardProps) {
+  const [step, setStep] = useState<CreateStep>('name');
+  const [name, setName] = useState('');
+  const [masterPin, setMasterPin] = useState('');
+  const [viewPin, setViewPin] = useState('');
+  const [skipView, setSkipView] = useState(false);
+  const [creating, setCreating] = useState(false);
+  const [error, setError] = useState('');
+
+  const overlayStyle: React.CSSProperties = {
+    position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.55)',
+    display: 'flex', alignItems: 'center', justifyContent: 'center',
+    zIndex: 10001, padding: 16,
+  };
+  const cardStyle: React.CSSProperties = {
+    background: '#fff', borderRadius: 22, padding: '24px 20px',
+    width: '100%', maxWidth: 320,
+    boxShadow: '0 12px 48px rgba(0,0,0,0.22)',
+    fontFamily: 'Plus Jakarta Sans, sans-serif',
+  };
+
+  const handleFinish = async () => {
+    if (creating) return;
+    setCreating(true);
+    setError('');
+    try {
+      await onSubmit(name.trim(), masterPin, skipView ? undefined : (viewPin || undefined));
+      onClose();
+    } catch (e: any) {
+      setError(e?.message || 'Failed to create business. Please try again.');
+      setCreating(false);
+    }
+  };
+
+  return (
+    <div style={overlayStyle}>
+      <div style={cardStyle}>
+        {/* Header */}
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <Building2 size={18} color="#3D6BDF" />
+            <span style={{ fontWeight: 800, fontSize: '0.95rem', color: '#1A1D2E' }}>
+              {step === 'name' ? 'New Business' : step === 'masterPin' ? 'Set Access PIN' : 'View-Only PIN'}
+            </span>
+          </div>
+          <button onClick={onClose} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#9A9FB8' }}>
+            <X size={18} />
+          </button>
+        </div>
+
+        {/* Step dots */}
+        <div style={{ display: 'flex', justifyContent: 'center', gap: 6, marginBottom: 22 }}>
+          {['name','masterPin','viewPin'].map((s, i) => (
+            <div key={s} style={{
+              width: step === s ? 20 : 7, height: 7, borderRadius: 4,
+              background: step === s ? '#3D6BDF' : (
+                (s === 'name' && (step === 'masterPin' || step === 'viewPin')) ||
+                (s === 'masterPin' && step === 'viewPin')
+              ) ? '#A8C4FF' : '#E0E4F0',
+              transition: 'all 0.2s',
+            }} />
+          ))}
+        </div>
+
+        {/* Step: Name */}
+        {step === 'name' && (
+          <div>
+            <div style={{ fontSize: '0.62rem', fontWeight: 700, letterSpacing: '0.1em', textTransform: 'uppercase', color: '#9A9FB8', marginBottom: 8 }}>
+              Business Name
+            </div>
+            <input
+              type="text"
+              placeholder="e.g. Nsawam Farm"
+              value={name}
+              onChange={e => setName(e.target.value)}
+              onKeyDown={e => e.key === 'Enter' && name.trim() && setStep('masterPin')}
+              autoFocus
+              style={{
+                width: '100%', padding: '13px 16px', borderRadius: 12,
+                border: '1.5px solid rgba(61,107,223,0.22)', fontSize: '0.95rem',
+                outline: 'none', boxSizing: 'border-box',
+                fontFamily: 'Plus Jakarta Sans, sans-serif', fontWeight: 600, color: '#1A1D2E',
+              }}
+            />
+            <button
+              onClick={() => name.trim() && setStep('masterPin')}
+              disabled={!name.trim()}
+              style={{
+                width: '100%', padding: '13px', borderRadius: 12, marginTop: 16,
+                background: name.trim() ? 'linear-gradient(135deg, #1A2FA8, #3D6BDF)' : '#D4D8E8',
+                color: '#fff', border: 'none',
+                cursor: name.trim() ? 'pointer' : 'not-allowed',
+                fontSize: '0.85rem', fontWeight: 800,
+              }}
+            >
+              Continue →
+            </button>
+          </div>
+        )}
+
+        {/* Step: Master PIN */}
+        {step === 'masterPin' && (
+          <div>
+            <div style={{ fontSize: '0.75rem', color: '#5A5F7A', textAlign: 'center', marginBottom: 16, lineHeight: 1.5 }}>
+              Set the <strong>master access PIN</strong> for <em>{name}</em>
+            </div>
+            <PinKeypad value={masterPin} onChange={setMasterPin} label="Enter PIN (min 4 digits)" />
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginTop: 16 }}>
+              <button onClick={() => { setStep('name'); setMasterPin(''); }}
+                style={{ padding: '12px', borderRadius: 12, background: '#F5F7FF', border: '1px solid rgba(0,0,0,0.08)', cursor: 'pointer', fontWeight: 700, color: '#5A5F7A', fontSize: '0.8rem' }}>
+                ← Back
+              </button>
+              <button
+                onClick={() => masterPin.length >= 4 && setStep('viewPin')}
+                disabled={masterPin.length < 4}
+                style={{
+                  padding: '12px', borderRadius: 12,
+                  background: masterPin.length >= 4 ? 'linear-gradient(135deg, #1A2FA8, #3D6BDF)' : '#D4D8E8',
+                  color: '#fff', border: 'none',
+                  cursor: masterPin.length >= 4 ? 'pointer' : 'not-allowed',
+                  fontWeight: 800, fontSize: '0.8rem',
+                }}
+              >
+                Next →
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* Step: View PIN */}
+        {step === 'viewPin' && (
+          <div>
+            <div style={{ fontSize: '0.75rem', color: '#5A5F7A', textAlign: 'center', marginBottom: 14, lineHeight: 1.5 }}>
+              Optional: set a <strong>view-only PIN</strong> for read access
+            </div>
+
+            {!skipView ? (
+              <>
+                <PinKeypad value={viewPin} onChange={setViewPin} label="View-Only PIN (optional)" />
+                <button
+                  onClick={() => setSkipView(true)}
+                  style={{ width: '100%', padding: '8px', marginTop: 10, background: 'none', border: '1.5px dashed rgba(61,107,223,0.2)', borderRadius: 10, cursor: 'pointer', fontSize: '0.72rem', color: '#9A9FB8', fontWeight: 600 }}
+                >
+                  Skip — no view-only access
+                </button>
+              </>
+            ) : (
+              <div style={{ textAlign: 'center', padding: '20px 0', color: '#9A9FB8', fontSize: '0.8rem' }}>
+                No view-only PIN — skipped
+                <br />
+                <button onClick={() => setSkipView(false)} style={{ marginTop: 10, background: 'none', border: 'none', cursor: 'pointer', color: '#3D6BDF', fontWeight: 700, fontSize: '0.75rem' }}>
+                  Set one instead
+                </button>
+              </div>
+            )}
+
+            {error && (
+              <div style={{ color: '#E83E5C', fontSize: '0.73rem', fontWeight: 700, textAlign: 'center', marginTop: 10 }}>
+                {error}
+              </div>
+            )}
+
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginTop: 14 }}>
+              <button onClick={() => { setStep('masterPin'); setViewPin(''); setSkipView(false); }}
+                style={{ padding: '12px', borderRadius: 12, background: '#F5F7FF', border: '1px solid rgba(0,0,0,0.08)', cursor: 'pointer', fontWeight: 700, color: '#5A5F7A', fontSize: '0.8rem' }}>
+                ← Back
+              </button>
+              <button
+                onClick={handleFinish}
+                disabled={creating || (!skipView && viewPin.length > 0 && viewPin.length < 4)}
+                style={{
+                  padding: '12px', borderRadius: 12,
+                  background: creating ? '#D4D8E8' : 'linear-gradient(135deg, #1A2FA8, #3D6BDF)',
+                  color: '#fff', border: 'none',
+                  cursor: creating ? 'wait' : 'pointer',
+                  fontWeight: 800, fontSize: '0.8rem',
+                }}
+              >
+                {creating ? 'Creating…' : '✓ Create'}
+              </button>
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+/* ── Live Clock ── */
+function LiveClock() {
+  const [now, setNow] = useState(new Date());
+  useEffect(() => {
+    const t = setInterval(() => setNow(new Date()), 1000);
+    return () => clearInterval(t);
+  }, []);
+  const timeStr = now.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+  const dateStr = now.toLocaleDateString('en-GB', { weekday: 'short', day: '2-digit', month: 'short', year: 'numeric' });
+  return (
+    <div style={{
+      background: 'linear-gradient(135deg, #0D1120 0%, #1A2FA8 100%)',
+      borderRadius: 16, padding: '14px 18px', marginBottom: 16,
+      boxShadow: '0 4px 20px rgba(26,47,168,0.3)',
+      display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+    }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+        <Clock size={18} color="rgba(255,255,255,0.6)" />
+        <div>
+          <div style={{ fontFamily: "'DM Mono', monospace", fontSize: '1.3rem', fontWeight: 500, color: '#fff', letterSpacing: '0.04em' }}>
+            {timeStr}
+          </div>
+          <div style={{ fontSize: '0.62rem', color: 'rgba(255,255,255,0.5)', marginTop: 1, letterSpacing: '0.08em' }}>
+            {dateStr}
+          </div>
+        </div>
+      </div>
+      <div style={{
+        width: 10, height: 10, borderRadius: '50%', background: '#4ADE80',
+        boxShadow: '0 0 0 3px rgba(74,222,128,0.25)',
+        animation: 'pulse 2s infinite',
+      }} />
+    </div>
+  );
+}
+
 export function BusinessSelector({
   onSelectBusiness,
   onMasterAdmin,
+  onLogoutMasterAdmin,
   businesses,
   onCreateBusiness,
   onDeleteBusiness,
@@ -59,13 +347,10 @@ export function BusinessSelector({
   const [adminPin, setAdminPin]   = useState('');
   const [adminErr, setAdminErr]   = useState('');
   const [checking, setChecking]   = useState(false);
+  const [adminShake, setAdminShake] = useState(false);
 
-  // Create business form
+  // Create business wizard
   const [showCreate, setShowCreate] = useState(false);
-  const [newName, setNewName]       = useState('');
-  const [newMPin, setNewMPin]       = useState('');
-  const [newVPin, setNewVPin]       = useState('');
-  const [creating, setCreating]     = useState(false);
 
   // Delete confirm
   const [deleteId, setDeleteId] = useState<string | null>(null);
@@ -77,6 +362,7 @@ export function BusinessSelector({
   const secretTap = useSecretTap(() => setShowAdmin(true));
 
   const handleAdminLogin = async () => {
+    if (adminPin.length < 4) return;
     setChecking(true);
     const h = await sha256(adminPin);
     setChecking(false);
@@ -87,22 +373,26 @@ export function BusinessSelector({
       onMasterAdmin();
     } else {
       setAdminErr('Incorrect master PIN');
-      setAdminPin('');
+      setAdminShake(true);
+      setTimeout(() => {
+        setAdminShake(false);
+        setAdminPin('');
+        setAdminErr('');
+      }, 900);
     }
   };
+
+  // Auto-check when admin PIN reaches 6 digits
+  useEffect(() => {
+    if (adminPin.length >= 6) {
+      handleAdminLogin();
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [adminPin]);
 
   const handleContinue = () => {
     const biz = businesses.find(b => b.id === selected);
     if (biz) onSelectBusiness(biz);
-  };
-
-  const handleCreate = async () => {
-    if (!newName.trim() || newMPin.length < 4) return;
-    setCreating(true);
-    await onCreateBusiness(newName.trim(), newMPin, newVPin || undefined);
-    setCreating(false);
-    setShowCreate(false);
-    setNewName(''); setNewMPin(''); setNewVPin('');
   };
 
   /* ─── Styles ──────────────────────────────────────── */
@@ -115,17 +405,7 @@ export function BusinessSelector({
     background: '#fff', borderRadius: 20, padding: 24,
     width: '100%', maxWidth: 340,
     boxShadow: '0 8px 40px rgba(0,0,0,0.2)',
-  };
-  const inputStyle = (hasErr = false): React.CSSProperties => ({
-    width: '100%', padding: '11px 14px', borderRadius: 10,
-    border: `1.5px solid ${hasErr ? '#E83E5C' : 'rgba(61,107,223,0.2)'}`,
-    fontSize: '0.88rem', outline: 'none', boxSizing: 'border-box',
     fontFamily: 'Plus Jakarta Sans, sans-serif',
-  });
-  const primaryBtn: React.CSSProperties = {
-    width: '100%', padding: '13px', borderRadius: 12, marginTop: 4,
-    background: 'linear-gradient(135deg, #1A2FA8, #3D6BDF)', color: '#fff',
-    border: 'none', cursor: 'pointer', fontSize: '0.85rem', fontWeight: 800,
   };
 
   return (
@@ -135,6 +415,12 @@ export function BusinessSelector({
       justifyContent: 'center', padding: 28, zIndex: 9999, userSelect: 'none',
       overflowY: 'auto',
     }}>
+      <style>{`
+        @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.4} }
+        @keyframes shake { 0%,100%{transform:translateX(0)} 20%,60%{transform:translateX(-8px)} 40%,80%{transform:translateX(8px)} }
+        .admin-shake { animation: shake 0.45s ease; }
+      `}</style>
+
       {/* Logo — secret tap zone */}
       <div
         onClick={secretTap}
@@ -156,8 +442,8 @@ export function BusinessSelector({
 
       {/* ══ MASTER ADMIN VIEW ═══════════════════════════════ */}
       {isMasterAdmin ? (
-        <div style={{ width: '100%', maxWidth: 340 }}>
-          {/* Header row */}
+        <div style={{ width: '100%', maxWidth: 360 }}>
+          {/* Header row with lock */}
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14 }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 7 }}>
               <ShieldCheck size={17} color="#3D6BDF" />
@@ -165,17 +451,66 @@ export function BusinessSelector({
                 Master Admin
               </span>
             </div>
-            <button
-              onClick={() => setShowCreate(true)}
-              style={{
-                background: 'linear-gradient(135deg, #1A2FA8, #3D6BDF)', color: '#fff',
-                border: 'none', borderRadius: 10, padding: '7px 14px',
-                fontSize: '0.72rem', fontWeight: 700, cursor: 'pointer',
-                display: 'flex', alignItems: 'center', gap: 5,
-              }}
-            >
-              <Plus size={13} /> New Business
-            </button>
+            <div style={{ display: 'flex', gap: 8 }}>
+              <button
+                onClick={() => setShowCreate(true)}
+                style={{
+                  background: 'linear-gradient(135deg, #1A2FA8, #3D6BDF)', color: '#fff',
+                  border: 'none', borderRadius: 10, padding: '7px 14px',
+                  fontSize: '0.72rem', fontWeight: 700, cursor: 'pointer',
+                  display: 'flex', alignItems: 'center', gap: 5,
+                }}
+              >
+                <Plus size={13} /> New Business
+              </button>
+              {/* LOCK ICON — log out of master admin */}
+              <button
+                onClick={onLogoutMasterAdmin}
+                title="Lock master admin"
+                style={{
+                  background: 'rgba(232,62,92,0.1)', border: 'none', borderRadius: 10,
+                  width: 34, height: 34, display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  cursor: 'pointer',
+                }}
+              >
+                <Lock size={16} color="#E83E5C" />
+              </button>
+            </div>
+          </div>
+
+          {/* Live clock */}
+          <LiveClock />
+
+          {/* Summary stats */}
+          <div style={{
+            display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 14,
+          }}>
+            <div style={{
+              background: '#fff', borderRadius: 14, padding: '14px 16px',
+              boxShadow: '0 2px 10px rgba(61,107,223,0.08)',
+              border: '1px solid rgba(61,107,223,0.1)',
+            }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 6 }}>
+                <Building2 size={14} color="#3D6BDF" />
+                <span style={{ fontSize: '0.58rem', fontWeight: 700, letterSpacing: '0.1em', textTransform: 'uppercase', color: '#9A9FB8' }}>Businesses</span>
+              </div>
+              <div style={{ fontSize: '1.6rem', fontWeight: 800, color: '#1A2FA8', lineHeight: 1 }}>{businesses.length}</div>
+              <div style={{ fontSize: '0.6rem', color: '#9A9FB8', marginTop: 3 }}>registered</div>
+            </div>
+            <div style={{
+              background: '#fff', borderRadius: 14, padding: '14px 16px',
+              boxShadow: '0 2px 10px rgba(61,107,223,0.08)',
+              border: '1px solid rgba(61,107,223,0.1)',
+            }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 6 }}>
+                <TrendingUp size={14} color="#3D6BDF" />
+                <span style={{ fontSize: '0.58rem', fontWeight: 700, letterSpacing: '0.1em', textTransform: 'uppercase', color: '#9A9FB8' }}>With View</span>
+              </div>
+              <div style={{ fontSize: '1.6rem', fontWeight: 800, color: '#1A2FA8', lineHeight: 1 }}>
+                {businesses.filter(b => b.hasViewAccess).length}
+              </div>
+              <div style={{ fontSize: '0.6rem', color: '#9A9FB8', marginTop: 3 }}>view-only access</div>
+            </div>
           </div>
 
           {/* Business list */}
@@ -184,20 +519,41 @@ export function BusinessSelector({
             boxShadow: '0 2px 16px rgba(0,0,0,0.07)', marginBottom: 16,
           }}>
             {businesses.length === 0 ? (
-              <div style={{ padding: 28, textAlign: 'center', color: '#9A9FB8', fontSize: '0.82rem' }}>
-                No businesses yet — tap <strong>New Business</strong> to create one
+              <div style={{ padding: 32, textAlign: 'center', color: '#9A9FB8', fontSize: '0.82rem', lineHeight: 1.7 }}>
+                <Building2 size={32} color="#D4D8E8" style={{ marginBottom: 10 }} />
+                <br />
+                No businesses yet.<br />
+                Tap <strong>New Business</strong> to create one.
               </div>
             ) : businesses.map((biz, i) => (
               <div key={biz.id} style={{
                 display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-                padding: '13px 16px',
+                padding: '14px 16px',
                 borderBottom: i < businesses.length - 1 ? '1px solid rgba(0,0,0,0.05)' : 'none',
               }}>
-                <div>
-                  <div style={{ fontSize: '0.9rem', fontWeight: 700, color: '#1A1D2E' }}>{biz.name}</div>
-                  {biz.hasViewAccess && (
-                    <div style={{ fontSize: '0.62rem', color: '#9A9FB8', marginTop: 1 }}>+ view-only access</div>
-                  )}
+                <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                  <div style={{
+                    width: 36, height: 36, borderRadius: 10,
+                    background: 'linear-gradient(135deg, rgba(61,107,223,0.12), rgba(107,143,255,0.18))',
+                    border: '1.5px solid rgba(61,107,223,0.18)',
+                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    fontSize: '0.7rem', fontWeight: 800, color: '#3D6BDF',
+                  }}>
+                    {biz.name.slice(0, 2).toUpperCase()}
+                  </div>
+                  <div>
+                    <div style={{ fontSize: '0.88rem', fontWeight: 700, color: '#1A1D2E' }}>{biz.name}</div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 4, marginTop: 1 }}>
+                      {biz.hasViewAccess && (
+                        <span style={{ fontSize: '0.58rem', background: 'rgba(61,107,223,0.1)', color: '#3D6BDF', padding: '1px 6px', borderRadius: 4, fontWeight: 700 }}>+ view access</span>
+                      )}
+                      {biz.createdAt && (
+                        <span style={{ fontSize: '0.58rem', color: '#C0C5D8' }}>
+                          {new Date(biz.createdAt).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: '2-digit' })}
+                        </span>
+                      )}
+                    </div>
+                  </div>
                 </div>
                 <div style={{ display: 'flex', gap: 7 }}>
                   <button
@@ -268,7 +624,7 @@ export function BusinessSelector({
         </div>
       )}
 
-      {/* ══ ADMIN PIN OVERLAY ════════════════════════════════ */}
+      {/* ══ ADMIN PIN OVERLAY — keypad style ════════════════ */}
       {showAdmin && (
         <div style={overlayStyle}>
           <div style={{ ...cardStyle, maxWidth: 300 }}>
@@ -281,70 +637,25 @@ export function BusinessSelector({
                 <X size={18} />
               </button>
             </div>
-            <input
-              type="password" placeholder="Enter master PIN"
-              value={adminPin} onChange={e => setAdminPin(e.target.value)}
-              onKeyDown={e => e.key === 'Enter' && handleAdminLogin()}
-              style={{
-                ...inputStyle(!!adminErr),
-                fontSize: '1.1rem', fontFamily: 'monospace', letterSpacing: '0.2em',
-                marginBottom: 8,
-              }}
-              autoFocus
-            />
+            <div className={adminShake ? 'admin-shake' : ''}>
+              <PinKeypad value={adminPin} onChange={setAdminPin} label="Enter master PIN" maxLen={6} />
+            </div>
             {adminErr && (
-              <div style={{ color: '#E83E5C', fontSize: '0.75rem', marginBottom: 8, fontWeight: 700 }}>{adminErr}</div>
+              <div style={{ color: '#E83E5C', fontSize: '0.73rem', fontWeight: 700, textAlign: 'center', marginTop: 10 }}>{adminErr}</div>
             )}
-            <button onClick={handleAdminLogin} disabled={checking} style={primaryBtn}>
-              {checking ? 'Checking…' : 'Enter'}
-            </button>
+            {checking && (
+              <div style={{ color: '#9A9FB8', fontSize: '0.72rem', textAlign: 'center', marginTop: 10 }}>Checking…</div>
+            )}
           </div>
         </div>
       )}
 
-      {/* ══ CREATE BUSINESS OVERLAY ══════════════════════════ */}
+      {/* ══ CREATE BUSINESS WIZARD ══════════════════════════ */}
       {showCreate && (
-        <div style={overlayStyle}>
-          <div style={cardStyle}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 18 }}>
-              <span style={{ fontWeight: 800, fontSize: '0.95rem', color: '#1A1D2E' }}>Create Business</span>
-              <button onClick={() => setShowCreate(false)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#9A9FB8' }}>
-                <X size={18} />
-              </button>
-            </div>
-            {([
-              { label: 'Business Name', val: newName, set: setNewName, ph: 'e.g. Nsawam Farm', type: 'text' },
-              { label: 'Access PIN (min 4 digits)', val: newMPin, set: setNewMPin, ph: '4–8 digit PIN', type: 'password' },
-              { label: 'View-Only PIN (optional)', val: newVPin, set: setNewVPin, ph: 'Leave blank to disable', type: 'password' },
-            ] as const).map(f => (
-              <div key={f.label} style={{ marginBottom: 14 }}>
-                <div style={{ fontSize: '0.6rem', fontWeight: 700, letterSpacing: '0.1em', textTransform: 'uppercase', color: '#9A9FB8', marginBottom: 5 }}>
-                  {f.label}
-                </div>
-                <input
-                  type={f.type} placeholder={f.ph} value={f.val}
-                  onChange={e => (f.set as any)(e.target.value)}
-                  style={{
-                    ...inputStyle(),
-                    fontFamily: f.type === 'password' ? 'monospace' : 'Plus Jakarta Sans, sans-serif',
-                    letterSpacing: f.type === 'password' ? '0.15em' : 'normal',
-                  }}
-                />
-              </div>
-            ))}
-            <button
-              onClick={handleCreate}
-              disabled={creating || !newName.trim() || newMPin.length < 4}
-              style={{
-                ...primaryBtn,
-                background: (!newName.trim() || newMPin.length < 4) ? '#D4D8E8' : 'linear-gradient(135deg, #1A2FA8, #3D6BDF)',
-                cursor: (!newName.trim() || newMPin.length < 4) ? 'not-allowed' : 'pointer',
-              }}
-            >
-              {creating ? 'Creating…' : 'Create Business'}
-            </button>
-          </div>
-        </div>
+        <CreateBusinessWizard
+          onClose={() => setShowCreate(false)}
+          onSubmit={onCreateBusiness}
+        />
       )}
 
       {/* ══ DELETE CONFIRM OVERLAY ═══════════════════════════ */}
