@@ -208,11 +208,12 @@ export function AddEntrySheet({ open, onClose, people, currency, onSave, initial
     if (type === 'credit') {
       const total = parseFloat(crTotal) || 0;
       const paid  = parseFloat(crPaid)  || 0;
+      const isPickup = crDate > today();
       if (!crBuyer)   { toast.error('Enter buyer name'); return; }
       if (!crDate)    { toast.error('Select a date'); return; }
-      if (total <= 0) { toast.error('Enter total expected amount'); return; }
-      if (paid > total) { toast.error('Amount paid cannot exceed total'); return; }
-      const isPickup = crDate > today();
+      // Total amount is required only for non-pickup (present/past) credit sales
+      if (!isPickup && total <= 0) { toast.error('Enter total expected amount'); return; }
+      if (total > 0 && paid > total) { toast.error('Amount paid cannot exceed total'); return; }
       const receiver = paid > 0 ? crReceiver : '';
       const desc = isPickup
         ? `Egg Pickup Scheduled — ${crBuyer} on ${crDate}`
@@ -432,7 +433,7 @@ export function AddEntrySheet({ open, onClose, people, currency, onSave, initial
               <div style={card}>
                 {isFutureDate(crDate) ? (
                   <div style={{ background: 'rgba(61,107,223,0.08)', border: '1px solid rgba(61,107,223,0.22)', borderRadius: 10, padding: '8px 13px', marginBottom: 10, display: 'flex', alignItems: 'center', gap: 8 }}>
-                    <span style={{ fontSize: '1rem' }}>📦</span>
+                    <span style={{ fontSize: '1rem' }}>🥚</span>
                     <span style={{ fontSize: '0.74rem', fontWeight: 700, color: '#1A2FA8' }}>
                       Scheduled for Egg Pickup — {crDate ? new Date(crDate + 'T00:00:00').toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: '2-digit' }) : ''}
                     </span>
@@ -450,8 +451,8 @@ export function AddEntrySheet({ open, onClose, people, currency, onSave, initial
                   </Field>
                 </Row>
                 <Row>
-                  <Field label={`Total Expected (${currency}) *`}>
-                    <input style={inp} type="number" placeholder="0.00" min="0" step="0.01"
+                  <Field label={isFutureDate(crDate) ? `Total Expected (${currency})` : `Total Expected (${currency}) *`}>
+                    <input style={inp} type="number" placeholder={isFutureDate(crDate) ? "0.00 (optional)" : "0.00"} min="0" step="0.01"
                       value={crTotal} onChange={e => setCrTotal(e.target.value)} />
                   </Field>
                   <Field label="Amount Paid Upfront">
