@@ -135,3 +135,24 @@ export async function sha256(s: string): Promise<string> {
   const buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(s));
   return Array.from(new Uint8Array(buf)).map(b => b.toString(16).padStart(2, '0')).join('');
 }
+
+/**
+ * Recursively remove all keys with undefined values from an object/array.
+ * Firestore rejects any field set to `undefined` — call this before every write.
+ */
+export function stripUndefined<T>(val: T): T {
+  if (Array.isArray(val)) {
+    return val.map(stripUndefined) as any;
+  }
+  if (val !== null && typeof val === 'object') {
+    const result: any = {};
+    for (const key of Object.keys(val as any)) {
+      const v = (val as any)[key];
+      if (v !== undefined) {
+        result[key] = stripUndefined(v);
+      }
+    }
+    return result;
+  }
+  return val;
+}

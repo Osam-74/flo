@@ -3,6 +3,7 @@ import { Drawer } from 'vaul';
 import { X } from 'lucide-react';
 import { toast } from 'sonner';
 import type { Transaction, Person, TxType } from '../types';
+import { stripUndefined } from '../utils';
 
 interface Props {
   open: boolean;
@@ -180,12 +181,12 @@ export function AddEntrySheet({ open, onClose, people, currency, onSave, initial
         if (!receiver) { toast.error('Select who received the money'); return; }
         const sellerName = people.find(p => p.id === person)?.name || '';
         const desc = `Sale${buyer ? ' — to ' + buyer : ''}${sellerName ? ' by ' + sellerName : ''}${cat ? ' — ' + cat : ''}`;
-        onSave({ id, ts, type, amount: amt, person: receiver, seller: person, sellerName, date, cat, note, source, buyer: buyer || undefined, receiver: receiver || undefined, desc });
+        onSave(stripUndefined({ id, ts, type, amount: amt, person: receiver, seller: person, sellerName, date, cat, note, source, buyer: buyer || undefined, receiver: receiver || undefined, desc }));
       } else {
         if (!person) { toast.error('Select a person'); return; }
         const pn = people.find(p => p.id === person)?.name || '';
         const desc = `Expense${pn ? ' by ' + pn : ''}`;
-        onSave({ id, ts, type, amount: amt, person, date, cat, note, source, buyer: buyer || undefined, receiver: receiver || undefined, desc });
+        onSave(stripUndefined({ id, ts, type, amount: amt, person, date, cat, note, source, buyer: buyer || undefined, receiver: receiver || undefined, desc }));
       }
     }
     if (type === 'salary') {
@@ -193,7 +194,7 @@ export function AddEntrySheet({ open, onClose, people, currency, onSave, initial
       if (!person || !date || amt <= 0) { toast.error('Fill all required fields'); return; }
       const emp = people.find(p => p.id === person)?.name || '?';
       const pb  = people.find(p => p.id === salPaidBy)?.name || '';
-      onSave({ id, ts, type, amount: amt, person: salPaidBy, employee: person, employeeName: emp, salaryPaidBy: salPaidBy, date, cat: 'Salary', note, desc: `Salary — ${emp}${pb ? ' (paid by ' + pb + ')' : ''}` });
+      onSave(stripUndefined({ id, ts, type, amount: amt, person: salPaidBy, employee: person, employeeName: emp, salaryPaidBy: salPaidBy, date, cat: 'Salary', note, desc: `Salary — ${emp}${pb ? ' (paid by ' + pb + ')' : ''}` }));
     }
     if (type === 'transfer') {
       const amt = parseFloat(tfAmt) || 0;
@@ -203,7 +204,7 @@ export function AddEntrySheet({ open, onClose, people, currency, onSave, initial
       if (amt <= 0)         { toast.error('Enter transfer amount'); return; }
       const fn = people.find(p => p.id === tfFrom)?.name || '?';
       const tn = people.find(p => p.id === tfTo)?.name || '?';
-      onSave({ id, ts, type, amount: amt, date: tfDate, transferFrom: tfFrom, transferTo: tfTo, transferRef: tfRef, person: tfFrom, cat: 'Transfer', note: tfRef, desc: `MoMo Transfer: ${fn} → ${tn}` });
+      onSave(stripUndefined({ id, ts, type, amount: amt, date: tfDate, transferFrom: tfFrom, transferTo: tfTo, transferRef: tfRef, person: tfFrom, cat: 'Transfer', note: tfRef, desc: `MoMo Transfer: ${fn} → ${tn}` }));
     }
     if (type === 'credit') {
       const total = parseFloat(crTotal) || 0;
@@ -218,7 +219,7 @@ export function AddEntrySheet({ open, onClose, people, currency, onSave, initial
       const desc = isPickup
         ? `Egg Pickup Scheduled — ${crBuyer} on ${crDate}`
         : `Credit sale — ${crBuyer}`;
-      onSave({ id, ts, type, amount: paid, creditTotal: total, creditPaid: paid, creditBuyer: crBuyer, creditSeller: crSeller, creditReceiver: receiver, person: crSeller, date: crDate, cat: crCat, note: crNote, source: crSource, desc, isPickup, payments: paid > 0 ? [{ amount: paid, receiver, date: crDate, note: 'Initial payment' }] : [] });
+      onSave(stripUndefined({ id, ts, type, amount: paid, creditTotal: total, creditPaid: paid, creditBuyer: crBuyer, creditSeller: crSeller, creditReceiver: receiver, person: crSeller, date: crDate, cat: crCat, note: crNote, source: crSource, desc, isPickup, payments: paid > 0 ? [{ amount: paid, receiver, date: crDate, note: 'Initial payment' }] : [] }));
     }
     if (type === 'owner-fund') {
       const amt = parseFloat(ofAmt) || 0;
@@ -228,7 +229,7 @@ export function AddEntrySheet({ open, onClose, people, currency, onSave, initial
       if (amt <= 0)    { toast.error('Enter amount'); return; }
       const sn = people.find(p => p.id === ofSender)?.name || 'Owner';
       const rn = people.find(p => p.id === ofReceiver)?.name || '?';
-      onSave({ id, ts, type, amount: amt, date: ofDate, ownerSender: ofSender, ownerReceiver: ofReceiver, person: ofReceiver, ownerName: sn, cat: 'Fund Injection', note: ofNote, desc: `Fund injection: ${sn} → ${rn}` });
+      onSave(stripUndefined({ id, ts, type, amount: amt, date: ofDate, ownerSender: ofSender, ownerReceiver: ofReceiver, person: ofReceiver, ownerName: sn, cat: 'Fund Injection', note: ofNote, desc: `Fund injection: ${sn} → ${rn}` }));
     }
     if (type === 'fund-return') {
       const amt = parseFloat(frAmt) || 0;
@@ -238,7 +239,7 @@ export function AddEntrySheet({ open, onClose, people, currency, onSave, initial
       if (amt <= 0)    { toast.error('Enter amount'); return; }
       const sn = people.find(p => p.id === frSender)?.name || '?';
       const rn = people.find(p => p.id === frReceiver)?.name || 'Owner';
-      onSave({ id, ts, type, amount: amt, date: frDate, frSender, frReceiver, person: frSender, cat: 'Fund Return', note: frNote, desc: `Fund return: ${sn} → ${rn}` });
+      onSave(stripUndefined({ id, ts, type, amount: amt, date: frDate, frSender, frReceiver, person: frSender, cat: 'Fund Return', note: frNote, desc: `Fund return: ${sn} → ${rn}` }));
     }
 
     setAmount(''); setNote(''); setBuyer(''); setTfRef('');

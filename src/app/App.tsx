@@ -17,7 +17,7 @@ import { SettingsTab }    from './components/SettingsTab';
 import { DeleteModal, EditModal, PaymentModal, ClearModal } from './components/Modals';
 
 import type { Transaction, Person, Tab, AppMode, TxType } from './types';
-import { gs, ss, sha256, sanitizeTxs } from './utils';
+import { gs, ss, sha256, sanitizeTxs, stripUndefined } from './utils';
 
 /* ── Firebase config ───────────────────────────────── */
 const FB = {
@@ -226,9 +226,15 @@ export default function App() {
         const ppl = Array.isArray(nextPeople) ? nextPeople : [];
         const withBiz = ppl.find(p => p.id === BIZ_ACCOUNT.id) ? ppl : [...ppl, BIZ_ACCOUNT];
         const [col, doc] = selectedBiz.fsDoc.split('/');
+        const payload = stripUndefined({
+          txs: nextTxs,
+          people: withBiz,
+          currency: nextCurrency,
+          ts: Date.now(),
+        });
         await fsRef.current.setDoc(
           fsRef.current.doc(dbRef.current, col, doc),
-          { txs: nextTxs, people: withBiz, currency: nextCurrency, ts: Date.now() }
+          payload
         );
         setDbStatus('✅ Last sync: ' + new Date().toLocaleTimeString());
       } catch (e: any) {
@@ -471,7 +477,7 @@ export default function App() {
     toast.loading('Pushing…');
     try {
       const [col, doc] = selectedBiz.fsDoc.split('/');
-      await fsRef.current.setDoc(fsRef.current.doc(dbRef.current, col, doc), { txs, people, currency, ts: Date.now() });
+      await fsRef.current.setDoc(fsRef.current.doc(dbRef.current, col, doc), stripUndefined({ txs, people, currency, ts: Date.now() }));
       toast.dismiss();
       toast.success('Pushed to cloud');
       setDbStatus('✅ Pushed: ' + new Date().toLocaleTimeString());
