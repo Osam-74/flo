@@ -1,4 +1,4 @@
-const CACHE_NAME = 'cashbook-v7';
+const CACHE_NAME = 'cashbook-v8';
 const BASE = '/flo';
 
 const PRECACHE = [
