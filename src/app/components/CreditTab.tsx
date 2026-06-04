@@ -9,11 +9,12 @@ interface Props {
   currency: string;
   isReadOnly: boolean;
   onPayment: (buyer: string) => void;
+  onPickup: (buyer: string, pickupDate: string) => void;
   onEdit: (tx: Transaction) => void;
   onDelete: (id: string, desc: string) => void;
 }
 
-export function CreditTab({ txs, people, currency, isReadOnly, onPayment, onEdit, onDelete }: Props) {
+export function CreditTab({ txs, people, currency, isReadOnly, onPayment, onPickup, onEdit, onDelete }: Props) {
   const creditTxs = txs.filter(t => t.type === 'credit');
 
   const byBuyer: Record<string, { total: number; paid: number; count: number; seller: string }> = {};
@@ -69,7 +70,7 @@ export function CreditTab({ txs, people, currency, isReadOnly, onPayment, onEdit
                       const nextPickupDate = allPickup ? buyerTxs.map(t => t.date).sort()[0] : null;
                       if (allPickup && nextPickupDate) return (
                         <div style={{ fontFamily: "'DM Mono',monospace", fontSize: '0.72rem', color: '#1A4FA8', marginTop: 2, display: 'flex', alignItems: 'center', gap: 4 }}>
-                          📦 Pickup {new Date(nextPickupDate + 'T00:00:00').toLocaleDateString('en-GB', { day: '2-digit', month: 'short' })}
+                          🥚 Pickup {new Date(nextPickupDate + 'T00:00:00').toLocaleDateString('en-GB', { day: '2-digit', month: 'short' })}
                         </div>
                       );
                       if (outstanding > 0.005) return (
@@ -84,12 +85,24 @@ export function CreditTab({ txs, people, currency, isReadOnly, onPayment, onEdit
                       );
                     })()}
                   </div>
-                  {!isReadOnly && outstanding > 0.005 && (() => {
+                  {!isReadOnly && (() => {
                     const todayStr = new Date().toISOString().split('T')[0];
                     const buyerTxs = creditTxs.filter(t => (t.creditBuyer || 'Unknown') === buyer);
                     const allPickup = buyerTxs.length > 0 && buyerTxs.every(t => t.isPickup && (t.date || '') > todayStr);
-                    if (allPickup) return null;
-                    return (
+                    const nextPickup = allPickup ? buyerTxs.map(t => t.date).sort()[0] ?? '' : '';
+                    if (allPickup) return (
+                      <button
+                        onClick={() => onPickup(buyer, nextPickup)}
+                        style={{
+                          background: 'rgba(26,79,168,0.10)', border: '1px solid #1A4FA8',
+                          color: '#1A4FA8', borderRadius: 10, padding: '6px 11px',
+                          fontSize: '0.64rem', fontWeight: 700, cursor: 'pointer', whiteSpace: 'nowrap',
+                        }}
+                      >
+                        🥚 Log Pickup
+                      </button>
+                    );
+                    if (outstanding > 0.005) return (
                       <button
                         onClick={() => onPayment(buyer)}
                         style={{
@@ -101,6 +114,7 @@ export function CreditTab({ txs, people, currency, isReadOnly, onPayment, onEdit
                         💸 Pay
                       </button>
                     );
+                    return null;
                   })()}
                 </div>
               </div>
@@ -135,3 +149,4 @@ const sh: React.CSSProperties = {
   fontSize: '0.62rem', fontWeight: 800, letterSpacing: '0.14em',
   textTransform: 'uppercase', color: '#9A9FB8', marginBottom: 10,
 };
+
