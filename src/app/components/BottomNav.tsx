@@ -13,22 +13,19 @@ interface NavItem {
   id: Tab;
   label: string;
   icon: React.ReactNode;
-  masterOnly?: boolean;
 }
 
 const NAV_ITEMS: NavItem[] = [
   { id: 'dashboard', label: 'Home',   icon: <LayoutDashboard size={20} strokeWidth={2} /> },
   { id: 'ledger',    label: 'Ledger', icon: <BookOpen size={20} strokeWidth={2} /> },
   { id: 'credit',    label: 'Credit', icon: <CreditCard size={20} strokeWidth={2} /> },
-  { id: 'people',    label: 'People', icon: <Users size={20} strokeWidth={2} />, masterOnly: true },
+  { id: 'people',    label: 'People', icon: <Users size={20} strokeWidth={2} /> },
 ];
 
 export function BottomNav({ activeTab, appMode, onTab, onAdd }: Props) {
-  const isReadOnly = appMode === 'view';
-  const visibleItems = NAV_ITEMS.filter(item => !item.masterOnly || !isReadOnly);
-  const half = Math.floor(visibleItems.length / 2);
-  const leftItems  = visibleItems.slice(0, half);
-  const rightItems = visibleItems.slice(half);
+  const half = Math.floor(NAV_ITEMS.length / 2);
+  const leftItems  = NAV_ITEMS.slice(0, half);
+  const rightItems = NAV_ITEMS.slice(half);
 
   return (
     <div style={{
@@ -48,46 +45,42 @@ export function BottomNav({ activeTab, appMode, onTab, onAdd }: Props) {
           <NavBtn key={item.id} item={item} active={activeTab === item.id} onTab={onTab} />
         ))}
 
-        {/* FAB */}
-        {!isReadOnly ? (
-          <div style={{ position: 'relative', width: 64, height: 64, flexShrink: 0 }}>
-            <button
-              onClick={onAdd}
-              style={{
-                position: 'absolute', top: -22, left: '50%', transform: 'translateX(-50%)',
-                width: 56, height: 56, borderRadius: '50%',
-                background: '#1A4FA8',
-                boxShadow: '0 4px 14px rgba(26,79,168,0.45)',
-                border: '2.5px solid #ffffff',
-                display: 'flex', alignItems: 'center', justifyContent: 'center',
-                cursor: 'pointer', zIndex: 10,
-                transition: 'transform 0.15s ease, box-shadow 0.15s ease, background 0.15s ease',
-              }}
-              onMouseEnter={e => {
-                e.currentTarget.style.transform = 'translateX(-50%) scale(1.07)';
-                e.currentTarget.style.background = '#1340A0';
-                e.currentTarget.style.boxShadow = '0 6px 20px rgba(26,79,168,0.55)';
-              }}
-              onMouseLeave={e => {
-                e.currentTarget.style.transform = 'translateX(-50%) scale(1)';
-                e.currentTarget.style.background = '#1A4FA8';
-                e.currentTarget.style.boxShadow = '0 4px 14px rgba(26,79,168,0.45)';
-              }}
-              onTouchStart={e => {
-                e.currentTarget.style.transform = 'translateX(-50%) scale(0.93)';
-                e.currentTarget.style.boxShadow = '0 2px 8px rgba(26,79,168,0.3)';
-              }}
-              onTouchEnd={e => {
-                e.currentTarget.style.transform = 'translateX(-50%) scale(1)';
-                e.currentTarget.style.boxShadow = '0 4px 14px rgba(26,79,168,0.45)';
-              }}
-            >
-              <Plus size={24} strokeWidth={2.5} color="#fff" />
-            </button>
-          </div>
-        ) : (
-          <div style={{ width: 32 }} />
-        )}
+        {/* FAB — always visible; in view mode it opens the sheet in read-only preview */}
+        <div style={{ position: 'relative', width: 64, height: 64, flexShrink: 0 }}>
+          <button
+            onClick={onAdd}
+            style={{
+              position: 'absolute', top: -22, left: '50%', transform: 'translateX(-50%)',
+              width: 56, height: 56, borderRadius: '50%',
+              background: '#1A4FA8',
+              boxShadow: '0 4px 14px rgba(26,79,168,0.45)',
+              border: '2.5px solid #ffffff',
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              cursor: 'pointer', zIndex: 10,
+              transition: 'transform 0.15s ease, box-shadow 0.15s ease, background 0.15s ease',
+            }}
+            onMouseEnter={e => {
+              e.currentTarget.style.transform = 'translateX(-50%) scale(1.07)';
+              e.currentTarget.style.background = '#1340A0';
+              e.currentTarget.style.boxShadow = '0 6px 20px rgba(26,79,168,0.55)';
+            }}
+            onMouseLeave={e => {
+              e.currentTarget.style.transform = 'translateX(-50%) scale(1)';
+              e.currentTarget.style.background = '#1A4FA8';
+              e.currentTarget.style.boxShadow = '0 4px 14px rgba(26,79,168,0.45)';
+            }}
+            onTouchStart={e => {
+              e.currentTarget.style.transform = 'translateX(-50%) scale(0.93)';
+              e.currentTarget.style.boxShadow = '0 2px 8px rgba(26,79,168,0.3)';
+            }}
+            onTouchEnd={e => {
+              e.currentTarget.style.transform = 'translateX(-50%) scale(1)';
+              e.currentTarget.style.boxShadow = '0 4px 14px rgba(26,79,168,0.45)';
+            }}
+          >
+            <Plus size={24} strokeWidth={2.5} color="#fff" />
+          </button>
+        </div>
 
         {rightItems.map(item => (
           <NavBtn key={item.id} item={item} active={activeTab === item.id} onTab={onTab} />
