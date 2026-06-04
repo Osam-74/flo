@@ -17,7 +17,7 @@ import { SettingsTab }    from './components/SettingsTab';
 import { DeleteModal, EditModal, PaymentModal, ClearModal } from './components/Modals';
 
 import type { Transaction, Person, Tab, AppMode, TxType } from './types';
-import { gs, ss, sha256 } from './utils';
+import { gs, ss, sha256, sanitizeTxs } from './utils';
 
 /* ── Firebase config ───────────────────────────────── */
 const FB = {
@@ -172,14 +172,7 @@ export default function App() {
     const ppl = Array.isArray(p) ? p : [];
     const withBiz = ppl.find((x: any) => x?.id === BIZ_ACCOUNT.id) ? ppl : [...ppl, BIZ_ACCOUNT];
     const rawTxs = r.txs ?? gs('cb_txs', []);
-    // Sanitize: coerce numeric fields to numbers so .toFixed() never crashes
-    const t = Array.isArray(rawTxs) ? rawTxs.map((tx: any) => ({
-      ...tx,
-      amount:      Number(tx.amount)      || 0,
-      creditTotal: Number(tx.creditTotal) || 0,
-      creditPaid:  Number(tx.creditPaid)  || 0,
-      ts:          Number(tx.ts)          || 0,
-    })) : [];
+    const t = sanitizeTxs(rawTxs);
     const c = r.currency ?? gs('cb_currency', 'GHS');
     setPeople(withBiz); setTxs(t); setCurrency(c);
     ss('cb_people', withBiz); ss('cb_txs', t); ss('cb_currency', c);
@@ -209,7 +202,8 @@ export default function App() {
       if (!snap.exists()) {
         const ppl = gs('cb_people', []);
         const withBiz = (Array.isArray(ppl) && ppl.find((x: any) => x?.id === BIZ_ACCOUNT.id)) ? ppl : [...(Array.isArray(ppl) ? ppl : []), BIZ_ACCOUNT];
-        setPeople(withBiz); setTxs(gs('cb_txs', [])); setCurrency(gs('cb_currency', 'GHS'));
+        const rawTxs = gs('cb_txs', []);
+        setPeople(withBiz); setTxs(sanitizeTxs(rawTxs)); setCurrency(gs('cb_currency', 'GHS'));
         ss('cb_people', withBiz);
         setDbStatus('⚠️ No cloud data yet — add your first transaction!');
       } else {
@@ -218,7 +212,8 @@ export default function App() {
     }, (err: any) => {
       console.warn('[DB]', err);
       setDbStatus('❌ Sync error: ' + err.code);
-      setPeople(gs('cb_people', [])); setTxs(gs('cb_txs', [])); setCurrency(gs('cb_currency', 'GHS'));
+      const rawTxs = gs('cb_txs', []);
+      setPeople(gs('cb_people', [])); setTxs(sanitizeTxs(rawTxs)); setCurrency(gs('cb_currency', 'GHS'));
     });
   }, [applyRemote]);
 
@@ -518,9 +513,10 @@ export default function App() {
         if (obj.people && obj.txs) {
           const ppl = Array.isArray(obj.people) ? obj.people : [];
           const withBiz = ppl.find((x: any) => x?.id === BIZ_ACCOUNT.id) ? ppl : [...ppl, BIZ_ACCOUNT];
-          setPeople(withBiz); setTxs(obj.txs); setCurrency(obj.currency || 'GHS');
-          ss('cb_people', withBiz); ss('cb_txs', obj.txs); ss('cb_currency', obj.currency || 'GHS');
-          dbSync(withBiz, obj.txs, obj.currency || 'GHS');
+          const cleanTxs = sanitizeTxs(obj.txs);
+          setPeople(withBiz); setTxs(cleanTxs); setCurrency(obj.currency || 'GHS');
+          ss('cb_people', withBiz); ss('cb_txs', cleanTxs); ss('cb_currency', obj.currency || 'GHS');
+          dbSync(withBiz, cleanTxs, obj.currency || 'GHS');
           toast.success('Imported data');
         } else toast.error('Invalid import file');
       } catch { toast.error('Import failed'); }
