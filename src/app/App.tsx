@@ -371,8 +371,9 @@ export default function App() {
   }, [people, currency, dbSync]);
 
   /* ── Credit payment ──────────────────────────────── */
-  const confirmPayment = useCallback((buyer: string, amount: number, receiver: string, receiverName: string, note: string) => {
-    const date = new Date().toISOString().slice(0, 10);
+  const confirmPayment = useCallback((buyer: string, amount: number, date: string, receiver: string) => {
+    const receiverName = people.find(p => p.id === receiver)?.name || receiver;
+    const note = '';
     setTxs(prev => {
       const next = prev.map(t => {
         if (t.type !== 'credit') return t;
@@ -730,29 +731,34 @@ export default function App() {
           open={deleteModal.open}
           desc={deleteModal.desc}
           onConfirm={confirmDelete}
-          onCancel={() => setDeleteModal(s => ({ ...s, open: false }))}
+          onClose={() => setDeleteModal(s => ({ ...s, open: false }))}
         />
         <EditModal
           open={editModal.open}
           tx={editModal.tx}
           people={people}
-          currency={currency}
-          onConfirm={confirmEdit}
-          onCancel={() => setEditModal({ open: false, tx: null })}
+          onSave={confirmEdit}
+          onClose={() => setEditModal({ open: false, tx: null })}
         />
         <PaymentModal
           open={payModal.open}
           buyer={payModal.buyer}
-          txs={txs}
+          outstanding={(() => {
+            const buyer = payModal.buyer;
+            let total = 0, paid = 0;
+            txs.filter(t => t.type === 'credit' && (t.creditBuyer || 'Unknown') === buyer)
+               .forEach(t => { total += t.creditTotal || 0; paid += t.creditPaid || 0; });
+            return Math.max(0, total - paid);
+          })()}
           people={people}
           currency={currency}
-          onConfirm={confirmPayment}
-          onCancel={() => setPayModal(s => ({ ...s, open: false }))}
+          onApply={(amount, date, receiver) => confirmPayment(payModal.buyer, amount, date, receiver)}
+          onClose={() => setPayModal(s => ({ ...s, open: false }))}
         />
         <ClearModal
           open={clearModal}
           onConfirm={() => { executeFullClear(); setClearModal(false); }}
-          onCancel={() => setClearModal(false)}
+          onClose={() => setClearModal(false)}
         />
       </div>
     </div>
