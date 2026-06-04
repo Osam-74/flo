@@ -72,7 +72,7 @@ export function EditModal({ open, tx, people, onClose, onSave }: EditModalProps)
       // Never allow creditTotal to go below what's already been paid — that would break settlement status.
       const alreadyPaid = tx.creditPaid || 0;
       if (amt < alreadyPaid) {
-        toast.error(`Total cannot be less than amount already paid (${alreadyPaid.toFixed(2)})`);
+        toast.error(\`Total cannot be less than amount already paid (\${alreadyPaid.toFixed(2)})\`);
         return;
       }
       Object.assign(updates, { creditTotal: amt, amount: tx.amount });

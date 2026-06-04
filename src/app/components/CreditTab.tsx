@@ -61,28 +61,47 @@ export function CreditTab({ txs, people, currency, isReadOnly, onPayment, onEdit
                     <div style={{ fontFamily: "'DM Mono',monospace", fontSize: '0.86rem', fontWeight: 600, color: '#1A1D2E' }}>
                       {fmtAmt(data.total, currency)}
                     </div>
-                    {outstanding > 0.005 ? (
-                      <div style={{ fontFamily: "'DM Mono',monospace", fontSize: '0.75rem', color: '#E83E5C', marginTop: 2 }}>
-                        Owes: {fmtAmt(outstanding, currency)}
-                      </div>
-                    ) : (
-                      <div style={{ fontFamily: "'DM Mono',monospace", fontSize: '0.75rem', color: '#00B87A', marginTop: 2 }}>
-                        Settled ✓
-                      </div>
-                    )}
+                    {(() => {
+                      const todayStr = new Date().toISOString().split('T')[0];
+                      // Check if ALL txs for this buyer are pickup-scheduled (future date, isPickup)
+                      const buyerTxs = creditTxs.filter(t => (t.creditBuyer || 'Unknown') === buyer);
+                      const allPickup = buyerTxs.length > 0 && buyerTxs.every(t => t.isPickup && (t.date || '') > todayStr);
+                      const nextPickupDate = allPickup ? buyerTxs.map(t => t.date).sort()[0] : null;
+                      if (allPickup && nextPickupDate) return (
+                        <div style={{ fontFamily: "'DM Mono',monospace", fontSize: '0.72rem', color: '#1A4FA8', marginTop: 2, display: 'flex', alignItems: 'center', gap: 4 }}>
+                          📦 Pickup {new Date(nextPickupDate + 'T00:00:00').toLocaleDateString('en-GB', { day: '2-digit', month: 'short' })}
+                        </div>
+                      );
+                      if (outstanding > 0.005) return (
+                        <div style={{ fontFamily: "'DM Mono',monospace", fontSize: '0.75rem', color: '#E83E5C', marginTop: 2 }}>
+                          Owes: {fmtAmt(outstanding, currency)}
+                        </div>
+                      );
+                      return (
+                        <div style={{ fontFamily: "'DM Mono',monospace", fontSize: '0.75rem', color: '#00B87A', marginTop: 2 }}>
+                          Settled ✓
+                        </div>
+                      );
+                    })()}
                   </div>
-                  {!isReadOnly && outstanding > 0.005 && (
-                    <button
-                      onClick={() => onPayment(buyer)}
-                      style={{
-                        background: 'rgba(0,184,122,0.12)', border: '1px solid #00B87A',
-                        color: '#00B87A', borderRadius: 10, padding: '6px 11px',
-                        fontSize: '0.64rem', fontWeight: 700, cursor: 'pointer', whiteSpace: 'nowrap',
-                      }}
-                    >
-                      💸 Pay
-                    </button>
-                  )}
+                  {!isReadOnly && outstanding > 0.005 && (() => {
+                    const todayStr = new Date().toISOString().split('T')[0];
+                    const buyerTxs = creditTxs.filter(t => (t.creditBuyer || 'Unknown') === buyer);
+                    const allPickup = buyerTxs.length > 0 && buyerTxs.every(t => t.isPickup && (t.date || '') > todayStr);
+                    if (allPickup) return null;
+                    return (
+                      <button
+                        onClick={() => onPayment(buyer)}
+                        style={{
+                          background: 'rgba(0,184,122,0.12)', border: '1px solid #00B87A',
+                          color: '#00B87A', borderRadius: 10, padding: '6px 11px',
+                          fontSize: '0.64rem', fontWeight: 700, cursor: 'pointer', whiteSpace: 'nowrap',
+                        }}
+                      >
+                        💸 Pay
+                      </button>
+                    );
+                  })()}
                 </div>
               </div>
             );

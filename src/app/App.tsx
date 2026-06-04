@@ -3,6 +3,7 @@ import { Toaster, toast } from 'sonner';
 import '../styles/fonts.css';
 
 import { PinScreen }      from './components/PinScreen';
+import { BusinessSelector, BUSINESSES } from './components/BusinessSelector';
 import { AppHeader }      from './components/AppHeader';
 import { BottomNav }      from './components/BottomNav';
 import { Dashboard }      from './components/Dashboard';
@@ -26,7 +27,7 @@ const FB = {
   messagingSenderId: "323704270723",
   appId: "1:323704270723:web:f5d7d6a2695d332937d0b6",
 };
-const FS_DOC = ['cashbook','main'] as const;
+// FS_DOC is now dynamic per business — resolved in initFirebase
 const H_MASTER = '84b2a5d834daee2fff7eb5e31f44ba68eb860d86d2cf8e37606a26fa775cf23b';
 
 const BIZ_ACCOUNT = { id: 'biz', name: 'Biz Account', role: 'biz', color: 'gold' };
@@ -34,12 +35,12 @@ const BIZ_ACCOUNT = { id: 'biz', name: 'Biz Account', role: 'biz', color: 'gold'
 export default function App() {
   /* ── Auth / session ──────────────────────── */
   const [appMode, setAppMode] = useState<AppMode>('locked');
+  const [selectedBusinessId, setSelectedBusinessId] = useState<string | null>(null);
 
   /* ── Data ──────────────────────────────────── */
   const [people,   setPeople]   = useState<Person[]>([]);
   const [txs,      setTxs]      = useState<Transaction[]>([]);
   const [currency, setCurrency] = useState('GHS');
-  const [businessName, setBusinessName] = useState('');
 
   /* ── UI state ─────────────────────────────── */
   const [activeTab,   setActiveTab]   = useState<Tab>('dashboard');
@@ -96,7 +97,11 @@ export default function App() {
   /* ── Auto-restore session ─────────────────── */
   useEffect(() => {
     const s = sessionStorage.getItem('cb_s');
-    if (s === 'master' || s === 'view') unlock(s === 'master' ? 'master' : 'view');
+    const bId = sessionStorage.getItem('cb_biz') || BUSINESSES[0].id;
+    if (s === 'master' || s === 'view') {
+      setSelectedBusinessId(bId);
+      unlock(s === 'master' ? 'master' : 'view', bId);
+    }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -107,25 +112,26 @@ export default function App() {
     const withBiz = ppl.find((x: any) => x?.id === BIZ_ACCOUNT.id) ? ppl : [...ppl, BIZ_ACCOUNT];
     const t = r.txs    ?? gs('cb_txs',    []);
     const c = r.currency ?? gs('cb_currency', 'GHS');
-    const b = r.businessName ?? gs('cb_businessName', '');
-    setPeople(withBiz); setTxs(t); setCurrency(c); setBusinessName(b);
-    ss('cb_people', withBiz); ss('cb_txs', t); ss('cb_currency', c); ss('cb_businessName', b);
+    setPeople(withBiz); setTxs(t); setCurrency(c);
+    ss('cb_people', withBiz); ss('cb_txs', t); ss('cb_currency', c);
     setDbStatus('✅ Live sync active. Last update: ' + new Date().toLocaleTimeString());
   }, []);
 
-  const initFirebase = useCallback(async () => {
+  const initFirebase = useCallback(async (bizId?: string) => {
     try {
       const { initializeApp, getApps } = await import('https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js' as any);
       const fs = await import('https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js' as any);
       fsRef.current = fs;
       const app = getApps().length === 0 ? initializeApp(FB) : getApps()[0];
       dbRef.current = fs.getFirestore(app);
-      const ref = fs.doc(dbRef.current, ...FS_DOC);
+      const activeBiz = BUSINESSES.find(b => b.id === (bizId || selectedBusinessId)) || BUSINESSES[0];
+      const [col, doc] = activeBiz.fsDoc.split('/');
+      const ref = fs.doc(dbRef.current, col, doc);
       fs.onSnapshot(ref, (snap: any) => {
         if (!snap.exists()) {
           const ppl = gs('cb_people', []);
           const withBiz = (Array.isArray(ppl) && ppl.find((x: any) => x?.id === BIZ_ACCOUNT.id)) ? ppl : [...(Array.isArray(ppl) ? ppl : []), BIZ_ACCOUNT];
-          setPeople(withBiz); setTxs(gs('cb_txs', [])); setCurrency(gs('cb_currency', 'GHS')); setBusinessName(gs('cb_businessName', ''));
+          setPeople(withBiz); setTxs(gs('cb_txs', [])); setCurrency(gs('cb_currency', 'GHS'));
           ss('cb_people', withBiz);
           setDbStatus('⚠️ No cloud data yet. Use ↑ Push Local to upload existing data.');
         } else {
@@ -134,7 +140,7 @@ export default function App() {
       }, (err: any) => {
         console.warn('[DB]', err);
         setDbStatus('❌ Sync error: ' + err.code);
-        setPeople(gs('cb_people', [])); setTxs(gs('cb_txs', [])); setCurrency(gs('cb_currency', 'GHS')); setBusinessName(gs('cb_businessName', ''));
+        setPeople(gs('cb_people', [])); setTxs(gs('cb_txs', [])); setCurrency(gs('cb_currency', 'GHS'));
       });
     } catch (e) {
       console.warn('[DB] Firebase failed:', e);
@@ -143,16 +149,18 @@ export default function App() {
     }
   }, [applyRemote]);
 
-  const dbSync = useCallback((nextPeople: Person[], nextTxs: Transaction[], nextCurrency: string, nextBusinessName?: string) => {
+  const dbSync = useCallback((nextPeople: Person[], nextTxs: Transaction[], nextCurrency: string) => {
     if (!dbRef.current || !fsRef.current) return;
     clearTimeout(syncRef.current);
     syncRef.current = setTimeout(async () => {
       try {
         const ppl = Array.isArray(nextPeople) ? nextPeople : [];
         const withBiz = ppl.find(p => p.id === BIZ_ACCOUNT.id) ? ppl : [...ppl, BIZ_ACCOUNT];
+        const activeBiz = BUSINESSES.find(b => b.id === selectedBusinessId) || BUSINESSES[0];
+        const [col, doc] = activeBiz.fsDoc.split('/');
         await fsRef.current.setDoc(
-          fsRef.current.doc(dbRef.current, ...FS_DOC),
-          { txs: nextTxs, people: withBiz, currency: nextCurrency, businessName: nextBusinessName || '', ts: Date.now(), _pinHash: H_MASTER }
+          fsRef.current.doc(dbRef.current, col, doc),
+          { txs: nextTxs, people: withBiz, currency: nextCurrency, ts: Date.now(), _pinHash: H_MASTER }
         );
         setDbStatus('✅ Last sync: ' + new Date().toLocaleTimeString());
       } catch (e: any) {
@@ -162,15 +170,18 @@ export default function App() {
   }, []);
 
   /* ── Unlock ───────────────────────────────── */
-  const unlock = useCallback((mode: 'master' | 'view') => {
+  const unlock = useCallback((mode: 'master' | 'view', bizId?: string) => {
     setAppMode(mode);
-    initFirebase();
-  }, [initFirebase]);
+    initFirebase(bizId || selectedBusinessId || BUSINESSES[0].id);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [initFirebase, selectedBusinessId]);
 
   const lock = useCallback(() => {
     sessionStorage.removeItem('cb_s');
+    sessionStorage.removeItem('cb_biz');
     setAppMode('locked');
-    setPeople([]); setTxs([]); setCurrency('GHS'); setBusinessName('');
+    setSelectedBusinessId(null);
+    setPeople([]); setTxs([]); setCurrency('GHS');
   }, []);
 
   /* ── Guard ────────────────────────────────── */
@@ -275,17 +286,9 @@ export default function App() {
     if (!guardWrite()) return;
     setCurrency(c);
     ss('cb_currency', c);
-    dbSync(people, txs, c, businessName);
+    dbSync(people, txs, c);
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [people, txs, businessName, dbSync, isReadOnly]);
-
-  /* ── Business Name ────────────────────────── */
-  const saveBusinessName = useCallback((name: string) => {
-    if (!guardWrite()) return;
-    setBusinessName(name);
-    ss('cb_businessName', name);
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isReadOnly]);
+  }, [people, txs, dbSync, isReadOnly]);
 
   /* ── Cloud ────────────────────────────────── */
   const manualPull = async () => {
@@ -301,7 +304,7 @@ export default function App() {
     if (!dbRef.current || !fsRef.current) { toast.error('Not connected'); return; }
     toast.loading('Pushing…');
     try {
-      await fsRef.current.setDoc(fsRef.current.doc(dbRef.current, ...FS_DOC), { txs, people, currency, businessName, ts: Date.now(), _pinHash: H_MASTER });
+      await fsRef.current.setDoc(fsRef.current.doc(dbRef.current, ...FS_DOC), { txs, people, currency, ts: Date.now(), _pinHash: H_MASTER });
       toast.dismiss();
       toast.success('Pushed to cloud');
       setDbStatus('✅ Pushed: ' + new Date().toLocaleTimeString());
@@ -344,12 +347,30 @@ export default function App() {
   };
 
   /* ── Render ───────────────────────────────── */
-  if (appMode === 'locked') return (
-    <>
-      <PinScreen onUnlock={unlock} />
-      <Toaster position="bottom-center" richColors />
-    </>
-  );
+  if (appMode === 'locked') {
+    // Step 1: choose business
+    if (!selectedBusinessId) return (
+      <>
+        <BusinessSelector onSelect={id => { setSelectedBusinessId(id); sessionStorage.setItem('cb_biz', id); }} />
+        <Toaster position="bottom-center" richColors />
+      </>
+    );
+    // Step 2: enter PIN for chosen business
+    const chosenBiz = BUSINESSES.find(b => b.id === selectedBusinessId) || BUSINESSES[0];
+    return (
+      <>
+        <PinScreen
+          onUnlock={(mode) => {
+            sessionStorage.setItem('cb_s', mode);
+            unlock(mode, selectedBusinessId);
+          }}
+          businessId={selectedBusinessId}
+          businessName={chosenBiz.name}
+        />
+        <Toaster position="bottom-center" richColors />
+      </>
+    );
+  }
 
   const exportData = () => {
     const payload = { people, txs, currency };
@@ -418,7 +439,7 @@ export default function App() {
         <div style={{ flex: 1, overflowY: 'auto', WebkitOverflowScrolling: 'touch' as any }}>
           {activeTab === 'dashboard' && (
             <Dashboard
-              businessName={businessName} txs={txs} people={people} currency={currency}
+              txs={txs} people={people} currency={currency}
               onPersonFilter={handlePersonFilter}
               onEdit={tx => { if (!guardWrite()) return; setEditModal({ open: true, tx }); }}
               onDelete={(id, desc) => { if (!guardWrite()) return; setDeleteModal({ open: true, id, desc }); }}
@@ -449,12 +470,12 @@ export default function App() {
             />
           )}
           {activeTab === 'report' && (
-            <ReportTab businessName={businessName} txs={txs} people={people} currency={currency} />
+            <ReportTab txs={txs} people={people} currency={currency} />
           )}
           {activeTab === 'settings' && (
             <SettingsTab
-              currency={currency} businessName={businessName} dbStatus={dbStatus}
-              onSaveCurrency={saveCurrency} onSaveBusinessName={saveBusinessName}
+              currency={currency} dbStatus={dbStatus}
+              onSaveCurrency={saveCurrency}
               onPull={manualPull} onPush={manualPush}
               onClearAll={() => { if (!guardWrite()) return; setClearModal(true); }}
               onExport={exportData}

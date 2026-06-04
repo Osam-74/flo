@@ -21,6 +21,7 @@ const humans    = (people: Person[]) => people.filter(p => {
 });
 
 const today = () => new Date().toISOString().split('T')[0];
+const isFutureDate = (d: string) => d > today();
 
 const TYPE_OPTS: { id: TxType; emoji: string; label: string; color: string }[] = [
   { id: 'income',      emoji: '●', label: 'Sales',          color: '#0077B6' },
@@ -69,6 +70,23 @@ export function AddEntrySheet({ open, onClose, people, currency, onSave, initial
   const [frSender, setFrSender] = useState('');
   const [frReceiver, setFrReceiver] = useState('');
   const [salPaidBy, setSalPaidBy] = useState('');
+
+  // ── Swipe gesture state ──────────────────────────────────────────────────
+  const swipeStartX = useRef<number | null>(null);
+  const TYPES_ORDER: TxType[] = ['income', 'expense', 'salary', 'transfer', 'credit', 'owner-fund', 'fund-return'];
+
+  const handleSwipeStart = (e: React.TouchEvent) => {
+    swipeStartX.current = e.touches[0].clientX;
+  };
+  const handleSwipeEnd = (e: React.TouchEvent) => {
+    if (swipeStartX.current === null) return;
+    const diff = swipeStartX.current - e.changedTouches[0].clientX;
+    if (Math.abs(diff) < 50) { swipeStartX.current = null; return; }
+    const idx = TYPES_ORDER.indexOf(type);
+    if (diff > 0 && idx < TYPES_ORDER.length - 1) changeType(TYPES_ORDER[idx + 1]); // swipe left → next
+    if (diff < 0 && idx > 0) changeType(TYPES_ORDER[idx - 1]); // swipe right → prev
+    swipeStartX.current = null;
+  };
 
   // ── Keyboard / viewport repositioning fix ──────────────────────────────
   // On mobile, when the soft keyboard opens/closes, the visual viewport shrinks/grows.
@@ -194,7 +212,12 @@ export function AddEntrySheet({ open, onClose, people, currency, onSave, initial
       if (!crDate)    { toast.error('Select a date'); return; }
       if (total <= 0) { toast.error('Enter total expected amount'); return; }
       if (paid > total) { toast.error('Amount paid cannot exceed total'); return; }
-      onSave({ id, ts, type, amount: paid, creditTotal: total, creditPaid: paid, creditBuyer: crBuyer, creditSeller: crSeller, creditReceiver: crReceiver, person: crSeller, date: crDate, cat: crCat, note: crNote, source: crSource, desc: `Credit sale — ${crBuyer}`, payments: paid > 0 ? [{ amount: paid, receiver: crReceiver, date: crDate, note: 'Initial payment' }] : [] });
+      const isPickup = crDate > today();
+      const receiver = paid > 0 ? crReceiver : '';
+      const desc = isPickup
+        ? `Egg Pickup Scheduled — ${crBuyer} on ${crDate}`
+        : `Credit sale — ${crBuyer}`;
+      onSave({ id, ts, type, amount: paid, creditTotal: total, creditPaid: paid, creditBuyer: crBuyer, creditSeller: crSeller, creditReceiver: receiver, person: crSeller, date: crDate, cat: crCat, note: crNote, source: crSource, desc, isPickup, payments: paid > 0 ? [{ amount: paid, receiver, date: crDate, note: 'Initial payment' }] : [] });
     }
     if (type === 'owner-fund') {
       const amt = parseFloat(ofAmt) || 0;
@@ -266,15 +289,16 @@ export function AddEntrySheet({ open, onClose, people, currency, onSave, initial
             </button>
           </div>
 
-          {/* Scrollable body */}
+          {/* Scrollable body — swipe left/right to switch transaction type */}
           <div
             data-scroll
+            onTouchStart={handleSwipeStart}
+            onTouchEnd={handleSwipeEnd}
             style={{
               overflowY: 'auto',
               flex: 1,
               padding: '0 16px 40px',
               WebkitOverflowScrolling: 'touch',
-              // Use padding-bottom to ensure content clears keyboard
               paddingBottom: 'max(40px, env(keyboard-inset-height, 0px))',
             }}
           >
@@ -335,7 +359,7 @@ export function AddEntrySheet({ open, onClose, people, currency, onSave, initial
                     </Select>
                   </Field>
                   <Field label="Date *">
-                    <input style={inp} type="date" value={date} onChange={e => setDate(e.target.value)} />
+                    <input style={inp} type="date" value={date} max={today()} onChange={e => setDate(e.target.value)} />
                   </Field>
                 </Row>
                 <Row>
@@ -371,14 +395,12 @@ export function AddEntrySheet({ open, onClose, people, currency, onSave, initial
             {type === 'transfer' && (
               <div style={card}>
                 <InfoBox>Record a mobile money or bank transfer made on behalf of the business.</InfoBox>
-                <div style={{ marginBottom: 14 }}>
-                  <Field label={`Amount (${currency}) *`}>
-                    <input style={{ ...inp, fontSize: '1.5rem', fontFamily: "'DM Mono',monospace" }}
-                      type="number" placeholder="0.00" min="0" step="0.01"
-                      value={tfAmt} onChange={e => setTfAmt(e.target.value)} />
-                  </Field>
-                </div>
-                <Row gap={14}>
+                <Field label={`Amount (${currency}) *`}>
+                  <input style={{ ...inp, fontSize: '1.5rem', fontFamily: "'DM Mono',monospace" }}
+                    type="number" placeholder="0.00" min="0" step="0.01"
+                    value={tfAmt} onChange={e => setTfAmt(e.target.value)} />
+                </Field>
+                <Row>
                   <Field label="Sent By *">
                     <Select value={tfFrom} onChange={setTfFrom}>
                       {no.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
@@ -392,7 +414,7 @@ export function AddEntrySheet({ open, onClose, people, currency, onSave, initial
                 </Row>
                 <Row>
                   <Field label="Date *">
-                    <input style={inp} type="date" value={tfDate} onChange={e => setTfDate(e.target.value)} />
+                    <input style={inp} type="date" value={tfDate} max={today()} onChange={e => setTfDate(e.target.value)} />
                   </Field>
                   <Field label="MoMo / Bank Reference">
                     <input style={inp} type="text" placeholder="e.g. MTN ref 123456"
@@ -405,13 +427,22 @@ export function AddEntrySheet({ open, onClose, people, currency, onSave, initial
             {/* ── CREDIT ── */}
             {type === 'credit' && (
               <div style={card}>
-                <InfoBox>Track buyer, total expected, and amount paid now.</InfoBox>
+                {isFutureDate(crDate) ? (
+                  <div style={{ background: 'rgba(61,107,223,0.08)', border: '1px solid rgba(61,107,223,0.22)', borderRadius: 10, padding: '8px 13px', marginBottom: 10, display: 'flex', alignItems: 'center', gap: 8 }}>
+                    <span style={{ fontSize: '1rem' }}>📦</span>
+                    <span style={{ fontSize: '0.74rem', fontWeight: 700, color: '#1A2FA8' }}>
+                      Scheduled for Egg Pickup — {crDate ? new Date(crDate + 'T00:00:00').toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: '2-digit' }) : ''}
+                    </span>
+                  </div>
+                ) : (
+                  <InfoBox>Track buyer, total expected, and amount paid now.</InfoBox>
+                )}
                 <Row>
                   <Field label="Buyer Name *">
                     <input style={inp} type="text" placeholder="Buyer's full name"
                       value={crBuyer} onChange={e => setCrBuyer(e.target.value)} />
                   </Field>
-                  <Field label="Date *">
+                  <Field label="Pickup / Sale Date *">
                     <input style={inp} type="date" value={crDate} onChange={e => setCrDate(e.target.value)} />
                   </Field>
                 </Row>
@@ -420,13 +451,14 @@ export function AddEntrySheet({ open, onClose, people, currency, onSave, initial
                     <input style={inp} type="number" placeholder="0.00" min="0" step="0.01"
                       value={crTotal} onChange={e => setCrTotal(e.target.value)} />
                   </Field>
-                  <Field label="Amount Paid Now">
-                    <input style={inp} type="number" placeholder="0.00" min="0" step="0.01"
+                  <Field label="Amount Paid Upfront">
+                    <input style={inp} type="number" placeholder="0.00 (optional)"
+                      min="0" step="0.01"
                       value={crPaid} onChange={e => setCrPaid(e.target.value)} />
                   </Field>
                 </Row>
                 {crTotalAmt > 0 && (
-                  <div style={{ ...infoBox, color: crOutstanding > 0 ? '#E83E5C' : '#0077B6', marginBottom: 10 }}>
+                  <div style={{ ...infoBox, color: crOutstanding > 0 ? '#E83E5C' : '#1A2FA8', marginBottom: 10 }}>
                     Total: {currency} {crTotalAmt.toFixed(2)} · Paid: {currency} {crPaidAmt.toFixed(2)} · Outstanding: {currency} {crOutstanding.toFixed(2)}
                   </div>
                 )}
@@ -436,11 +468,14 @@ export function AddEntrySheet({ open, onClose, people, currency, onSave, initial
                       {humans(people).map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
                     </Select>
                   </Field>
-                  <Field label="Money Received By">
-                    <Select value={crReceiver} onChange={setCrReceiver}>
-                      {no.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
-                    </Select>
-                  </Field>
+                  {/* Only show "Money Received By" if an upfront payment was entered */}
+                  {crPaidAmt > 0 && (
+                    <Field label="Money Received By">
+                      <Select value={crReceiver} onChange={setCrReceiver}>
+                        {no.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
+                      </Select>
+                    </Field>
+                  )}
                 </Row>
                 <Row>
                   <Field label="Category">
@@ -467,23 +502,21 @@ export function AddEntrySheet({ open, onClose, people, currency, onSave, initial
             {type === 'owner-fund' && (
               <div style={card}>
                 <InfoBox>Record money sent by an owner into the business.</InfoBox>
-                <div style={{ marginBottom: 14 }}>
-                  <Field label={`Amount (${currency}) *`}>
-                    <input style={{ ...inp, fontSize: '1.5rem', fontFamily: "'DM Mono',monospace" }}
-                      type="number" placeholder="0.00" min="0" step="0.01"
-                      value={ofAmt} onChange={e => setOfAmt(e.target.value)} />
-                  </Field>
-                </div>
-                <Row gap={14}>
+                <Field label={`Amount (${currency}) *`}>
+                  <input style={{ ...inp, fontSize: '1.5rem', fontFamily: "'DM Mono',monospace" }}
+                    type="number" placeholder="0.00" min="0" step="0.01"
+                    value={ofAmt} onChange={e => setOfAmt(e.target.value)} />
+                </Field>
+                <Row>
                   <Field label="Date *">
-                    <input style={inp} type="date" value={ofDate} onChange={e => setOfDate(e.target.value)} />
+                    <input style={inp} type="date" value={ofDate} max={today()} onChange={e => setOfDate(e.target.value)} />
                   </Field>
                   <Field label="Note">
                     <input style={inp} type="text" placeholder="Optional reference"
                       value={ofNote} onChange={e => setOfNote(e.target.value)} />
                   </Field>
                 </Row>
-                <Row gap={14}>
+                <Row>
                   <Field label="Sent By (Owner) *">
                     <Select value={ofSender} onChange={setOfSender}>
                       {ow.length ? ow.map(p => <option key={p.id} value={p.id}>{p.name}</option>) : <option value="">— No owners —</option>}
@@ -502,23 +535,21 @@ export function AddEntrySheet({ open, onClose, people, currency, onSave, initial
             {type === 'fund-return' && (
               <div style={card}>
                 <InfoBox>Record unused money returned from the business back to an owner.</InfoBox>
-                <div style={{ marginBottom: 14 }}>
-                  <Field label={`Amount (${currency}) *`}>
-                    <input style={{ ...inp, fontSize: '1.5rem', fontFamily: "'DM Mono',monospace" }}
-                      type="number" placeholder="0.00" min="0" step="0.01"
-                      value={frAmt} onChange={e => setFrAmt(e.target.value)} />
-                  </Field>
-                </div>
-                <Row gap={14}>
+                <Field label={`Amount (${currency}) *`}>
+                  <input style={{ ...inp, fontSize: '1.5rem', fontFamily: "'DM Mono',monospace" }}
+                    type="number" placeholder="0.00" min="0" step="0.01"
+                    value={frAmt} onChange={e => setFrAmt(e.target.value)} />
+                </Field>
+                <Row>
                   <Field label="Date *">
-                    <input style={inp} type="date" value={frDate} onChange={e => setFrDate(e.target.value)} />
+                    <input style={inp} type="date" value={frDate} max={today()} onChange={e => setFrDate(e.target.value)} />
                   </Field>
                   <Field label="Note">
                     <input style={inp} type="text" placeholder="Optional reference"
                       value={frNote} onChange={e => setFrNote(e.target.value)} />
                   </Field>
                 </Row>
-                <Row gap={14}>
+                <Row>
                   <Field label="Returned By *">
                     <Select value={frSender} onChange={setFrSender}>
                       {no.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
@@ -567,8 +598,8 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
   );
 }
 
-function Row({ children, gap = 10 }: { children: React.ReactNode; gap?: number }) {
-  return <div style={{ display: 'flex', gap, marginBottom: 10, flexWrap: 'wrap' }}>{children}</div>;
+function Row({ children }: { children: React.ReactNode }) {
+  return <div style={{ display: 'flex', gap: 10, marginBottom: 10, flexWrap: 'wrap' }}>{children}</div>;
 }
 
 function Select({ value, onChange, children }: { value: string; onChange: (v: string) => void; children: React.ReactNode }) {
@@ -605,7 +636,7 @@ const inp: React.CSSProperties = {
 };
 
 const infoBox: React.CSSProperties = {
-  background: 'linear-gradient(135deg, #EEF2FF 0%, #DBEAFE 100%)',
+  background: '#ffffff',
   border: '1px solid rgba(61,107,223,0.18)',
   borderRadius: 10, padding: '10px 13px',
   fontSize: '0.72rem', color: '#1A2FA8', lineHeight: 1.6,

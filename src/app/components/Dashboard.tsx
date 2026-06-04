@@ -1,11 +1,10 @@
 import React from 'react';
 import { TrendingUp, TrendingDown, Hash } from 'lucide-react';
 import type { Transaction, Person } from '../types';
-import { pColor, pInit, fmtAmt, pStats } from '../utils';
+import { pColor, pInit, fmtAmt, pStats, fmtDate } from '../utils';
 import { TxItem } from './TxItem';
 
 interface Props {
-  businessName: string;
   txs: Transaction[];
   people: Person[];
   currency: string;
@@ -14,7 +13,7 @@ interface Props {
   onDelete: (id: string, desc: string) => void;
 }
 
-export function Dashboard({ businessName, txs, people, currency, onPersonFilter, onEdit, onDelete }: Props) {
+export function Dashboard({ txs, people, currency, onPersonFilter, onEdit, onDelete }: Props) {
   let totalIn = 0, totalOut = 0, ownerIn = 0, ownerOut = 0;
   for (const t of txs) {
     if (t.type === 'income')  totalIn  += t.amount;
@@ -79,15 +78,6 @@ export function Dashboard({ businessName, txs, people, currency, onPersonFilter,
     return !r.includes('owner') && p.id !== 'biz';
   });
 
-  // Total cash available: sum of positive member balances + biz account balance
-  let totalCashAvailable = bizBalance; // Include biz account
-  for (const m of members) {
-    const { pBal } = pStats(m.id, txs);
-    if (pBal > 0) {
-      totalCashAvailable += pBal;
-    }
-  }
-
   const recent = [...txs].sort((a, b) => (b.ts || 0) - (a.ts || 0)).slice(0, 5);
 
   const byBuyer: Record<string, { total: number; paid: number }> = {};
@@ -101,14 +91,14 @@ export function Dashboard({ businessName, txs, people, currency, onPersonFilter,
     .map(([n, d]) => ({ n, o: d.total - d.paid }))
     .filter(x => x.o > 0.005);
 
+  // Upcoming egg pickups: credit txs with a future date and isPickup flag
+  const todayStr = new Date().toISOString().split('T')[0];
+  const upcomingPickups = txs
+    .filter(t => t.type === 'credit' && t.isPickup && t.date > todayStr)
+    .sort((a, b) => (a.date || '').localeCompare(b.date || ''));
+
   return (
     <div style={{ padding: '16px 16px 100px' }}>
-      {/* Business Name */}
-      {businessName && (
-        <div style={{ fontSize: '1.4rem', fontWeight: 800, color: '#1A2FA8', marginBottom: 16, letterSpacing: '-0.01em' }}>
-          {businessName}
-        </div>
-      )}
       {/* Balance Card */}
       <div style={{
         background: 'linear-gradient(135deg, #1A2FA8 0%, #3D6BDF 55%, #5580F0 100%)',
@@ -126,11 +116,11 @@ export function Dashboard({ businessName, txs, people, currency, onPersonFilter,
         </div>
         <div style={{
           fontFamily: "'DM Mono', monospace",
-          fontSize: totalCashAvailable < 0 ? '2rem' : '2.6rem',
-          fontWeight: 500, color: totalCashAvailable < 0 ? '#FFB3C0' : '#fff',
+          fontSize: bal < 0 ? '2rem' : '2.6rem',
+          fontWeight: 500, color: bal < 0 ? '#FFB3C0' : '#fff',
           letterSpacing: '-0.02em', lineHeight: 1, marginBottom: 20, position: 'relative', zIndex: 1,
         }}>
-          {fmtAmt(totalCashAvailable, currency)}
+          {fmtAmt(bal, currency)}
         </div>
 
         {/* Stats row */}
@@ -194,13 +184,34 @@ export function Dashboard({ businessName, txs, people, currency, onPersonFilter,
           </div>
           <div>
             <div style={{ fontSize: '0.7rem', fontWeight: 800, color: '#1A2FA8', letterSpacing: '0.06em' }}>Biz Account</div>
-            <div style={{ fontSize: '0.55rem', color: '#7A8FC4', letterSpacing: '0.08em', textTransform: 'uppercase', marginTop: 1 }}></div>
+            <div style={{ fontSize: '0.55rem', color: '#7A8FC4', letterSpacing: '0.08em', textTransform: 'uppercase', marginTop: 1 }}>Internal funds held</div>
           </div>
         </div>
         <div style={{ fontFamily: "'DM Mono',monospace", fontSize: '1rem', fontWeight: 600, color: bizBalance >= 0 ? '#1A2FA8' : '#E83E5C' }}>
           {fmtAmt(bizBalance, currency)}
         </div>
       </div>
+
+      {/* Upcoming Egg Pickups */}
+      {upcomingPickups.length > 0 && (
+        <div style={{
+          background: 'rgba(61,107,223,0.06)', borderRadius: 14, padding: '12px 14px', marginBottom: 16,
+          border: '1px solid rgba(61,107,223,0.18)',
+        }}>
+          <div style={{ ...sh, color: '#1A2FA8' }}>📦 Awaiting Pickup</div>
+          {upcomingPickups.map(t => (
+            <div key={t.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6, padding: '6px 0', borderBottom: '1px solid rgba(61,107,223,0.08)' }}>
+              <div>
+                <div style={{ fontSize: '0.82rem', fontWeight: 700, color: '#1A2FA8' }}>{t.creditBuyer || '—'}</div>
+                <div style={{ fontSize: '0.65rem', color: '#7A8FC4', marginTop: 1 }}>{fmtDate(t.date)}</div>
+              </div>
+              <div style={{ fontFamily: "'DM Mono',monospace", fontSize: '0.85rem', fontWeight: 600, color: '#1A2FA8' }}>
+                {fmtAmt(t.creditTotal || 0, currency)}
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
 
       {/* Owing list */}
       {owing.length > 0 && (

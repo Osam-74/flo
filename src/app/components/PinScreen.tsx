@@ -1,15 +1,18 @@
 import React, { useState, useCallback, useEffect } from 'react';
 import { Delete } from 'lucide-react';
 import { sha256 } from '../utils';
-
-const H_MASTER = '84b2a5d834daee2fff7eb5e31f44ba68eb860d86d2cf8e37606a26fa775cf23b';
-const H_VIEW   = '2926a2731f4b312c08982cacf8061eb14bf65c1a87cc5d70e864e079c6220731';
+import { BUSINESSES } from './BusinessSelector';
 
 interface Props {
   onUnlock: (mode: 'master' | 'view') => void;
+  businessId: string;
+  businessName: string;
 }
 
-export function PinScreen({ onUnlock }: Props) {
+export function PinScreen({ onUnlock, businessId, businessName }: Props) {
+  const biz = BUSINESSES.find(b => b.id === businessId) || BUSINESSES[0];
+  const H_MASTER = biz.masterHash;
+  const H_VIEW   = biz.viewHash;
   const [entry, setEntry] = useState('');
   const [dotState, setDotState] = useState<'idle' | 'error'>('idle');
   const [shaking, setShaking] = useState(false);
@@ -94,8 +97,11 @@ export function PinScreen({ onUnlock }: Props) {
       <div style={{ fontSize: '1.9rem', fontWeight: 800, letterSpacing: '-0.04em', marginBottom: 4, fontFamily: 'Plus Jakarta Sans, sans-serif' }}>
         Cash<span style={{ color: '#3D6BDF' }}>book</span>
       </div>
-      <div style={{ fontSize: '0.68rem', color: '#9A9FB8', letterSpacing: '0.16em', textTransform: 'uppercase', marginBottom: 40 }}>
-        Farm Expense Tracker
+      <div style={{ fontSize: '0.78rem', fontWeight: 700, color: '#1A2FA8', letterSpacing: '0.02em', marginBottom: 2, fontFamily: 'Plus Jakarta Sans, sans-serif' }}>
+        {businessName}
+      </div>
+      <div style={{ fontSize: '0.62rem', color: '#9A9FB8', letterSpacing: '0.12em', textTransform: 'uppercase', marginBottom: 40 }}>
+        Enter PIN to continue
       </div>
 
       {/* Dots */}

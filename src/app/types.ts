@@ -62,4 +62,5 @@ export interface Transaction {
   employee?: string;
   employeeName?: string;
   salaryPaidBy?: string;
+  isPickup?: boolean;
 }
