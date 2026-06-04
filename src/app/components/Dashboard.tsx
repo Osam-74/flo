@@ -8,12 +8,13 @@ interface Props {
   txs: Transaction[];
   people: Person[];
   currency: string;
+  businessName?: string;
   onPersonFilter: (pid: string) => void;
   onEdit: (tx: Transaction) => void;
   onDelete: (id: string, desc: string) => void;
 }
 
-export function Dashboard({ txs, people, currency, onPersonFilter, onEdit, onDelete }: Props) {
+export function Dashboard({ txs, people, currency, businessName, onPersonFilter, onEdit, onDelete }: Props) {
   let totalIn = 0, totalOut = 0, ownerIn = 0, ownerOut = 0;
   for (const t of txs) {
     if (t.type === 'income')  totalIn  += t.amount;
@@ -111,6 +112,11 @@ export function Dashboard({ txs, people, currency, onPersonFilter, onEdit, onDel
         <div style={{ position: 'absolute', top: -50, right: -50, width: 180, height: 180, borderRadius: '50%', background: 'rgba(255,255,255,0.06)' }} />
         <div style={{ position: 'absolute', bottom: -30, left: -20, width: 120, height: 120, borderRadius: '50%', background: 'rgba(255,255,255,0.04)' }} />
 
+        {businessName && (
+          <div style={{ fontSize: '0.7rem', fontWeight: 700, letterSpacing: '0.05em', color: 'rgba(255,255,255,0.75)', marginBottom: 4, display: 'flex', alignItems: 'center', gap: 5 }}>
+            <span style={{ fontSize: '0.75rem' }}>🏢</span> {businessName}
+          </div>
+        )}
         <div style={{ fontSize: '0.6rem', fontWeight: 700, letterSpacing: '0.14em', textTransform: 'uppercase', color: 'rgba(255,255,255,0.6)', marginBottom: 8 }}>
           Total Cash Available
         </div>
