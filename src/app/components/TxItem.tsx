@@ -35,7 +35,14 @@ export function TxItem({ tx, people, currency, showActions, onEdit, onDelete }: 
   if (tx.type === 'credit') {
     const paid  = tx.creditPaid  || 0;
     const total = tx.creditTotal || 0;
-    amountEl = (
+    const todayStr = new Date().toISOString().split('T')[0];
+    const isAwaitingPickup = tx.isPickup && (tx.date || '') > todayStr;
+    amountEl = isAwaitingPickup ? (
+      <div style={{ textAlign: 'right', flexShrink: 0 }}>
+        <div style={{ fontSize: '1.1rem', textAlign: 'center' }}>🥚</div>
+        <div style={{ fontFamily: "'DM Mono',monospace", fontSize: '0.62rem', color: '#1A4FA8', fontWeight: 700 }}>Awaiting</div>
+      </div>
+    ) : (
       <div className="text-right flex-shrink-0">
         <div style={{ fontFamily: "'DM Mono',monospace", fontSize: '0.88rem', fontWeight: 600, color: '#3D6BDF' }}>
           +{currency} {paid.toFixed(2)}
@@ -73,8 +80,16 @@ export function TxItem({ tx, people, currency, showActions, onEdit, onDelete }: 
   }
   if (tx.type === 'credit') {
     const outstanding = (tx.creditTotal || 0) - (tx.creditPaid || 0);
+    const todayStrMeta = new Date().toISOString().split('T')[0];
+    const isAwaitingPickupMeta = tx.isPickup && (tx.date || '') > todayStrMeta;
     if (tx.creditBuyer) extraMeta.push(<span key="crb" style={metaCss}>Buyer: {tx.creditBuyer}</span>);
-    if (outstanding > 0.005) {
+    if (isAwaitingPickupMeta) {
+      extraMeta.push(
+        <span key="pickup-badge" style={{ fontSize: '0.6rem', fontWeight: 700, padding: '1px 7px', borderRadius: 6, background: 'rgba(26,79,168,0.10)', color: '#1A4FA8' }}>
+          🥚 Pickup scheduled
+        </span>
+      );
+    } else if (outstanding > 0.005) {
       extraMeta.push(
         <span key="owe" style={{ fontSize: '0.6rem', fontWeight: 700, padding: '1px 7px', borderRadius: 6, background: 'rgba(232,62,92,0.12)', color: '#E83E5C' }}>
           Owes {currency} {outstanding.toFixed(2)}
@@ -187,3 +202,4 @@ const actionBtnStyle: React.CSSProperties = {
   display: 'flex', alignItems: 'center', justifyContent: 'center',
   cursor: 'pointer', transition: 'color 0.15s',
 };
+
