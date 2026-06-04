@@ -511,6 +511,10 @@ export default function App() {
             setIsMasterAdmin(true);
             sessionStorage.setItem('cb_master', '1');
           }}
+          onLogoutMasterAdmin={() => {
+            setIsMasterAdmin(false);
+            sessionStorage.removeItem('cb_master');
+          }}
           onSelectBusiness={(biz) => {
             setSelectedBiz(biz);
             setScreen('pin');
