@@ -289,11 +289,38 @@ export function AddEntrySheet({ open, onClose, people, currency, onSave, initial
             </button>
           </div>
 
-          {/* Scrollable body — swipe left/right to switch transaction type */}
+          {/* Type switcher — fixed above scroll, never moves */}
           <div
-            data-scroll
             onTouchStart={handleSwipeStart}
             onTouchEnd={handleSwipeEnd}
+            style={{ flexShrink: 0, display: 'flex', gap: 7, overflowX: 'auto', padding: '6px 16px 10px', scrollbarWidth: 'none' as any, borderBottom: '1px solid rgba(0,119,182,0.08)' }}
+          >
+            {TYPE_OPTS.map(opt => {
+              const active = type === opt.id;
+              return (
+                <button
+                  key={opt.id}
+                  onClick={() => changeType(opt.id)}
+                  style={{
+                    flexShrink: 0, padding: '8px 14px', borderRadius: 20,
+                    fontSize: '0.68rem', fontWeight: 700, letterSpacing: '0.04em',
+                    border: 'none', cursor: 'pointer', whiteSpace: 'nowrap',
+                    transition: 'all 0.15s',
+                    ...(active
+                      ? { background: opt.color, color: '#fff', boxShadow: `0 4px 12px ${opt.color}55` }
+                      : { background: 'rgba(0,119,182,0.08)', color: '#0077B6', boxShadow: 'none' }
+                    ),
+                  }}
+                >
+                  {opt.label}
+                </button>
+              );
+            })}
+          </div>
+
+          {/* Scrollable body */}
+          <div
+            data-scroll
             style={{
               overflowY: 'auto',
               flex: 1,
@@ -302,30 +329,6 @@ export function AddEntrySheet({ open, onClose, people, currency, onSave, initial
               paddingBottom: 'max(40px, env(keyboard-inset-height, 0px))',
             }}
           >
-            {/* Type switcher */}
-            <div style={{ display: 'flex', gap: 7, overflowX: 'auto', paddingTop: 10, paddingBottom: 12, scrollbarWidth: 'none' as any }}>
-              {TYPE_OPTS.map(opt => {
-                const active = type === opt.id;
-                return (
-                  <button
-                    key={opt.id}
-                    onClick={() => changeType(opt.id)}
-                    style={{
-                      flexShrink: 0, padding: '8px 14px', borderRadius: 20,
-                      fontSize: '0.68rem', fontWeight: 700, letterSpacing: '0.04em',
-                      border: 'none', cursor: 'pointer', whiteSpace: 'nowrap',
-                      transition: 'all 0.15s',
-                      ...(active
-                        ? { background: opt.color, color: '#fff', boxShadow: `0 4px 12px ${opt.color}55` }
-                        : { background: 'rgba(0,119,182,0.08)', color: '#0077B6', boxShadow: 'none' }
-                      ),
-                    }}
-                  >
-                    {opt.label}
-                  </button>
-                );
-              })}
-            </div>
 
             {/* ── STANDARD (income / expense / salary) ── */}
             {isStandard && (
