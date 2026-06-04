@@ -180,7 +180,20 @@ export default function App() {
 
   /* ── Subscribe to business data ──────────────────── */
   const subscribeToBiz = useCallback((biz: BizRecord) => {
-    if (!dbRef.current || !fsRef.current) return;
+    // If Firebase hasn't loaded yet, retry every 200ms until it's ready (max 10s)
+    if (!dbRef.current || !fsRef.current) {
+      const start = Date.now();
+      const interval = setInterval(() => {
+        if (dbRef.current && fsRef.current) {
+          clearInterval(interval);
+          subscribeToBiz(biz);
+        } else if (Date.now() - start > 10000) {
+          clearInterval(interval);
+          setDbStatus('❌ Firebase not ready — please refresh.');
+        }
+      }, 200);
+      return;
+    }
     if (bizUnsubRef.current) bizUnsubRef.current();
     const [col, doc] = biz.fsDoc.split('/');
     const ref = fsRef.current.doc(dbRef.current, col, doc);
@@ -190,7 +203,7 @@ export default function App() {
         const withBiz = (Array.isArray(ppl) && ppl.find((x: any) => x?.id === BIZ_ACCOUNT.id)) ? ppl : [...(Array.isArray(ppl) ? ppl : []), BIZ_ACCOUNT];
         setPeople(withBiz); setTxs(gs('cb_txs', [])); setCurrency(gs('cb_currency', 'GHS'));
         ss('cb_people', withBiz);
-        setDbStatus('⚠️ No cloud data yet.');
+        setDbStatus('⚠️ No cloud data yet — add your first transaction!');
       } else {
         applyRemote(snap.data());
       }
@@ -278,6 +291,32 @@ export default function App() {
     toast.success(`"${name}" created!`);
   }, [businesses, saveRegistry]);
 
+  /* ── Reset PIN for a business ───────────────────── */
+  const handleResetPin = useCallback(async (bizId: string, newMasterPin: string, newViewPin?: string) => {
+    const biz = businesses.find(b => b.id === bizId);
+    if (!biz) return;
+    const masterHash = await sha256(newMasterPin);
+    const updated = businesses.map(b => {
+      if (b.id !== bizId) return b;
+      const obj: any = { ...b, masterHash, hasViewAccess: !!newViewPin };
+      if (newViewPin) {
+        // viewHash will be set below after async sha256
+        return obj;
+      }
+      delete obj.viewHash;
+      return obj;
+    });
+    // Set viewHash async if needed
+    if (newViewPin) {
+      const viewHash = await sha256(newViewPin);
+      const final = updated.map(b => b.id === bizId ? { ...b, viewHash } : b);
+      await saveRegistry(final);
+    } else {
+      await saveRegistry(updated);
+    }
+    toast.success('PIN reset for "' + biz.name + '"!');
+  }, [businesses, saveRegistry]);
+
   /* ── Delete business ─────────────────────────────── */
   const handleDeleteBusiness = useCallback(async (bizId: string) => {
     const biz = businesses.find(b => b.id === bizId);
@@ -293,6 +332,33 @@ export default function App() {
     await saveRegistry(updated);
     toast.success(`"${biz.name}" deleted`);
   }, [businesses, saveRegistry]);
+
+  /* ── Master-level biz data ops (by bizId) ──────────── */
+  const masterExport = useCallback((bizId: string) => {
+    // Just call the regular export if it's the current business
+    if (selectedBiz?.id === bizId) { exportData(); return; }
+    toast.info('Open that business first to export its data.');
+  }, [selectedBiz]);
+
+  const masterImport = useCallback((bizId: string, file: File) => {
+    if (selectedBiz?.id === bizId) { importData(file); return; }
+    toast.info('Open that business first to import data.');
+  }, [selectedBiz]);
+
+  const masterClearData = useCallback((bizId: string) => {
+    if (selectedBiz?.id === bizId) { executeFullClear(); return; }
+    toast.info('Open that business first to clear its data.');
+  }, [selectedBiz, executeFullClear]);
+
+  const masterPull = useCallback((bizId: string) => {
+    if (selectedBiz?.id === bizId) { manualPull(); return; }
+    toast.info('Open that business first to pull data.');
+  }, [selectedBiz, manualPull]);
+
+  const masterPush = useCallback((bizId: string) => {
+    if (selectedBiz?.id === bizId) { manualPush(); return; }
+    toast.info('Open that business first to push data.');
+  }, [selectedBiz, manualPush]);
 
   /* ── Transactions ────────────────────────────────── */
   const saveTx = useCallback((tx: Transaction) => {
@@ -530,6 +596,12 @@ export default function App() {
           }}
           onCreateBusiness={handleCreateBusiness}
           onDeleteBusiness={handleDeleteBusiness}
+          onResetPin={handleResetPin}
+          onExport={masterExport}
+          onImport={masterImport}
+          onClearData={masterClearData}
+          onPull={masterPull}
+          onPush={masterPush}
         />
         <Toaster position="bottom-center" richColors />
       </>
