@@ -116,7 +116,7 @@ export function Dashboard({ txs, people, currency, businessName, onPersonFilter,
         <div style={{ position: 'absolute', bottom: -30, left: -20, width: 120, height: 120, borderRadius: '50%', background: 'rgba(255,255,255,0.04)' }} />
 
         {businessName && (
-          <div style={{ fontSize: '0.7rem', fontWeight: 700, letterSpacing: '0.05em', color: 'rgba(255,255,255,0.75)', marginBottom: 4, display: 'flex', alignItems: 'center', gap: 5 }}>
+          <div style={{ fontSize: '0.95rem', fontWeight: 700, letterSpacing: '0.05em', color: 'rgba(255,255,255,0.75)', marginBottom: 4, display: 'flex', alignItems: 'center', gap: 5 }}>
             <span style={{ fontSize: '0.75rem' }}>🏢</span> {businessName}
           </div>
         )}
