@@ -56,9 +56,10 @@ export function fmtDate(d: string): string {
     : dt.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: '2-digit' });
 }
 
-export function fmtAmt(n: number, currency: string): string {
-  const abs = Math.abs(n).toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g, ',');
-  return (n < 0 ? '-' : '') + currency + ' ' + abs;
+export function fmtAmt(n: number | undefined | null, currency: string): string {
+  const safe = Number(n) || 0;
+  const abs = Math.abs(safe).toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g, ',');
+  return (safe < 0 ? '-' : '') + currency + ' ' + abs;
 }
 
 export function fmtN(n: number): string {
