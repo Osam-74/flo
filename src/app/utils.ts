@@ -1,5 +1,26 @@
 import type { Person, Transaction, ColorDef } from './types';
 
+/**
+ * Coerce every numeric field on each transaction to a real number.
+ * This prevents "can't access property 'toFixed', a is undefined" crashes
+ * that occur when Firestore, localStorage, or imported JSON contains
+ * string/null/undefined values in fields we call .toFixed() on.
+ */
+export function sanitizeTxs(raw: any[]): Transaction[] {
+  if (!Array.isArray(raw)) return [];
+  return raw.map((tx: any) => ({
+    ...tx,
+    amount:      Number(tx?.amount)      || 0,
+    creditTotal: Number(tx?.creditTotal) || 0,
+    creditPaid:  Number(tx?.creditPaid)  || 0,
+    ts:          Number(tx?.ts)          || 0,
+    // Sanitize nested payment amounts too
+    payments: Array.isArray(tx?.payments)
+      ? tx.payments.map((p: any) => ({ ...p, amount: Number(p?.amount) || 0 }))
+      : tx?.payments,
+  }));
+}
+
 // All person colors now use blue shades
 export const COLORS: Record<string, ColorDef> = {
   green:  { bg: 'rgba(61,107,223,0.14)',  text: '#3D6BDF' },  // blue (was green)
