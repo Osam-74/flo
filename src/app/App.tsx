@@ -167,15 +167,15 @@ export default function App() {
   }, [bizLoading]);
 
   /* ── Apply remote data ───────────────────────────── */
-  const applyRemote = useCallback((r: any) => {
-    const p = r.people ?? gs('cb_people', []);
+  const applyRemote = useCallback((r: any, bizId: string) => {
+    const p = r.people ?? gs(`cb_people_${bizId}`, []);
     const ppl = Array.isArray(p) ? p : [];
     const withBiz = ppl.find((x: any) => x?.id === BIZ_ACCOUNT.id) ? ppl : [...ppl, BIZ_ACCOUNT];
-    const rawTxs = r.txs ?? gs('cb_txs', []);
+    const rawTxs = r.txs ?? gs(`cb_txs_${bizId}`, []);
     const t = sanitizeTxs(rawTxs);
-    const c = r.currency ?? gs('cb_currency', 'GHS');
+    const c = r.currency ?? gs(`cb_currency_${bizId}`, 'GHS');
     setPeople(withBiz); setTxs(t); setCurrency(c);
-    ss('cb_people', withBiz); ss('cb_txs', t); ss('cb_currency', c);
+    ss(`cb_people_${bizId}`, withBiz); ss(`cb_txs_${bizId}`, t); ss(`cb_currency_${bizId}`, c);
     setDbStatus('✅ Live sync active. Last update: ' + new Date().toLocaleTimeString());
   }, []);
 
@@ -200,20 +200,20 @@ export default function App() {
     const ref = fsRef.current.doc(dbRef.current, col, doc);
     bizUnsubRef.current = fsRef.current.onSnapshot(ref, (snap: any) => {
       if (!snap.exists()) {
-        const ppl = gs('cb_people', []);
+        const ppl = gs(`cb_people_${biz.id}`, []);
         const withBiz = (Array.isArray(ppl) && ppl.find((x: any) => x?.id === BIZ_ACCOUNT.id)) ? ppl : [...(Array.isArray(ppl) ? ppl : []), BIZ_ACCOUNT];
-        const rawTxs = gs('cb_txs', []);
-        setPeople(withBiz); setTxs(sanitizeTxs(rawTxs)); setCurrency(gs('cb_currency', 'GHS'));
-        ss('cb_people', withBiz);
+        const rawTxs = gs(`cb_txs_${biz.id}`, []);
+        setPeople(withBiz); setTxs(sanitizeTxs(rawTxs)); setCurrency(gs(`cb_currency_${biz.id}`, 'GHS'));
+        ss(`cb_people_${biz.id}`, withBiz);
         setDbStatus('⚠️ No cloud data yet — add your first transaction!');
       } else {
-        applyRemote(snap.data());
+        applyRemote(snap.data(), biz.id);
       }
     }, (err: any) => {
       console.warn('[DB]', err);
       setDbStatus('❌ Sync error: ' + err.code);
-      const rawTxs = gs('cb_txs', []);
-      setPeople(gs('cb_people', [])); setTxs(sanitizeTxs(rawTxs)); setCurrency(gs('cb_currency', 'GHS'));
+      const rawTxs = gs(`cb_txs_${biz.id}`, []);
+      setPeople(gs(`cb_people_${biz.id}`, [])); setTxs(sanitizeTxs(rawTxs)); setCurrency(gs(`cb_currency_${biz.id}`, 'GHS'));
     });
   }, [applyRemote]);
 
@@ -336,12 +336,21 @@ export default function App() {
     toast.success(`"${biz.name}" deleted`);
   }, [businesses, saveRegistry]);
 
+  /* ── Rename business ────────────────────────────── */
+  const handleRenameBusiness = useCallback(async (bizId: string, newName: string) => {
+    const updated = businesses.map(b => b.id === bizId ? { ...b, name: newName } : b);
+    await saveRegistry(updated);
+    // If the currently open business is being renamed, update selectedBiz
+    if (selectedBiz?.id === bizId) setSelectedBiz(prev => prev ? { ...prev, name: newName } : prev);
+    toast.success(`Renamed to "${newName}"`);
+  }, [businesses, saveRegistry, selectedBiz]);
+
   /* ── Transactions ────────────────────────────────── */
   const saveTx = useCallback((tx: Transaction) => {
     if (!guardWrite()) return;
     setTxs(prev => {
       const next = [...prev, tx];
-      ss('cb_txs', next);
+      if (selectedBiz) ss(`cb_txs_${selectedBiz.id}`, next);
       dbSync(people, next, currency);
       return next;
     });
@@ -353,7 +362,7 @@ export default function App() {
   const confirmDelete = useCallback(() => {
     setTxs(prev => {
       const next = prev.filter(t => t.id !== deleteModal.id);
-      ss('cb_txs', next);
+      if (selectedBiz) ss(`cb_txs_${selectedBiz.id}`, next);
       dbSync(people, next, currency);
       return next;
     });
@@ -364,7 +373,7 @@ export default function App() {
   const confirmEdit = useCallback((id: string, updates: Partial<Transaction>) => {
     setTxs(prev => {
       const next = prev.map(t => t.id === id ? { ...t, ...updates } : t);
-      ss('cb_txs', next);
+      if (selectedBiz) ss(`cb_txs_${selectedBiz.id}`, next);
       dbSync(people, next, currency);
       return next;
     });
@@ -397,7 +406,7 @@ export default function App() {
           payments: newPayments,
         };
       });
-      ss('cb_txs', next);
+      if (selectedBiz) ss(`cb_txs_${selectedBiz.id}`, next);
       dbSync(people, next, currency);
       return next;
     });
@@ -411,7 +420,7 @@ export default function App() {
     const p: Person = { id: 'p_' + Date.now(), name, role, color };
     setPeople(prev => {
       const next = [...prev, p];
-      ss('cb_people', next);
+      if (selectedBiz) ss(`cb_people_${selectedBiz.id}`, next);
       dbSync(next, txs, currency);
       return next;
     });
@@ -429,7 +438,7 @@ export default function App() {
     )) { toast.error('Cannot delete — person has transactions'); return; }
     setPeople(prev => {
       const next = prev.filter(p => p.id !== id);
-      ss('cb_people', next);
+      if (selectedBiz) ss(`cb_people_${selectedBiz.id}`, next);
       dbSync(next, txs, currency);
       return next;
     });
@@ -441,7 +450,7 @@ export default function App() {
   const saveCurrency = useCallback((c: string) => {
     if (!guardWrite()) return;
     setCurrency(c);
-    ss('cb_currency', c);
+    if (selectedBiz) ss(`cb_currency_${selectedBiz.id}`, c);
     dbSync(people, txs, c);
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [people, txs, dbSync, isReadOnly]);
@@ -474,7 +483,11 @@ export default function App() {
     const emptyTxs: Transaction[] = [];
     const peopleWithBiz: Person[] = [BIZ_ACCOUNT as any];
     setPeople(peopleWithBiz); setTxs(emptyTxs); setCurrency('GHS');
-    ss('cb_people', peopleWithBiz); ss('cb_txs', emptyTxs); ss('cb_currency', 'GHS');
+    if (selectedBiz) {
+      ss(`cb_people_${selectedBiz.id}`, peopleWithBiz);
+      ss(`cb_txs_${selectedBiz.id}`, emptyTxs);
+      ss(`cb_currency_${selectedBiz.id}`, 'GHS');
+    }
     dbSync(peopleWithBiz, emptyTxs, 'GHS');
     toast.success('All data cleared');
   }, [dbSync]);
@@ -516,7 +529,11 @@ export default function App() {
           const withBiz = ppl.find((x: any) => x?.id === BIZ_ACCOUNT.id) ? ppl : [...ppl, BIZ_ACCOUNT];
           const cleanTxs = sanitizeTxs(obj.txs);
           setPeople(withBiz); setTxs(cleanTxs); setCurrency(obj.currency || 'GHS');
-          ss('cb_people', withBiz); ss('cb_txs', cleanTxs); ss('cb_currency', obj.currency || 'GHS');
+          if (selectedBiz) {
+            ss(`cb_people_${selectedBiz.id}`, withBiz);
+            ss(`cb_txs_${selectedBiz.id}`, cleanTxs);
+            ss(`cb_currency_${selectedBiz.id}`, obj.currency || 'GHS');
+          }
           dbSync(withBiz, cleanTxs, obj.currency || 'GHS');
           toast.success('Imported data');
         } else toast.error('Invalid import file');
@@ -601,6 +618,7 @@ export default function App() {
           onCreateBusiness={handleCreateBusiness}
           onDeleteBusiness={handleDeleteBusiness}
           onResetPin={handleResetPin}
+          onRenameBusiness={handleRenameBusiness}
           onExport={masterExport}
           onImport={masterImport}
           onClearData={masterClearData}
