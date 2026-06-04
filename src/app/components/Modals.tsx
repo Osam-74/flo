@@ -191,6 +191,94 @@ export function PaymentModal({ open, buyer, outstanding, people, currency, onClo
   );
 }
 
+
+/* ── Pickup Modal ────────────────────────────────── */
+interface PickupModalProps {
+  open: boolean;
+  buyer: string | null;
+  pickupDate: string;
+  people: Person[];
+  currency: string;
+  onClose: () => void;
+  onApply: (totalAmount: number, paidAmount: number, date: string, receiver: string, note: string) => void;
+}
+
+export function PickupModal({ open, buyer, pickupDate, people, currency, onClose, onApply }: PickupModalProps) {
+  const [total,    setTotal]    = useState('');
+  const [paid,     setPaid]     = useState('');
+  const [date,     setDate]     = useState('');
+  const [receiver, setReceiver] = useState('');
+  const [note,     setNote]     = useState('');
+
+  useEffect(() => {
+    setDate(new Date().toISOString().split('T')[0]);
+    setTotal(''); setPaid(''); setNote('');
+    const nonOwners = people.filter(p => !p.role?.toLowerCase().includes('owner'));
+    if (nonOwners.length > 0) setReceiver(nonOwners[0].id);
+  }, [open, people]);
+
+  const nonOwners = people.filter(p => !p.role?.toLowerCase().includes('owner'));
+  const totalAmt = parseFloat(total) || 0;
+  const paidAmt  = parseFloat(paid)  || 0;
+  const outstanding = Math.max(0, totalAmt - paidAmt);
+
+  const apply = () => {
+    if (totalAmt <= 0) { toast.error('Enter total amount for this pickup'); return; }
+    if (paidAmt > totalAmt) { toast.error('Amount paid cannot exceed total'); return; }
+    if (paidAmt > 0 && !receiver) { toast.error('Select who received the payment'); return; }
+    if (!date) { toast.error('Select a date'); return; }
+    onApply(totalAmt, paidAmt, date, receiver, note);
+    onClose();
+  };
+
+  return (
+    <BottomSheet open={open} onClose={onClose}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
+        <span style={{ fontSize: '1.4rem' }}>🥚</span>
+        <h2 style={title}>Log Egg Pickup</h2>
+      </div>
+      <p style={sub}>
+        {buyer} — scheduled pickup {pickupDate ? new Date(pickupDate + 'T00:00:00').toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }) : ''}
+      </p>
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 10 }}>
+        <Field label={`Total Amount (${currency}) *`}>
+          <input style={inp} type="number" min="0.01" step="0.01" placeholder="0.00"
+            value={total} onChange={e => setTotal(e.target.value)} />
+        </Field>
+        <Field label="Date Picked Up *">
+          <input style={inp} type="date" value={date} onChange={e => setDate(e.target.value)} />
+        </Field>
+      </div>
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 10 }}>
+        <Field label={`Amount Paid Now (${currency})`}>
+          <input style={inp} type="number" min="0" step="0.01" placeholder="0.00"
+            value={paid} onChange={e => setPaid(e.target.value)} />
+        </Field>
+        <Field label="Received By">
+          <select style={{ ...inp, appearance: 'none' as any }} value={receiver} onChange={e => setReceiver(e.target.value)}>
+            <option value="">— None —</option>
+            {nonOwners.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
+          </select>
+        </Field>
+      </div>
+      {totalAmt > 0 && outstanding > 0.005 && (
+        <div style={{ background: 'rgba(232,62,92,0.07)', borderRadius: 10, padding: '8px 12px', marginBottom: 10, fontSize: '0.72rem', color: '#E83E5C', fontWeight: 700 }}>
+          Still owes: {currency} {outstanding.toFixed(2)}
+        </div>
+      )}
+      <div style={{ marginBottom: 14 }}>
+        <Field label="Note (optional)">
+          <input style={inp} type="text" placeholder="e.g. 30 trays" value={note} onChange={e => setNote(e.target.value)} />
+        </Field>
+      </div>
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+        <button onClick={onClose} style={cancelBtn}>Cancel</button>
+        <button onClick={apply} style={actionBtn}>Log Pickup</button>
+      </div>
+    </BottomSheet>
+  );
+}
+
 /* ── Clear All Modal (with PIN) ──────────────────── */
 interface ClearModalProps {
   open: boolean;
@@ -337,3 +425,4 @@ const smallKey: React.CSSProperties = {
   fontSize: '1.3rem', fontWeight: 700, color: '#1A1D2E', cursor: 'pointer',
   fontFamily: 'Plus Jakarta Sans, sans-serif',
 };
+
