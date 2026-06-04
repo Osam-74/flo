@@ -291,10 +291,8 @@ export function AddEntrySheet({ open, onClose, people, currency, onSave, initial
             </button>
           </div>
 
-          {/* Type switcher — fixed above scroll, never moves */}
+          {/* Type switcher — scrolls horizontally, swipe handled on form body below */}
           <div
-            onTouchStart={handleSwipeStart}
-            onTouchEnd={handleSwipeEnd}
             style={{ flexShrink: 0, display: 'flex', gap: 7, overflowX: 'auto', padding: '6px 16px 10px', scrollbarWidth: 'none' as any, borderBottom: '1px solid rgba(0,119,182,0.08)' }}
           >
             {TYPE_OPTS.map(opt => {
@@ -320,9 +318,11 @@ export function AddEntrySheet({ open, onClose, people, currency, onSave, initial
             })}
           </div>
 
-          {/* Scrollable body */}
+          {/* Scrollable body — swipe left/right here to switch transaction type */}
           <div
             data-scroll
+            onTouchStart={handleSwipeStart}
+            onTouchEnd={handleSwipeEnd}
             style={{
               overflowY: 'auto',
               flex: 1,
@@ -647,3 +647,4 @@ const infoBox: React.CSSProperties = {
   fontSize: '0.72rem', color: '#1A2FA8', lineHeight: 1.6,
   marginBottom: 10,
 };
+
