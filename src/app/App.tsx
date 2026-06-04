@@ -3,7 +3,7 @@ import { Toaster, toast } from 'sonner';
 import '../styles/fonts.css';
 
 import { PinScreen }      from './components/PinScreen';
-import { BusinessSelector, MASTER_ADMIN_HASH } from './components/BusinessSelector';
+import { BusinessSelector } from './components/BusinessSelector';
 import type { BizRecord } from './components/BusinessSelector';
 import { AppHeader }      from './components/AppHeader';
 import { BottomNav }      from './components/BottomNav';
@@ -333,33 +333,6 @@ export default function App() {
     toast.success(`"${biz.name}" deleted`);
   }, [businesses, saveRegistry]);
 
-  /* ── Master-level biz data ops (by bizId) ──────────── */
-  const masterExport = useCallback((bizId: string) => {
-    // Just call the regular export if it's the current business
-    if (selectedBiz?.id === bizId) { exportData(); return; }
-    toast.info('Open that business first to export its data.');
-  }, [selectedBiz]);
-
-  const masterImport = useCallback((bizId: string, file: File) => {
-    if (selectedBiz?.id === bizId) { importData(file); return; }
-    toast.info('Open that business first to import data.');
-  }, [selectedBiz]);
-
-  const masterClearData = useCallback((bizId: string) => {
-    if (selectedBiz?.id === bizId) { executeFullClear(); return; }
-    toast.info('Open that business first to clear its data.');
-  }, [selectedBiz, executeFullClear]);
-
-  const masterPull = useCallback((bizId: string) => {
-    if (selectedBiz?.id === bizId) { manualPull(); return; }
-    toast.info('Open that business first to pull data.');
-  }, [selectedBiz, manualPull]);
-
-  const masterPush = useCallback((bizId: string) => {
-    if (selectedBiz?.id === bizId) { manualPush(); return; }
-    toast.info('Open that business first to push data.');
-  }, [selectedBiz, manualPush]);
-
   /* ── Transactions ────────────────────────────────── */
   const saveTx = useCallback((tx: Transaction) => {
     if (!guardWrite()) return;
@@ -546,6 +519,32 @@ export default function App() {
     };
     fr.readAsText(file);
   };
+
+  /* ── Master-level biz data ops (by bizId) ──────────── */
+  const masterExport = useCallback((bizId: string) => {
+    if (selectedBiz?.id === bizId) { exportData(); return; }
+    toast.info('Open that business first to export its data.');
+  }, [selectedBiz, exportData]);
+
+  const masterImport = useCallback((bizId: string, file: File) => {
+    if (selectedBiz?.id === bizId) { importData(file); return; }
+    toast.info('Open that business first to import data.');
+  }, [selectedBiz, importData]);
+
+  const masterClearData = useCallback((bizId: string) => {
+    if (selectedBiz?.id === bizId) { executeFullClear(); return; }
+    toast.info('Open that business first to clear its data.');
+  }, [selectedBiz, executeFullClear]);
+
+  const masterPull = useCallback((bizId: string) => {
+    if (selectedBiz?.id === bizId) { manualPull(); return; }
+    toast.info('Open that business first to pull data.');
+  }, [selectedBiz, manualPull]);
+
+  const masterPush = useCallback((bizId: string) => {
+    if (selectedBiz?.id === bizId) { manualPush(); return; }
+    toast.info('Open that business first to push data.');
+  }, [selectedBiz, manualPush]);
 
   /* ════════════════════════════════════════════════
      RENDER
