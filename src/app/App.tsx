@@ -14,7 +14,7 @@ import { CreditTab }      from './components/CreditTab';
 import { PeopleTab }      from './components/PeopleTab';
 import { ReportTab }      from './components/ReportTab';
 import { SettingsTab }    from './components/SettingsTab';
-import { DeleteModal, EditModal, PaymentModal, ClearModal } from './components/Modals';
+import { DeleteModal, EditModal, PaymentModal, PickupModal, ClearModal } from './components/Modals';
 
 import type { Transaction, Person, Tab, AppMode, TxType } from './types';
 import { gs, ss, sha256, sanitizeTxs, stripUndefined } from './utils';
@@ -67,6 +67,7 @@ export default function App() {
   const [deleteModal, setDeleteModal] = useState<{ open: boolean; id: string; desc: string }>({ open: false, id: '', desc: '' });
   const [editModal,   setEditModal]   = useState<{ open: boolean; tx: Transaction | null }>({ open: false, tx: null });
   const [payModal,    setPayModal]    = useState<{ open: boolean; buyer: string }>({ open: false, buyer: '' });
+  const [pickupModal, setPickupModal] = useState<{ open: boolean; buyer: string; pickupDate: string }>({ open: false, buyer: '', pickupDate: '' });
   const [clearModal,  setClearModal]  = useState(false);
 
   /* ── Refs ──────────────────────────────────────── */
@@ -413,6 +414,38 @@ export default function App() {
     toast.success('Payment recorded');
   }, [people, currency, dbSync]);
 
+  /* ── Log Pickup (converts pickup → real credit sale) ── */
+  const confirmPickup = useCallback((buyer: string, totalAmount: number, paidAmount: number, date: string, receiver: string, note: string) => {
+    const receiverName = people.find(p => p.id === receiver)?.name || '';
+    setTxs(prev => {
+      const next = prev.map(t => {
+        if (t.type !== 'credit') return t;
+        if ((t.creditBuyer || 'Unknown') !== buyer) return t;
+        if (!t.isPickup) return t;
+        // Convert pickup → settled credit sale
+        const newPayments = paidAmount > 0
+          ? [{ amount: paidAmount, receiver, receiverName, date, note: note || 'Pickup payment' }]
+          : [];
+        return {
+          ...t,
+          isPickup: false,
+          creditTotal: totalAmount,
+          creditPaid: paidAmount,
+          creditReceiver: paidAmount > 0 ? receiver : t.creditReceiver,
+          creditReceiverName: paidAmount > 0 ? receiverName : t.creditReceiverName,
+          payments: [...(t.payments || []), ...newPayments],
+          date,
+          desc: `Credit sale — ${buyer}`,
+          note: note || t.note,
+        };
+      });
+      dbSync(people, next, currency);
+      return next;
+    });
+    setPickupModal(s => ({ ...s, open: false }));
+    toast.success('Pickup logged!');
+  }, [people, currency, dbSync]);
+
   /* ── People ──────────────────────────────────────── */
   const addPerson = useCallback((name: string, role: string, color: string) => {
     if (!guardWrite()) return;
@@ -698,6 +731,7 @@ export default function App() {
               txs={txs} people={people} currency={currency}
               isReadOnly={isReadOnly}
               onPayment={buyer => { if (!guardWrite()) return; setPayModal({ open: true, buyer }); }}
+              onPickup={(buyer, pickupDate) => { if (!guardWrite()) return; setPickupModal({ open: true, buyer, pickupDate }); }}
               onEdit={tx => { if (!guardWrite()) return; setEditModal({ open: true, tx }); }}
               onDelete={(id, desc) => { if (!guardWrite()) return; setDeleteModal({ open: true, id, desc }); }}
             />
@@ -771,6 +805,15 @@ export default function App() {
           currency={currency}
           onApply={(amount, date, receiver) => confirmPayment(payModal.buyer, amount, date, receiver)}
           onClose={() => setPayModal(s => ({ ...s, open: false }))}
+        />
+        <PickupModal
+          open={pickupModal.open}
+          buyer={pickupModal.buyer}
+          pickupDate={pickupModal.pickupDate}
+          people={people}
+          currency={currency}
+          onApply={(totalAmount, paidAmount, date, receiver, note) => confirmPickup(pickupModal.buyer, totalAmount, paidAmount, date, receiver, note)}
+          onClose={() => setPickupModal(s => ({ ...s, open: false }))}
         />
         <ClearModal
           open={clearModal}
