@@ -143,7 +143,7 @@ export default function App() {
     }
   }, [applyRemote]);
 
-  const dbSync = useCallback((nextPeople: Person[], nextTxs: Transaction[], nextCurrency: string) => {
+  const dbSync = useCallback((nextPeople: Person[], nextTxs: Transaction[], nextCurrency: string, nextBusinessName?: string) => {
     if (!dbRef.current || !fsRef.current) return;
     clearTimeout(syncRef.current);
     syncRef.current = setTimeout(async () => {
@@ -152,7 +152,7 @@ export default function App() {
         const withBiz = ppl.find(p => p.id === BIZ_ACCOUNT.id) ? ppl : [...ppl, BIZ_ACCOUNT];
         await fsRef.current.setDoc(
           fsRef.current.doc(dbRef.current, ...FS_DOC),
-          { txs: nextTxs, people: withBiz, currency: nextCurrency, ts: Date.now(), _pinHash: H_MASTER }
+          { txs: nextTxs, people: withBiz, currency: nextCurrency, businessName: nextBusinessName || '', ts: Date.now(), _pinHash: H_MASTER }
         );
         setDbStatus('✅ Last sync: ' + new Date().toLocaleTimeString());
       } catch (e: any) {
@@ -170,7 +170,7 @@ export default function App() {
   const lock = useCallback(() => {
     sessionStorage.removeItem('cb_s');
     setAppMode('locked');
-    setPeople([]); setTxs([]); setCurrency('GHS');
+    setPeople([]); setTxs([]); setCurrency('GHS'); setBusinessName('');
   }, []);
 
   /* ── Guard ────────────────────────────────── */
@@ -275,9 +275,9 @@ export default function App() {
     if (!guardWrite()) return;
     setCurrency(c);
     ss('cb_currency', c);
-    dbSync(people, txs, c);
+    dbSync(people, txs, c, businessName);
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [people, txs, dbSync, isReadOnly]);
+  }, [people, txs, businessName, dbSync, isReadOnly]);
 
   /* ── Business Name ────────────────────────── */
   const saveBusinessName = useCallback((name: string) => {
@@ -301,7 +301,7 @@ export default function App() {
     if (!dbRef.current || !fsRef.current) { toast.error('Not connected'); return; }
     toast.loading('Pushing…');
     try {
-      await fsRef.current.setDoc(fsRef.current.doc(dbRef.current, ...FS_DOC), { txs, people, currency, ts: Date.now(), _pinHash: H_MASTER });
+      await fsRef.current.setDoc(fsRef.current.doc(dbRef.current, ...FS_DOC), { txs, people, currency, businessName, ts: Date.now(), _pinHash: H_MASTER });
       toast.dismiss();
       toast.success('Pushed to cloud');
       setDbStatus('✅ Pushed: ' + new Date().toLocaleTimeString());
