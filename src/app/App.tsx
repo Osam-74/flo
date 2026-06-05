@@ -110,7 +110,16 @@ export default function App() {
   /* ── Service Worker ─────────────────────────────── */
   useEffect(() => {
     if ('serviceWorker' in navigator) {
-      navigator.serviceWorker.register('/flo/sw.js', { scope: '/flo/' })
+      // Detect base path so this works on both Vercel (/) and GitHub Pages (/flo/)
+      const swBase = window.location.pathname.replace(/\/$/, '').split('/').slice(0, -1).join('/');
+      // sw.js sits at the app root (same level as index.html)
+      const swUrl = (window.location.pathname === '/' || !window.location.pathname.includes('/flo'))
+        ? '/sw.js'
+        : '/flo/sw.js';
+      const swScope = (window.location.pathname === '/' || !window.location.pathname.includes('/flo'))
+        ? '/'
+        : '/flo/';
+      navigator.serviceWorker.register(swUrl, { scope: swScope })
         .then(reg => {
           reg.addEventListener('updatefound', () => {
             const sw = reg.installing;

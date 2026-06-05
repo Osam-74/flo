@@ -1,11 +1,16 @@
-const CACHE_NAME = 'cashbook-v10';
-const BASE = '/flo';
+const CACHE_NAME = 'cashbook-v11';
+
+// Detect base path from the SW's own location at runtime.
+// On GitHub Pages:  self.location = https://osam-74.github.io/flo/sw.js  → BASE = '/flo'
+// On Vercel:        self.location = https://yourapp.vercel.app/sw.js      → BASE = ''
+const swPath = self.location.pathname; // e.g. '/flo/sw.js' or '/sw.js'
+const BASE = swPath.replace(/\/sw\.js$/, ''); // e.g. '/flo' or ''
 
 const PRECACHE = [
   BASE + '/',
   BASE + '/index.html',
   BASE + '/manifest.json',
-];
+].filter((v, i, a) => a.indexOf(v) === i); // dedupe (in case BASE is empty, '/' appears once)
 
 self.addEventListener('install', event => {
   event.waitUntil(
@@ -38,7 +43,7 @@ self.addEventListener('fetch', event => {
     url.hostname.includes('fonts.') ||
     url.protocol === 'chrome-extension:'
   ) {
-    return; // Let the browser handle it natively
+    return;
   }
 
   if (event.request.method !== 'GET') return;
@@ -46,7 +51,6 @@ self.addEventListener('fetch', event => {
   event.respondWith(
     fetch(event.request)
       .then(response => {
-        // Cache successful responses
         if (response && response.status === 200 && response.type !== 'opaque') {
           const clone = response.clone();
           caches.open(CACHE_NAME).then(cache => cache.put(event.request, clone));
@@ -54,21 +58,18 @@ self.addEventListener('fetch', event => {
         return response;
       })
       .catch(() => {
-        // Network failed — try cache
         return caches.match(event.request).then(cached => {
           if (cached) return cached;
 
-          // For navigation requests, serve index.html so the SPA can handle routing
           if (event.request.mode === 'navigate') {
             return caches.match(BASE + '/index.html')
               .then(html => html || caches.match(BASE + '/'))
               .then(html => html || new Response(
-                '<!DOCTYPE html><html><body><p>You are offline. Please reconnect.</p></body></html>',
+                '<!DOCTYPE html><html><body style="font-family:sans-serif;padding:2rem"><h2>You are offline</h2><p>Please reconnect and reload.</p></body></html>',
                 { headers: { 'Content-Type': 'text/html' } }
               ));
           }
 
-          // For other resources, return a safe empty 503 response (never undefined)
           return new Response('Offline — resource unavailable', {
             status: 503,
             headers: { 'Content-Type': 'text/plain' },
