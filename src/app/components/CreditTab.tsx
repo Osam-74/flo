@@ -64,15 +64,18 @@ export function CreditTab({ txs, people, currency, isReadOnly, onPayment, onPick
                     </div>
                     {(() => {
                       const todayStr = new Date().toISOString().split('T')[0];
-                      // Check if ALL txs for this buyer are pickup-scheduled (future date, isPickup)
                       const buyerTxs = creditTxs.filter(t => (t.creditBuyer || 'Unknown') === buyer);
-                      const allPickup = buyerTxs.length > 0 && buyerTxs.every(t => t.isPickup && (t.date || '') > todayStr);
+                      // isPickup is the only authority — never auto-settle based on date
+                      const allPickup = buyerTxs.length > 0 && buyerTxs.every(t => t.isPickup);
                       const nextPickupDate = allPickup ? buyerTxs.map(t => t.date).sort()[0] : null;
-                      if (allPickup && nextPickupDate) return (
-                        <div style={{ fontFamily: "'DM Mono',monospace", fontSize: '0.72rem', color: '#1A4FA8', marginTop: 2, display: 'flex', alignItems: 'center', gap: 4 }}>
-                          🥚 Pickup {new Date(nextPickupDate + 'T00:00:00').toLocaleDateString('en-GB', { day: '2-digit', month: 'short' })}
-                        </div>
-                      );
+                      if (allPickup && nextPickupDate) {
+                        const isDelayed = nextPickupDate < todayStr;
+                        return (
+                          <div style={{ fontFamily: "'DM Mono',monospace", fontSize: '0.72rem', color: isDelayed ? '#E8903E' : '#1A4FA8', marginTop: 2, display: 'flex', alignItems: 'center', gap: 4 }}>
+                            {isDelayed ? '⏰ Delayed pickup' : `🥚 Pickup ${new Date(nextPickupDate + 'T00:00:00').toLocaleDateString('en-GB', { day: '2-digit', month: 'short' })}`}
+                          </div>
+                        );
+                      }
                       if (outstanding > 0.005) return (
                         <div style={{ fontFamily: "'DM Mono',monospace", fontSize: '0.75rem', color: '#E83E5C', marginTop: 2 }}>
                           Owes: {fmtAmt(outstanding, currency)}
@@ -88,18 +91,22 @@ export function CreditTab({ txs, people, currency, isReadOnly, onPayment, onPick
                   {!isReadOnly && (() => {
                     const todayStr = new Date().toISOString().split('T')[0];
                     const buyerTxs = creditTxs.filter(t => (t.creditBuyer || 'Unknown') === buyer);
-                    const allPickup = buyerTxs.length > 0 && buyerTxs.every(t => t.isPickup && (t.date || '') > todayStr);
+                    // isPickup is the authority — show Log Pickup whether date is future OR past
+                    const allPickup = buyerTxs.length > 0 && buyerTxs.every(t => t.isPickup);
                     const nextPickup = allPickup ? buyerTxs.map(t => t.date).sort()[0] ?? '' : '';
+                    const isDelayed = allPickup && nextPickup < todayStr;
                     if (allPickup) return (
                       <button
                         onClick={() => onPickup(buyer, nextPickup)}
                         style={{
-                          background: 'rgba(26,79,168,0.10)', border: '1px solid #1A4FA8',
-                          color: '#1A4FA8', borderRadius: 10, padding: '6px 11px',
+                          background: isDelayed ? 'rgba(232,144,62,0.10)' : 'rgba(26,79,168,0.10)',
+                          border: `1px solid ${isDelayed ? '#E8903E' : '#1A4FA8'}`,
+                          color: isDelayed ? '#E8903E' : '#1A4FA8',
+                          borderRadius: 10, padding: '6px 11px',
                           fontSize: '0.64rem', fontWeight: 700, cursor: 'pointer', whiteSpace: 'nowrap',
                         }}
                       >
-                        🥚 Log Pickup
+                        {isDelayed ? '⏰ Log Pickup' : '🥚 Log Pickup'}
                       </button>
                     );
                     if (outstanding > 0.005) return (
