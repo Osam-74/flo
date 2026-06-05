@@ -62,10 +62,15 @@ export function EditModal({ open, tx, people, onClose, onSave }: EditModalProps)
   }, [tx]);
 
   const save = () => {
-    const amt = parseFloat(amount);
-    if (isNaN(amt) || amt < 0) { toast.error('Enter a valid amount'); return; }
-    if (amt <= 0) { toast.error('Enter a valid amount'); return; }
+    const amt = parseFloat(amount) || 0;
     if (!tx) return;
+    const isPickupEntry = tx.type === 'credit' && !!tx.isPickup;
+    // For awaiting-pickup entries, amount may legitimately be 0 (set later when logging pickup)
+    if (!isPickupEntry) {
+      if (isNaN(amt) || amt <= 0) { toast.error('Enter a valid amount'); return; }
+    } else {
+      if (amt < 0) { toast.error('Amount cannot be negative'); return; }
+    }
     const updates: Partial<Transaction> = { date, desc: desc || tx.desc, note, person, cat };
     if (tx.type === 'credit') {
       // For credit: amount entered is the new creditTotal.
@@ -104,7 +109,13 @@ export function EditModal({ open, tx, people, onClose, onSave }: EditModalProps)
         </Field>
         <Field label="Date"><input style={inp} type="date" value={date} onChange={e => setDate(e.target.value)} /></Field>
       </div>
-      {tx?.type === 'credit' && (
+      {tx?.type === 'credit' && tx.isPickup && (
+        <div style={{ background: 'rgba(26,79,168,0.07)', borderRadius: 10, padding: '8px 12px', marginBottom: 10, fontSize: '0.74rem', color: '#1A4FA8', fontWeight: 600, display: 'flex', alignItems: 'flex-start', gap: 7 }}>
+          <span style={{ fontSize: '0.9rem', lineHeight: 1 }}>🥚</span>
+          <span>Awaiting pickup — amount will be confirmed when you log the pickup. You can update the pickup date here.</span>
+        </div>
+      )}
+      {tx?.type === 'credit' && !tx.isPickup && (
         <div style={{ background: 'rgba(61,107,223,0.07)', borderRadius: 10, padding: '8px 12px', marginBottom: 10, fontSize: '0.74rem', color: '#3D6BDF', fontWeight: 600 }}>
           Paid so far: {(tx.creditPaid || 0).toFixed(2)} · Outstanding: {Math.max(0, (tx.creditTotal || 0) - (tx.creditPaid || 0)).toFixed(2)}
         </div>
@@ -425,4 +436,5 @@ const smallKey: React.CSSProperties = {
   fontSize: '1.3rem', fontWeight: 700, color: '#1A1D2E', cursor: 'pointer',
   fontFamily: 'Plus Jakarta Sans, sans-serif',
 };
+
 
