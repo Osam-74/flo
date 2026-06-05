@@ -366,6 +366,7 @@ export function BusinessSelector({
   const [renameId, setRenameId]               = useState<string | null>(null);
   const [renameName, setRenameName]           = useState('');
   const [renaming, setRenaming]               = useState(false);
+  const [showContact, setShowContact]         = useState(false);
 
   useEffect(() => {
     if (businesses.length > 0 && !selected) setSelected(businesses[0].id);
@@ -539,6 +540,17 @@ export function BusinessSelector({
                 <ChevronDown size={18} color="#3D6BDF" style={{ position: 'absolute', right: 14, top: '50%', transform: 'translateY(-50%)', pointerEvents: 'none' }} />
               </div>
               <button onClick={() => { const biz = businesses.find(b => b.id === selected); if (biz) onSelectBusiness(biz); }} style={{ width: '100%', padding: '15px', borderRadius: 16, marginTop: 14, background: 'linear-gradient(135deg, #1A2FA8, #3D6BDF)', color: '#fff', border: 'none', cursor: 'pointer', fontSize: '0.9rem', fontWeight: 800, letterSpacing: '0.04em', boxShadow: '0 4px 16px rgba(61,107,223,0.35)', fontFamily: 'Plus Jakarta Sans, sans-serif' }}>Continue →</button>
+
+              {/* Register prompt */}
+              <div style={{ textAlign: 'center', marginTop: 20 }}>
+                <span style={{ fontSize: '0.7rem', color: '#B0B5CC' }}>Want to register a business? </span>
+                <button
+                  onClick={() => setShowContact(true)}
+                  style={{ background: 'none', border: 'none', padding: 0, cursor: 'pointer', fontSize: '0.7rem', fontWeight: 700, color: '#3D6BDF', textDecoration: 'underline', textDecorationStyle: 'dotted', textUnderlineOffset: 3 }}
+                >
+                  Contact admin →
+                </button>
+              </div>
             </>
           )}
         </div>
@@ -596,6 +608,34 @@ export function BusinessSelector({
           </div>
         </div>
       )}
+
+      {/* ══ CONTACT ADMIN ══ */}
+      {showContact && (
+        <div style={overlayStyle}>
+          <div style={{ ...cardStyle, maxWidth: 320, textAlign: 'center', position: 'relative' }}>
+            <button onClick={() => setShowContact(false)} style={{ position: 'absolute', top: 16, right: 16, background: 'none', border: 'none', cursor: 'pointer', color: '#9A9FB8' }}><X size={18} /></button>
+            {/* Icon */}
+            <div style={{ width: 56, height: 56, borderRadius: 18, background: 'linear-gradient(135deg, rgba(61,107,223,0.12), rgba(107,143,255,0.2))', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 16px', border: '1.5px solid rgba(61,107,223,0.18)' }}>
+              <Building2 size={24} color="#3D6BDF" />
+            </div>
+            <div style={{ fontWeight: 800, fontSize: '1rem', color: '#1A1D2E', marginBottom: 8 }}>Register a Business</div>
+            <div style={{ fontSize: '0.8rem', color: '#5A5F7A', lineHeight: 1.7, marginBottom: 6 }}>
+              Business accounts are set up by the admin.<br />
+              Reach out to get your business registered and receive your access PIN.
+            </div>
+            <div style={{ background: 'rgba(61,107,223,0.06)', border: '1px solid rgba(61,107,223,0.14)', borderRadius: 12, padding: '12px 16px', margin: '14px 0 20px', display: 'flex', alignItems: 'center', gap: 10 }}>
+              <ShieldCheck size={16} color="#3D6BDF" style={{ flexShrink: 0 }} />
+              <span style={{ fontSize: '0.72rem', color: '#3D6BDF', fontWeight: 600, textAlign: 'left', lineHeight: 1.5 }}>
+                Contact the <strong>master admin</strong> to register your business and get started.
+              </span>
+            </div>
+            <button onClick={() => setShowContact(false)} style={{ width: '100%', padding: '13px', borderRadius: 14, background: 'linear-gradient(135deg, #1A2FA8, #3D6BDF)', color: '#fff', border: 'none', cursor: 'pointer', fontSize: '0.85rem', fontWeight: 800, boxShadow: '0 4px 14px rgba(61,107,223,0.3)' }}>
+              Got it
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
+
