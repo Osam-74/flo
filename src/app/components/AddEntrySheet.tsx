@@ -330,17 +330,9 @@ export function AddEntrySheet({ open, onClose, people, currency, onSave, initial
               padding: '0 16px 40px',
               WebkitOverflowScrolling: 'touch',
               paddingBottom: 'max(40px, env(keyboard-inset-height, 0px))',
-              position: 'relative',
             }}
           >
-            {/* Read-only overlay — blocks all input interaction when in view mode */}
-            {isReadOnly && (
-              <div style={{
-                position: 'absolute', inset: 0, zIndex: 10,
-                cursor: 'not-allowed',
-                background: 'transparent',
-              }} />
-            )}
+
 
             {/* ── STANDARD (income / expense / salary) ── */}
             {isStandard && (
@@ -671,5 +663,6 @@ const infoBox: React.CSSProperties = {
   fontSize: '0.72rem', color: '#1A2FA8', lineHeight: 1.6,
   marginBottom: 10,
 };
+
 
 
