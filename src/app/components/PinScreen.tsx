@@ -1,5 +1,5 @@
 import React, { useState, useCallback, useEffect } from 'react';
-import { Delete, ArrowLeft } from 'lucide-react';
+import { Delete, ArrowLeft, Download } from 'lucide-react';
 import { sha256 } from '../utils';
 
 interface Props {
@@ -17,6 +17,33 @@ export function PinScreen({ onUnlock, onBack, businessName, masterHash, viewHash
   const [shaking, setShaking] = useState(false);
   const [errMsg, setErrMsg] = useState('');
   const [lastPress, setLastPress] = useState(0);
+  const [installReady, setInstallReady] = useState(!!(window.__pwaInstallReady && window.__pwaInstallPrompt));
+
+  /* ── Listen for install prompt ── */
+  useEffect(() => {
+    const onReady = () => setInstallReady(!!(window.__pwaInstallPrompt));
+    const onDone  = () => setInstallReady(false);
+    window.addEventListener('pwa-install-ready', onReady);
+    window.addEventListener('pwa-install-done',  onDone);
+    return () => {
+      window.removeEventListener('pwa-install-ready', onReady);
+      window.removeEventListener('pwa-install-done',  onDone);
+    };
+  }, []);
+
+  const handleInstall = async () => {
+    const p = window.__pwaInstallPrompt;
+    if (!p) { return; }
+    try {
+      p.prompt();
+      const choice = await p.userChoice;
+      if (choice?.outcome === 'accepted') {
+        window.__pwaInstallPrompt = undefined;
+        window.__pwaInstallReady = false;
+        setInstallReady(false);
+      }
+    } catch (e) { console.warn('[Install]', e); }
+  };
 
   const checkPin = useCallback(async (pin: string) => {
     const h = await sha256(pin);
@@ -137,6 +164,25 @@ export function PinScreen({ onUnlock, onBack, businessName, masterHash, viewHash
           );
         })}
       </div>
+
+      {/* Install App button — shown only when PWA install is available */}
+      {installReady && (
+        <button
+          onClick={handleInstall}
+          style={{
+            display: 'flex', alignItems: 'center', gap: 8,
+            background: 'linear-gradient(135deg, #1A2FA8, #3D6BDF)',
+            color: '#fff', border: 'none', borderRadius: 14,
+            padding: '11px 22px', cursor: 'pointer', marginBottom: 24,
+            fontSize: '0.8rem', fontWeight: 700, letterSpacing: '0.04em',
+            boxShadow: '0 4px 16px rgba(61,107,223,0.35)',
+            fontFamily: 'Plus Jakarta Sans, sans-serif',
+          }}
+        >
+          <Download size={15} strokeWidth={2.5} />
+          Install App
+        </button>
+      )}
 
       {/* Number pad */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 12, width: 270 }}>

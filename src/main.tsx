@@ -3,6 +3,33 @@ import { createRoot } from "react-dom/client";
 import App from "./app/App.tsx";
 import "./styles/index.css";
 
+/* ── Capture beforeinstallprompt BEFORE React mounts ──────────────────
+   The browser fires this event very early — often before React even
+   finishes hydrating. We capture it here at the module level so it
+   is never missed, and store it on window for App.tsx to consume.
+──────────────────────────────────────────────────────────────────── */
+declare global {
+  interface Window {
+    __pwaInstallPrompt?: any;
+    __pwaInstallReady?: boolean;
+  }
+}
+
+window.__pwaInstallReady = false;
+window.addEventListener('beforeinstallprompt', (e: any) => {
+  e.preventDefault();
+  window.__pwaInstallPrompt = e;
+  window.__pwaInstallReady = true;
+  // Notify any already-mounted React listeners
+  window.dispatchEvent(new Event('pwa-install-ready'));
+}, { once: true });
+
+window.addEventListener('appinstalled', () => {
+  window.__pwaInstallPrompt = undefined;
+  window.__pwaInstallReady = false;
+  window.dispatchEvent(new Event('pwa-install-done'));
+});
+
 class ErrorBoundary extends React.Component<
   { children: React.ReactNode },
   { error: Error | null }

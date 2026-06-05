@@ -1,4 +1,4 @@
-const CACHE_NAME = 'cashbook-v9';
+const CACHE_NAME = 'cashbook-v10';
 const BASE = '/flo';
 
 const PRECACHE = [
@@ -27,6 +27,8 @@ self.addEventListener('activate', event => {
 
 self.addEventListener('fetch', event => {
   const url = new URL(event.request.url);
+
+  // Never intercept Firebase, Google APIs, extensions
   if (
     url.hostname.includes('firebase') ||
     url.hostname.includes('firebaseio') ||
@@ -36,27 +38,44 @@ self.addEventListener('fetch', event => {
     url.hostname.includes('fonts.') ||
     url.protocol === 'chrome-extension:'
   ) {
-    return;
+    return; // Let the browser handle it natively
   }
-  if (event.request.method === 'GET') {
-    event.respondWith(
-      fetch(event.request)
-        .then(response => {
-          if (response && response.status === 200) {
-            const clone = response.clone();
-            caches.open(CACHE_NAME).then(cache => cache.put(event.request, clone));
-          }
-          return response;
-        })
-        .catch(() => caches.match(event.request).then(cached => {
+
+  if (event.request.method !== 'GET') return;
+
+  event.respondWith(
+    fetch(event.request)
+      .then(response => {
+        // Cache successful responses
+        if (response && response.status === 200 && response.type !== 'opaque') {
+          const clone = response.clone();
+          caches.open(CACHE_NAME).then(cache => cache.put(event.request, clone));
+        }
+        return response;
+      })
+      .catch(() => {
+        // Network failed — try cache
+        return caches.match(event.request).then(cached => {
           if (cached) return cached;
+
+          // For navigation requests, serve index.html so the SPA can handle routing
           if (event.request.mode === 'navigate') {
-            return caches.match(BASE + '/index.html') || caches.match(BASE + '/');
+            return caches.match(BASE + '/index.html')
+              .then(html => html || caches.match(BASE + '/'))
+              .then(html => html || new Response(
+                '<!DOCTYPE html><html><body><p>You are offline. Please reconnect.</p></body></html>',
+                { headers: { 'Content-Type': 'text/html' } }
+              ));
           }
-          return new Response('Offline — resource unavailable', { status: 503 });
-        }))
-    );
-  }
+
+          // For other resources, return a safe empty 503 response (never undefined)
+          return new Response('Offline — resource unavailable', {
+            status: 503,
+            headers: { 'Content-Type': 'text/plain' },
+          });
+        });
+      })
+  );
 });
 
 self.addEventListener('message', event => {

@@ -80,15 +80,30 @@ export default function App() {
 
   const isReadOnly = appMode === 'view';
 
-  /* ── PWA install ────────────────────────────────── */
+  /* ── PWA install ─────────────────────────────────────────────────────
+     The beforeinstallprompt event is captured in main.tsx BEFORE React
+     mounts (stored on window.__pwaInstallPrompt). We read it here and
+     also listen for the custom 'pwa-install-ready' event in case React
+     mounts before the browser fires the prompt (rare but possible).
+  ─────────────────────────────────────────────────────────────────── */
   useEffect(() => {
-    const onBefore = (e: any) => { e.preventDefault(); promptRef.current = e; setInstallReady(true); };
-    const onInstalled = () => { promptRef.current = null; setInstallReady(false); };
-    window.addEventListener('beforeinstallprompt', onBefore);
-    window.addEventListener('appinstalled', onInstalled);
+    // Check if already captured before we mounted
+    if (window.__pwaInstallReady && window.__pwaInstallPrompt) {
+      promptRef.current = window.__pwaInstallPrompt;
+      setInstallReady(true);
+    }
+    const onReady = () => {
+      if (window.__pwaInstallPrompt) {
+        promptRef.current = window.__pwaInstallPrompt;
+        setInstallReady(true);
+      }
+    };
+    const onDone = () => { promptRef.current = null; setInstallReady(false); };
+    window.addEventListener('pwa-install-ready', onReady);
+    window.addEventListener('pwa-install-done', onDone);
     return () => {
-      window.removeEventListener('beforeinstallprompt', onBefore);
-      window.removeEventListener('appinstalled', onInstalled);
+      window.removeEventListener('pwa-install-ready', onReady);
+      window.removeEventListener('pwa-install-done', onDone);
     };
   }, []);
 
