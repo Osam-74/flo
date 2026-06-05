@@ -35,12 +35,16 @@ export function TxItem({ tx, people, currency, showActions, onEdit, onDelete }: 
   if (tx.type === 'credit') {
     const paid  = tx.creditPaid  || 0;
     const total = tx.creditTotal || 0;
-    const todayStr = new Date().toISOString().split('T')[0];
-    const isAwaitingPickup = tx.isPickup && (tx.date || '') > todayStr;
+    const todayStrAmt = new Date().toISOString().split('T')[0];
+    // isPickup is the only authority — never auto-settle based on date
+    const isAwaitingPickup = !!tx.isPickup;
+    const isDelayedPickup  = isAwaitingPickup && (tx.date || '') < todayStrAmt;
     amountEl = isAwaitingPickup ? (
       <div style={{ textAlign: 'right', flexShrink: 0 }}>
-        <div style={{ fontSize: '1.1rem', textAlign: 'center' }}>🥚</div>
-        <div style={{ fontFamily: "'DM Mono',monospace", fontSize: '0.62rem', color: '#1A4FA8', fontWeight: 700 }}>Awaiting</div>
+        <div style={{ fontSize: '1.1rem', textAlign: 'center' }}>{isDelayedPickup ? '⏰' : '🥚'}</div>
+        <div style={{ fontFamily: "'DM Mono',monospace", fontSize: '0.62rem', color: isDelayedPickup ? '#E8903E' : '#1A4FA8', fontWeight: 700 }}>
+          {isDelayedPickup ? 'Delayed' : 'Awaiting'}
+        </div>
       </div>
     ) : (
       <div className="text-right flex-shrink-0">
@@ -81,12 +85,17 @@ export function TxItem({ tx, people, currency, showActions, onEdit, onDelete }: 
   if (tx.type === 'credit') {
     const outstanding = (tx.creditTotal || 0) - (tx.creditPaid || 0);
     const todayStrMeta = new Date().toISOString().split('T')[0];
-    const isAwaitingPickupMeta = tx.isPickup && (tx.date || '') > todayStrMeta;
+    const isAwaitingPickupMeta = !!tx.isPickup;
+    const isDelayedPickupMeta  = isAwaitingPickupMeta && (tx.date || '') < todayStrMeta;
     if (tx.creditBuyer) extraMeta.push(<span key="crb" style={metaCss}>Buyer: {tx.creditBuyer}</span>);
     if (isAwaitingPickupMeta) {
       extraMeta.push(
-        <span key="pickup-badge" style={{ fontSize: '0.6rem', fontWeight: 700, padding: '1px 7px', borderRadius: 6, background: 'rgba(26,79,168,0.10)', color: '#1A4FA8' }}>
-          🥚 Pickup scheduled
+        <span key="pickup-badge" style={{
+          fontSize: '0.6rem', fontWeight: 700, padding: '1px 7px', borderRadius: 6,
+          background: isDelayedPickupMeta ? 'rgba(232,144,62,0.12)' : 'rgba(26,79,168,0.10)',
+          color: isDelayedPickupMeta ? '#E8903E' : '#1A4FA8',
+        }}>
+          {isDelayedPickupMeta ? '⏰ Pickup delayed' : '🥚 Pickup scheduled'}
         </span>
       );
     } else if (outstanding > 0.005) {
