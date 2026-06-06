@@ -1,7 +1,7 @@
 {
-  "name": "Cashflow \u2014 A better tracking option for operations",
+  "name": "Cashflow",
   "short_name": "Cashflow",
-  "description": "A better tracking option for operations.",
+  "description": "",
   "start_url": "./",
   "scope": "./",
   "display": "standalone",
