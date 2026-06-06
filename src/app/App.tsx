@@ -644,7 +644,6 @@ export default function App() {
         <div style={{ fontSize: '1.6rem', fontWeight: 800, letterSpacing: '-0.04em', marginBottom: 12 }}>
           Cash<span style={{ color: '#3D6BDF' }}>book</span>
         </div>
-        <div style={{ fontSize: '0.75rem', color: '#9A9FB8' }}>Loading…</div>
         <Toaster position="bottom-center" richColors />
       </div>
     );
@@ -719,12 +718,17 @@ export default function App() {
           onLock={lock}
           onInstall={async () => {
             const p = promptRef.current;
-            if (!p) { toast('Open browser menu to install'); return; }
+            if (!p) { toast('Open your browser menu to install'); return; }
             try {
               p.prompt();
               const choice = await p.userChoice;
-              if (choice?.outcome === 'accepted') toast.success('App installed');
-              else toast('Install dismissed');
+              if (choice?.outcome === 'accepted') {
+                toast.success('✅ Cashbook installed! Find it in your app list.');
+                window.__pwaInstallPrompt = undefined;
+                window.__pwaInstallReady = false;
+              } else {
+                toast('Installation cancelled');
+              }
             } catch (e) { console.warn('[Install]', e); }
             promptRef.current = null; setInstallReady(false);
           }}

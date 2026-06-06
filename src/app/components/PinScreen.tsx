@@ -1,5 +1,6 @@
 import React, { useState, useCallback, useEffect } from 'react';
 import { Delete, ArrowLeft, Download } from 'lucide-react';
+import { toast } from 'sonner';
 import { sha256 } from '../utils';
 
 interface Props {
@@ -41,6 +42,9 @@ export function PinScreen({ onUnlock, onBack, businessName, masterHash, viewHash
         window.__pwaInstallPrompt = undefined;
         window.__pwaInstallReady = false;
         setInstallReady(false);
+        toast.success('✅ Cashbook installed! Find it in your app list.');
+      } else {
+        toast('Installation cancelled');
       }
     } catch (e) { console.warn('[Install]', e); }
   };
