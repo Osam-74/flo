@@ -1,6 +1,6 @@
 {
-  "name": "Cashbook",
-  "short_name": "Cashbook",
+  "name": "FlowHQ",
+  "short_name": "FlowHQ",
   "description": "",
   "start_url": "./",
   "scope": "./",
@@ -36,5 +36,5 @@
       "purpose": "any maskable"
     }
   ],
-  "id": "cashflow-app"
+  "id": "flowhq-app"
 }

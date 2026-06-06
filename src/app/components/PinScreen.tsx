@@ -42,7 +42,7 @@ export function PinScreen({ onUnlock, onBack, businessName, masterHash, viewHash
         window.__pwaInstallPrompt = undefined;
         window.__pwaInstallReady = false;
         setInstallReady(false);
-        toast.success('✅ Cashbook installed! Find it in your app list.');
+        toast.success('✅ FlowHQ installed!');
       } else {
         toast('Installation cancelled');
       }
@@ -140,7 +140,7 @@ export function PinScreen({ onUnlock, onBack, businessName, masterHash, viewHash
       }}>💰</div>
 
       <div style={{ fontSize: '1.9rem', fontWeight: 800, letterSpacing: '-0.04em', marginBottom: 4, fontFamily: 'Plus Jakarta Sans, sans-serif' }}>
-        Cash<span style={{ color: '#3D6BDF' }}>book</span>
+        Flow<span style={{ color: '#00B4D8' }}>HQ</span>
       </div>
       <div style={{ fontSize: '0.78rem', fontWeight: 700, color: '#1A2FA8', letterSpacing: '0.02em', marginBottom: 2, fontFamily: 'Plus Jakarta Sans, sans-serif' }}>
         {businessName}

@@ -642,8 +642,9 @@ export default function App() {
           boxShadow: '0 8px 32px rgba(61,107,223,0.35)',
         }}>💰</div>
         <div style={{ fontSize: '1.6rem', fontWeight: 800, letterSpacing: '-0.04em', marginBottom: 12 }}>
-          Cash<span style={{ color: '#3D6BDF' }}>book</span>
+          Flow<span style={{ color: '#00B4D8' }}>HQ</span>
         </div>
+        <div style={{ fontSize: '0.75rem', color: '#9A9FB8' }}>Loading…</div>
         <Toaster position="bottom-center" richColors />
       </div>
     );
@@ -723,7 +724,7 @@ export default function App() {
               p.prompt();
               const choice = await p.userChoice;
               if (choice?.outcome === 'accepted') {
-                toast.success('✅ Cashbook installed! Find it in your app list.');
+                toast.success('✅ FlowHQ installed!');
                 window.__pwaInstallPrompt = undefined;
                 window.__pwaInstallReady = false;
               } else {
