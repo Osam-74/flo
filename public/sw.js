@@ -1,16 +1,11 @@
-const CACHE_NAME = 'cashbook-v9';
-const BASE = '/flo';
-
-const PRECACHE = [
-  BASE + '/',
-  BASE + '/index.html',
-  BASE + '/manifest.json',
-];
+// FlowHQ Service Worker
+// Uses relative paths so it works on both GitHub Pages (/flo/) and Vercel (/)
+const CACHE_NAME = 'flowhq-v1';
 
 self.addEventListener('install', event => {
   event.waitUntil(
     caches.open(CACHE_NAME)
-      .then(cache => cache.addAll(PRECACHE))
+      .then(cache => cache.add('./'))
       .then(() => self.skipWaiting())
   );
 });
@@ -27,7 +22,9 @@ self.addEventListener('activate', event => {
 
 self.addEventListener('fetch', event => {
   const url = new URL(event.request.url);
+  // Skip non-GET and external/firebase/google requests
   if (
+    event.request.method !== 'GET' ||
     url.hostname.includes('firebase') ||
     url.hostname.includes('firebaseio') ||
     url.hostname.includes('googleapis') ||
@@ -38,25 +35,27 @@ self.addEventListener('fetch', event => {
   ) {
     return;
   }
-  if (event.request.method === 'GET') {
-    event.respondWith(
-      fetch(event.request)
-        .then(response => {
-          if (response && response.status === 200) {
-            const clone = response.clone();
-            caches.open(CACHE_NAME).then(cache => cache.put(event.request, clone));
-          }
-          return response;
-        })
-        .catch(() => caches.match(event.request).then(cached => {
+
+  event.respondWith(
+    fetch(event.request)
+      .then(response => {
+        if (response && response.status === 200) {
+          const clone = response.clone();
+          caches.open(CACHE_NAME).then(cache => cache.put(event.request, clone));
+        }
+        return response;
+      })
+      .catch(() =>
+        caches.match(event.request).then(cached => {
           if (cached) return cached;
+          // For navigation requests, return cached index
           if (event.request.mode === 'navigate') {
-            return caches.match(BASE + '/index.html') || caches.match(BASE + '/');
+            return caches.match('./') || caches.match('./index.html');
           }
-          return new Response('Offline — resource unavailable', { status: 503 });
-        }))
-    );
-  }
+          return new Response('Offline', { status: 503 });
+        })
+      )
+  );
 });
 
 self.addEventListener('message', event => {

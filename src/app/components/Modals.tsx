@@ -36,10 +36,21 @@ export function ToastContainer() {
     setTimeout(() => setToasts(prev => prev.filter(t => t.id !== id)), 400);
   };
 
+  // Light colours matching the biz account card style
   const bgMap: Record<string, string> = {
-    success: 'linear-gradient(135deg, #0D2B6E, #1A4FA8)',
-    error:   'linear-gradient(135deg, #a01030, #E83E5C)',
-    info:    'linear-gradient(135deg, #0D2B6E, #3D6BDF)',
+    success: 'rgba(61,107,223,0.08)',
+    error:   'rgba(232,62,92,0.08)',
+    info:    'rgba(61,107,223,0.08)',
+  };
+  const borderMap: Record<string, string> = {
+    success: 'rgba(61,107,223,0.18)',
+    error:   'rgba(232,62,92,0.25)',
+    info:    'rgba(61,107,223,0.18)',
+  };
+  const textMap: Record<string, string> = {
+    success: '#1A4FA8',
+    error:   '#c0203a',
+    info:    '#1A2FA8',
   };
   const iconMap: Record<string, string> = { success: '✓', error: '✕', info: 'ℹ' };
 
@@ -47,7 +58,7 @@ export function ToastContainer() {
     <div style={{
       position: 'fixed', top: 0, left: 0, right: 0, zIndex: 9999,
       display: 'flex', flexDirection: 'column', alignItems: 'center',
-      gap: 8, padding: '52px 16px 0',   /* 52px pushes it just below the status bar notch */
+      gap: 8, padding: '52px 16px 0',
       pointerEvents: 'none',
       fontFamily: 'Plus Jakarta Sans, sans-serif',
     }}>
@@ -57,12 +68,14 @@ export function ToastContainer() {
           style={{
             pointerEvents: 'all',
             background: bgMap[t.variant],
-            color: '#fff',
+            border: `1px solid ${borderMap[t.variant]}`,
+            color: textMap[t.variant],
             borderRadius: 14,
-            padding: '12px 16px',
+            padding: '11px 14px',
             display: 'flex', alignItems: 'center', gap: 10,
             minWidth: 240, maxWidth: 340,
-            boxShadow: '0 8px 32px rgba(13,43,110,0.35)',
+            boxShadow: '0 4px 20px rgba(61,107,223,0.10)',
+            backdropFilter: 'blur(8px)',
             opacity: t.visible ? 1 : 0,
             transform: t.visible ? 'translateY(0)' : 'translateY(-16px)',
             transition: 'opacity 0.35s ease, transform 0.35s ease',
@@ -70,22 +83,23 @@ export function ToastContainer() {
           }}
         >
           <span style={{
-            width: 22, height: 22, borderRadius: '50%',
-            background: 'rgba(255,255,255,0.2)',
+            width: 20, height: 20, borderRadius: '50%',
+            background: borderMap[t.variant],
             display: 'flex', alignItems: 'center', justifyContent: 'center',
-            fontSize: '0.75rem', fontWeight: 800, flexShrink: 0,
+            fontSize: '0.7rem', fontWeight: 800, flexShrink: 0,
+            color: textMap[t.variant],
           }}>{iconMap[t.variant]}</span>
           <span style={{ flex: 1 }}>{t.message}</span>
           <button
             onClick={() => dismiss(t.id)}
             style={{
-              background: 'rgba(255,255,255,0.15)', border: 'none',
-              borderRadius: 8, width: 22, height: 22, cursor: 'pointer',
+              background: borderMap[t.variant], border: 'none',
+              borderRadius: 7, width: 20, height: 20, cursor: 'pointer',
               display: 'flex', alignItems: 'center', justifyContent: 'center',
-              color: '#fff', padding: 0, flexShrink: 0,
+              color: textMap[t.variant], padding: 0, flexShrink: 0,
             }}
           >
-            <X size={12} strokeWidth={3} />
+            <X size={11} strokeWidth={3} />
           </button>
         </div>
       ))}
