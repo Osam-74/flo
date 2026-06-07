@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { toast } from 'sonner';
+import { showToast } from './Modals';
 import { CloudDownload, CloudUpload, Trash2, Building2 } from 'lucide-react';
 
 interface Props {

@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { UserPlus, Trash2 } from 'lucide-react';
-import { toast } from 'sonner';
+import { showToast } from './Modals';
 import type { Person, Transaction } from '../types';
 import { pColor, pInit, fmtAmt, pStats, isOwner } from '../utils';
 
@@ -21,9 +21,9 @@ export function PeopleTab({ people, txs, currency, isReadOnly, onAdd, onDelete }
   const [color, setColor] = useState('green');
 
   const handleAdd = () => {
-    if (!name.trim()) { toast.error('Enter a name'); return; }
+    if (!name.trim()) { showToast('Enter a name', 'error'); return; }
     if (people.some(p => p.name.toLowerCase() === name.trim().toLowerCase())) {
-      toast.error('Name already exists'); return;
+      showToast('Name already exists', 'error'); return;
     }
     onAdd(name.trim(), role.trim(), color);
     setName(''); setRole(''); setColor('green');

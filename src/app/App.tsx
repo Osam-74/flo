@@ -1,5 +1,4 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { Toaster, toast } from 'sonner';
 import '../styles/fonts.css';
 
 import { PinScreen }      from './components/PinScreen';
@@ -14,7 +13,7 @@ import { CreditTab }      from './components/CreditTab';
 import { PeopleTab }      from './components/PeopleTab';
 import { ReportTab }      from './components/ReportTab';
 import { SettingsTab }    from './components/SettingsTab';
-import { DeleteModal, EditModal, PaymentModal, PickupModal, ClearModal } from './components/Modals';
+import { DeleteModal, EditModal, PaymentModal, PickupModal, ClearModal, ToastContainer, showToast } from './components/Modals';
 
 import type { Transaction, Person, Tab, AppMode, TxType } from './types';
 import { gs, ss, sha256, sanitizeTxs, stripUndefined } from './utils';
@@ -282,7 +281,7 @@ export default function App() {
 
   /* ── Guard write ─────────────────────────────────── */
   const guardWrite = (): boolean => {
-    if (isReadOnly) { toast.error('🔒 View-only mode'); return false; }
+    if (isReadOnly) { showToast('🔒 View-only mode', 'error'); return false; }
     return true;
   };
 
@@ -378,7 +377,7 @@ export default function App() {
       dbSync(people, next, currency);
       return next;
     });
-    toast.success('Transaction saved!');
+    showToast('Transaction saved!', 'success');
     setActiveTab('ledger');
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [people, currency, dbSync, isReadOnly]);
@@ -391,7 +390,7 @@ export default function App() {
       return next;
     });
     setDeleteModal(s => ({ ...s, open: false }));
-    toast.success('Transaction deleted');
+    showToast('Transaction deleted', 'success');
   }, [deleteModal.id, people, currency, dbSync]);
 
   const confirmEdit = useCallback((id: string, updates: Partial<Transaction>) => {
@@ -435,7 +434,7 @@ export default function App() {
       return next;
     });
     setPayModal(s => ({ ...s, open: false }));
-    toast.success('Payment recorded');
+    showToast('Payment recorded', 'success');
   }, [people, currency, dbSync]);
 
   /* ── Log Pickup (converts pickup → real credit sale) ── */
@@ -467,7 +466,7 @@ export default function App() {
       return next;
     });
     setPickupModal(s => ({ ...s, open: false }));
-    toast.success('Pickup logged!');
+    showToast('Pickup logged!', 'success');
   }, [people, currency, dbSync]);
 
   /* ── People ──────────────────────────────────────── */
@@ -480,25 +479,25 @@ export default function App() {
       dbSync(next, txs, currency);
       return next;
     });
-    toast.success('Person added');
+    showToast('Person added', 'success');
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [txs, currency, dbSync, isReadOnly]);
 
   const deletePerson = useCallback((id: string) => {
     if (!guardWrite()) return;
-    if (id === BIZ_ACCOUNT.id) { toast.error('Cannot delete Business Account'); return; }
+    if (id === BIZ_ACCOUNT.id) { showToast('Cannot delete Business Account', 'error'); return; }
     if (txs.some(t =>
       t.person === id || t.transferFrom === id || t.transferTo === id ||
       t.ownerSender === id || t.ownerReceiver === id || t.frSender === id ||
       t.frReceiver === id || t.creditSeller === id || t.creditReceiver === id
-    )) { toast.error('Cannot delete — person has transactions'); return; }
+    )) { showToast('Cannot delete — person has transactions', 'error'); return; }
     setPeople(prev => {
       const next = prev.filter(p => p.id !== id);
       // if (selectedBiz) ss(`cb_people_${selectedBiz.id}`, next); // removed: Firebase is source of truth
       dbSync(next, txs, currency);
       return next;
     });
-    toast.success('Person removed');
+    showToast('Person removed', 'success');
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [txs, currency, dbSync, isReadOnly]);
 
@@ -513,25 +512,25 @@ export default function App() {
 
   /* ── Cloud pull / push ───────────────────────────── */
   const manualPull = async () => {
-    if (!dbRef.current || !fsRef.current || !selectedBiz) { toast.error('Not connected'); return; }
-    toast.loading('Pulling…');
+    if (!dbRef.current || !fsRef.current || !selectedBiz) { showToast('Not connected', 'error'); return; }
+    showToast('Pulling…', 'info');
     const [col, doc] = selectedBiz.fsDoc.split('/');
     const s = await fsRef.current.getDoc(fsRef.current.doc(dbRef.current, col, doc));
     toast.dismiss();
-    if (s.exists()) { applyRemote(s.data()); toast.success('Pulled from cloud'); }
+    if (s.exists()) { applyRemote(s.data()); showToast('Pulled from cloud', 'success'); }
     else toast.info('No cloud data');
   };
 
   const manualPush = async () => {
-    if (!dbRef.current || !fsRef.current || !selectedBiz) { toast.error('Not connected'); return; }
-    toast.loading('Pushing…');
+    if (!dbRef.current || !fsRef.current || !selectedBiz) { showToast('Not connected', 'error'); return; }
+    showToast('Pushing…', 'info');
     try {
       const [col, doc] = selectedBiz.fsDoc.split('/');
       await fsRef.current.setDoc(fsRef.current.doc(dbRef.current, col, doc), stripUndefined({ txs, people, currency, ts: Date.now() }));
       toast.dismiss();
-      toast.success('Pushed to cloud');
+      showToast('Pushed to cloud', 'success');
       setDbStatus('✅ Pushed: ' + new Date().toLocaleTimeString());
-    } catch (e: any) { toast.dismiss(); toast.error('Push failed'); }
+    } catch (e: any) { toast.dismiss(); showToast('Push failed', 'error'); }
   };
 
   /* ── Clear all ───────────────────────────────────── */
@@ -545,7 +544,7 @@ export default function App() {
       ss(`cb_currency_${selectedBiz.id}`, 'GHS');
     }
     dbSync(peopleWithBiz, emptyTxs, 'GHS');
-    toast.success('All data cleared');
+    showToast('All data cleared', 'success');
   }, [dbSync]);
 
   /* ── Tab switch ──────────────────────────────────── */
@@ -589,9 +588,9 @@ export default function App() {
             ss(`cb_currency_${selectedBiz.id}`, obj.currency || 'GHS');
           }
           dbSync(withBiz, cleanTxs, obj.currency || 'GHS');
-          toast.success('Imported data');
-        } else toast.error('Invalid import file');
-      } catch { toast.error('Import failed'); }
+          showToast('Imported data', 'success');
+        } else showToast('Invalid import file', 'error');
+      } catch { showToast('Import failed', 'error'); }
     };
     fr.readAsText(file);
   };
@@ -638,14 +637,11 @@ export default function App() {
           width: 64, height: 64, borderRadius: 20,
           background: 'linear-gradient(145deg, #2A4FCF, #6B8FFF)',
           display: 'flex', alignItems: 'center', justifyContent: 'center',
-          fontSize: '1.8rem', marginBottom: 16,
+          fontSize: '1.8rem', marginBottom: 20,
           boxShadow: '0 8px 32px rgba(61,107,223,0.35)',
         }}>💰</div>
-        <div style={{ fontSize: '1.6rem', fontWeight: 800, letterSpacing: '-0.04em', marginBottom: 12 }}>
-          Flow<span style={{ color: '#00B4D8' }}>HQ</span>
-        </div>
         <div style={{ fontSize: '0.75rem', color: '#9A9FB8' }}>Loading…</div>
-        <Toaster position="bottom-center" richColors />
+        <ToastContainer />
       </div>
     );
   }
@@ -679,7 +675,7 @@ export default function App() {
           onPull={masterPull}
           onPush={masterPush}
         />
-        <Toaster position="bottom-center" richColors />
+        <ToastContainer />
       </>
     );
   }
@@ -696,7 +692,7 @@ export default function App() {
           onUnlock={(mode) => unlockBiz(selectedBiz, mode)}
           onBack={() => setScreen('selector')}
         />
-        <Toaster position="bottom-center" richColors />
+        <ToastContainer />
       </>
     );
   }
@@ -710,7 +706,7 @@ export default function App() {
     }}>
       <style>{globalCss}</style>
       <div className="app-container">
-        <Toaster position="bottom-center" richColors />
+        <ToastContainer />
 
         <AppHeader
           appMode={appMode}
@@ -719,16 +715,16 @@ export default function App() {
           onLock={lock}
           onInstall={async () => {
             const p = promptRef.current;
-            if (!p) { toast('Open your browser menu to install'); return; }
+            if (!p) { showToast('Open your browser menu to install', 'info'); return; }
             try {
               p.prompt();
               const choice = await p.userChoice;
               if (choice?.outcome === 'accepted') {
-                toast.success('✅ FlowHQ installed!');
+                showToast('✅ FlowHQ installed!', 'success');
                 window.__pwaInstallPrompt = undefined;
                 window.__pwaInstallReady = false;
               } else {
-                toast('Installation cancelled');
+                showToast('Installation cancelled', 'info');
               }
             } catch (e) { console.warn('[Install]', e); }
             promptRef.current = null; setInstallReady(false);

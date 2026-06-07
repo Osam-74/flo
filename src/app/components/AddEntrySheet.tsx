@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Drawer } from 'vaul';
 import { X } from 'lucide-react';
-import { toast } from 'sonner';
+import { showToast } from './Modals';
 import type { Transaction, Person, TxType } from '../types';
 import { stripUndefined } from '../utils';
 
@@ -175,16 +175,16 @@ export function AddEntrySheet({ open, onClose, people, currency, onSave, initial
 
     if (type === 'income' || type === 'expense') {
       const amt = parseFloat(amount) || 0;
-      if (!date)    { toast.error('Select a date'); return; }
-      if (amt <= 0) { toast.error('Enter a valid amount'); return; }
+      if (!date)    { showToast('Select a date', 'error'); return; }
+      if (amt <= 0) { showToast('Enter a valid amount', 'error'); return; }
       if (type === 'income') {
-        if (!person)   { toast.error('Select who made the sale'); return; }
-        if (!receiver) { toast.error('Select who received the money'); return; }
+        if (!person)   { showToast('Select who made the sale', 'error'); return; }
+        if (!receiver) { showToast('Select who received the money', 'error'); return; }
         const sellerName = people.find(p => p.id === person)?.name || '';
         const desc = `Sale${buyer ? ' — to ' + buyer : ''}${sellerName ? ' by ' + sellerName : ''}${cat ? ' — ' + cat : ''}`;
         onSave(stripUndefined({ id, ts, type, amount: amt, person: receiver, seller: person, sellerName, date, cat, note, source, buyer: buyer || undefined, receiver: receiver || undefined, desc }));
       } else {
-        if (!person) { toast.error('Select a person'); return; }
+        if (!person) { showToast('Select a person', 'error'); return; }
         const pn = people.find(p => p.id === person)?.name || '';
         const desc = `Expense${pn ? ' by ' + pn : ''}`;
         onSave(stripUndefined({ id, ts, type, amount: amt, person, date, cat, note, source, buyer: buyer || undefined, receiver: receiver || undefined, desc }));
@@ -192,17 +192,17 @@ export function AddEntrySheet({ open, onClose, people, currency, onSave, initial
     }
     if (type === 'salary') {
       const amt = parseFloat(amount) || 0;
-      if (!person || !date || amt <= 0) { toast.error('Fill all required fields'); return; }
+      if (!person || !date || amt <= 0) { showToast('Fill all required fields', 'error'); return; }
       const emp = people.find(p => p.id === person)?.name || '?';
       const pb  = people.find(p => p.id === salPaidBy)?.name || '';
       onSave(stripUndefined({ id, ts, type, amount: amt, person: salPaidBy, employee: person, employeeName: emp, salaryPaidBy: salPaidBy, date, cat: 'Salary', note, desc: `Salary — ${emp}${pb ? ' (paid by ' + pb + ')' : ''}` }));
     }
     if (type === 'transfer') {
       const amt = parseFloat(tfAmt) || 0;
-      if (!tfFrom || !tfTo) { toast.error('Select sender and receiver'); return; }
-      if (tfFrom === tfTo)  { toast.error('Sender and receiver must differ'); return; }
-      if (!tfDate)          { toast.error('Select a date'); return; }
-      if (amt <= 0)         { toast.error('Enter transfer amount'); return; }
+      if (!tfFrom || !tfTo) { showToast('Select sender and receiver', 'error'); return; }
+      if (tfFrom === tfTo)  { showToast('Sender and receiver must differ', 'error'); return; }
+      if (!tfDate)          { showToast('Select a date', 'error'); return; }
+      if (amt <= 0)         { showToast('Enter transfer amount', 'error'); return; }
       const fn = people.find(p => p.id === tfFrom)?.name || '?';
       const tn = people.find(p => p.id === tfTo)?.name || '?';
       onSave(stripUndefined({ id, ts, type, amount: amt, date: tfDate, transferFrom: tfFrom, transferTo: tfTo, transferRef: tfRef, person: tfFrom, cat: 'Transfer', note: tfRef, desc: `MoMo Transfer: ${fn} → ${tn}` }));
@@ -211,11 +211,11 @@ export function AddEntrySheet({ open, onClose, people, currency, onSave, initial
       const total = parseFloat(crTotal) || 0;
       const paid  = parseFloat(crPaid)  || 0;
       const isPickup = crDate > today();
-      if (!crBuyer)   { toast.error('Enter buyer name'); return; }
-      if (!crDate)    { toast.error('Select a date'); return; }
+      if (!crBuyer)   { showToast('Enter buyer name', 'error'); return; }
+      if (!crDate)    { showToast('Select a date', 'error'); return; }
       // Total amount is required only for non-pickup (present/past) credit sales
-      if (!isPickup && total <= 0) { toast.error('Enter total expected amount'); return; }
-      if (total > 0 && paid > total) { toast.error('Amount paid cannot exceed total'); return; }
+      if (!isPickup && total <= 0) { showToast('Enter total expected amount', 'error'); return; }
+      if (total > 0 && paid > total) { showToast('Amount paid cannot exceed total', 'error'); return; }
       const receiver = paid > 0 ? crReceiver : '';
       const desc = isPickup
         ? `Egg Pickup Scheduled — ${crBuyer} on ${crDate}`
@@ -224,20 +224,20 @@ export function AddEntrySheet({ open, onClose, people, currency, onSave, initial
     }
     if (type === 'owner-fund') {
       const amt = parseFloat(ofAmt) || 0;
-      if (!ofSender)   { toast.error('Select owner'); return; }
-      if (!ofReceiver) { toast.error('Select receiver'); return; }
-      if (!ofDate)     { toast.error('Select a date'); return; }
-      if (amt <= 0)    { toast.error('Enter amount'); return; }
+      if (!ofSender)   { showToast('Select owner', 'error'); return; }
+      if (!ofReceiver) { showToast('Select receiver', 'error'); return; }
+      if (!ofDate)     { showToast('Select a date', 'error'); return; }
+      if (amt <= 0)    { showToast('Enter amount', 'error'); return; }
       const sn = people.find(p => p.id === ofSender)?.name || 'Owner';
       const rn = people.find(p => p.id === ofReceiver)?.name || '?';
       onSave(stripUndefined({ id, ts, type, amount: amt, date: ofDate, ownerSender: ofSender, ownerReceiver: ofReceiver, person: ofReceiver, ownerName: sn, cat: 'Fund Injection', note: ofNote, desc: `Fund injection: ${sn} → ${rn}` }));
     }
     if (type === 'fund-return') {
       const amt = parseFloat(frAmt) || 0;
-      if (!frSender)   { toast.error('Select who is returning funds'); return; }
-      if (!frReceiver) { toast.error('Select owner receiving funds'); return; }
-      if (!frDate)     { toast.error('Select a date'); return; }
-      if (amt <= 0)    { toast.error('Enter amount'); return; }
+      if (!frSender)   { showToast('Select who is returning funds', 'error'); return; }
+      if (!frReceiver) { showToast('Select owner receiving funds', 'error'); return; }
+      if (!frDate)     { showToast('Select a date', 'error'); return; }
+      if (amt <= 0)    { showToast('Enter amount', 'error'); return; }
       const sn = people.find(p => p.id === frSender)?.name || '?';
       const rn = people.find(p => p.id === frReceiver)?.name || 'Owner';
       onSave(stripUndefined({ id, ts, type, amount: amt, date: frDate, frSender, frReceiver, person: frSender, cat: 'Fund Return', note: frNote, desc: `Fund return: ${sn} → ${rn}` }));

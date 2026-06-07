@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { FileText, Printer } from 'lucide-react';
-import { toast } from 'sonner';
+import { showToast } from './Modals';
 import type { Transaction, Person } from '../types';
 import { fmtDate, fmtN } from '../utils';
 
@@ -121,7 +121,7 @@ export function ReportTab({ businessName, txs, people, currency }: Props) {
 
     setReportHtml(html);
     setGenerated(true);
-    toast.success('Report ready');
+    showToast('Report ready', 'success');
     setTimeout(() => document.getElementById('report-preview')?.scrollIntoView({ behavior: 'smooth' }), 100);
   }
 
