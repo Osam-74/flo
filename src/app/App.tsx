@@ -625,7 +625,7 @@ export default function App() {
      RENDER
   ════════════════════════════════════════════════ */
 
-  /* Loading state while registry loads */
+  /* Loading state while registry loads — show white screen with logo only (no blue screen) */
   if (bizLoading) {
     return (
       <div style={{
@@ -633,13 +633,9 @@ export default function App() {
         display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
         fontFamily: 'Plus Jakarta Sans, sans-serif',
       }}>
-        <div style={{
-          width: 64, height: 64, borderRadius: 20,
-          background: 'linear-gradient(145deg, #2A4FCF, #6B8FFF)',
-          display: 'flex', alignItems: 'center', justifyContent: 'center',
-          fontSize: '1.8rem', marginBottom: 20,
-          boxShadow: '0 8px 32px rgba(61,107,223,0.35)',
-        }}>💰</div>
+        <div onClick={() => {}} style={{ width: 76, height: 76, borderRadius: 24, background: 'linear-gradient(145deg, #2A4FCF, #6B8FFF)', boxShadow: '0 8px 32px rgba(61,107,223,0.45)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '2.2rem', marginBottom: 20 }}>💰</div>
+        <div style={{ fontSize: '1.9rem', fontWeight: 800, letterSpacing: '-0.04em', marginBottom: 4, fontFamily: 'Plus Jakarta Sans, sans-serif' }}>Flow<span style={{ color: '#00B4D8' }}>HQ</span></div>
+        <div style={{ fontSize: '0.68rem', color: '#9A9FB8', letterSpacing: '0.16em', textTransform: 'uppercase', marginBottom: 20 }}>Farm Expense Tracker</div>
         <div style={{ fontSize: '0.75rem', color: '#9A9FB8' }}>Loading…</div>
         <ToastContainer />
       </div>
