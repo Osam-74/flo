@@ -315,7 +315,7 @@ export default function App() {
     }
     const updated = [...businesses, newBiz];
     await saveRegistry(updated);
-    toast.success(`"${name}" created!`);
+    showToast(`"${name}" created!`, 'success');
   }, [businesses, saveRegistry]);
 
   /* ── Reset PIN for a business ───────────────────── */
@@ -341,7 +341,7 @@ export default function App() {
     } else {
       await saveRegistry(updated);
     }
-    toast.success('PIN reset for "' + biz.name + '"!');
+    showToast('PIN reset for "' + biz.name + '"!', 'success');
   }, [businesses, saveRegistry]);
 
   /* ── Delete business ─────────────────────────────── */
@@ -357,7 +357,7 @@ export default function App() {
     }
     const updated = businesses.filter(b => b.id !== bizId);
     await saveRegistry(updated);
-    toast.success(`"${biz.name}" deleted`);
+    showToast(`"${biz.name}" deleted`, 'success');
   }, [businesses, saveRegistry]);
 
   /* ── Rename business ────────────────────────────── */
@@ -366,7 +366,7 @@ export default function App() {
     await saveRegistry(updated);
     // If the currently open business is being renamed, update selectedBiz
     if (selectedBiz?.id === bizId) setSelectedBiz(prev => prev ? { ...prev, name: newName } : prev);
-    toast.success(`Renamed to "${newName}"`);
+    showToast(`Renamed to "${newName}"`, 'success');
   }, [businesses, saveRegistry, selectedBiz]);
 
   /* ── Transactions ────────────────────────────────── */
@@ -517,9 +517,9 @@ export default function App() {
     showToast('Pulling…', 'info');
     const [col, doc] = selectedBiz.fsDoc.split('/');
     const s = await fsRef.current.getDoc(fsRef.current.doc(dbRef.current, col, doc));
-    toast.dismiss();
+    
     if (s.exists()) { applyRemote(s.data()); showToast('Pulled from cloud', 'success'); }
-    else toast.info('No cloud data');
+    else showToast('No cloud data', 'info');
   };
 
   const manualPush = async () => {
@@ -528,10 +528,10 @@ export default function App() {
     try {
       const [col, doc] = selectedBiz.fsDoc.split('/');
       await fsRef.current.setDoc(fsRef.current.doc(dbRef.current, col, doc), stripUndefined({ txs, people, currency, ts: Date.now() }));
-      toast.dismiss();
+      
       showToast('Pushed to cloud', 'success');
       setDbStatus('✅ Pushed: ' + new Date().toLocaleTimeString());
-    } catch (e: any) { toast.dismiss(); showToast('Push failed', 'error'); }
+    } catch (e: any) {  showToast('Push failed', 'error'); }
   };
 
   /* ── Clear all ───────────────────────────────────── */
@@ -599,27 +599,27 @@ export default function App() {
   /* ── Master-level biz data ops (by bizId) ──────────── */
   const masterExport = useCallback((bizId: string) => {
     if (selectedBiz?.id === bizId) { exportData(); return; }
-    toast.info('Open that business first to export its data.');
+    showToast('Open that business first to export its data.', 'info');
   }, [selectedBiz, exportData]);
 
   const masterImport = useCallback((bizId: string, file: File) => {
     if (selectedBiz?.id === bizId) { importData(file); return; }
-    toast.info('Open that business first to import data.');
+    showToast('Open that business first to import data.', 'info');
   }, [selectedBiz, importData]);
 
   const masterClearData = useCallback((bizId: string) => {
     if (selectedBiz?.id === bizId) { executeFullClear(); return; }
-    toast.info('Open that business first to clear its data.');
+    showToast('Open that business first to clear its data.', 'info');
   }, [selectedBiz, executeFullClear]);
 
   const masterPull = useCallback((bizId: string) => {
     if (selectedBiz?.id === bizId) { manualPull(); return; }
-    toast.info('Open that business first to pull data.');
+    showToast('Open that business first to pull data.', 'info');
   }, [selectedBiz, manualPull]);
 
   const masterPush = useCallback((bizId: string) => {
     if (selectedBiz?.id === bizId) { manualPush(); return; }
-    toast.info('Open that business first to push data.');
+    showToast('Open that business first to push data.', 'info');
   }, [selectedBiz, manualPush]);
 
   /* ════════════════════════════════════════════════
@@ -717,7 +717,7 @@ export default function App() {
               p.prompt();
               const choice = await p.userChoice;
               if (choice?.outcome === 'accepted') {
-                showToast('✅ FlowHQ installed!', 'success');
+                showToast('✅ FloHQ installed!', 'success');
                 window.__pwaInstallPrompt = undefined;
                 window.__pwaInstallReady = false;
               } else {

@@ -280,10 +280,6 @@ export function TxDetailModal({ tx, people, currency, onClose, onEdit, onDelete 
         )}
       </div>
 
-      <style>{`
-        @keyframes txFadeIn { from { opacity: 0 } to { opacity: 1 } }
-        @keyframes txPopIn  { from { opacity: 0; transform: translate(-50%,-50%) scale(0.88) } to { opacity: 1; transform: translate(-50%,-50%) scale(1) } }
-      `}</style>
     </>
   );
 }

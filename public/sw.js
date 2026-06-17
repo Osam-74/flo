@@ -1,6 +1,6 @@
-// FlowHQ Service Worker
+// FloHQ Service Worker v2
 // Uses relative paths so it works on both GitHub Pages (/flo/) and Vercel (/)
-const CACHE_NAME = 'flowhq-v1';
+const CACHE_NAME = 'flohq-v2';
 
 self.addEventListener('install', event => {
   event.waitUntil(
@@ -48,7 +48,6 @@ self.addEventListener('fetch', event => {
       .catch(() =>
         caches.match(event.request).then(cached => {
           if (cached) return cached;
-          // For navigation requests, return cached index
           if (event.request.mode === 'navigate') {
             return caches.match('./') || caches.match('./index.html');
           }

@@ -56,7 +56,7 @@ export function SettingsTab({ currency, businessName, dbStatus, onSaveCurrency, 
           />
         </Field>
         <button
-          onClick={() => { if (cur.trim()) { onSaveCurrency(cur.trim()); toast.success('Currency updated to ' + cur.trim()); } }}
+          onClick={() => { if (cur.trim()) { onSaveCurrency(cur.trim()); showToast('Currency updated to ' + cur.trim(), 'success'); } }}
           style={primaryBtn}
         >
           Save Currency

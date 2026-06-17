@@ -42,7 +42,7 @@ export function PinScreen({ onUnlock, onBack, businessName, masterHash, viewHash
         window.__pwaInstallPrompt = undefined;
         window.__pwaInstallReady = false;
         setInstallReady(false);
-        showToast('✅ FlowHQ installed!', 'success');
+        showToast('✅ FloHQ installed!', 'success');
       } else {
         showToast('Installation cancelled', 'info');
       }

@@ -1,34 +1,28 @@
 {
-  "name": "FlowHQ",
-  "short_name": "FlowHQ",
+  "name": "FloHQ",
+  "short_name": "FloHQ",
   "description": "",
   "start_url": "./",
   "scope": "./",
   "display": "standalone",
-  "display_override": [
-    "standalone",
-    "minimal-ui"
-  ],
-  "theme_color": "#2A4FCF",
-  "background_color": "#F0F2F7",
+  "display_override": ["standalone"],
+  "theme_color": "#1A2FA8",
+  "background_color": "#1A2FA8",
   "orientation": "portrait",
-  "categories": [
-    "finance",
-    "productivity"
-  ],
+  "categories": ["finance", "productivity"],
   "icons": [
     {
-      "src": "data:image/svg+xml,%3Csvg%20xmlns='http://www.w3.org/2000/svg'%20viewBox='0%200%20192%20192'%3E%3Cdefs%3E%3ClinearGradient%20id='g'%20x1='0%25'%20y1='0%25'%20x2='100%25'%20y2='100%25'%3E%3Cstop%20offset='0%25'%20stop-color='%25232A4FCF'/%3E%3Cstop%20offset='100%25'%20stop-color='%25236B8FFF'/%3E%3C/linearGradient%3E%3C/defs%3E%3Crect%20width='192'%20height='192'%20rx='43'%20fill='url(%2523g)'/%3E%3Ctext%20x='96'%20y='128'%20font-size='96'%20text-anchor='middle'%20font-family='Apple%20Color%20Emoji,Segoe%20UI%20Emoji,Noto%20Color%20Emoji,sans-serif'%3E%F0%9F%92%B0%3C/text%3E%3C/svg%3E",
+      "src": "data:image/svg+xml,%3Csvg%20xmlns='http://www.w3.org/2000/svg'%20viewBox='0%200%20192%20192'%3E%3Cdefs%3E%3ClinearGradient%20id='g'%20x1='0%25'%20y1='0%25'%20x2='100%25'%20y2='100%25'%3E%3Cstop%20offset='0%25'%20stop-color='%231A2FA8'/%3E%3Cstop%20offset='100%25'%20stop-color='%233D6BDF'/%3E%3C/linearGradient%3E%3C/defs%3E%3Crect%20width='192'%20height='192'%20rx='43'%20fill='url(%23g)'/%3E%3Ctext%20x='96'%20y='128'%20font-size='96'%20text-anchor='middle'%20font-family='Apple%20Color%20Emoji%2CSegoe%20UI%20Emoji%2CNoto%20Color%20Emoji%2Csans-serif'%3E%F0%9F%92%B0%3C%2Ftext%3E%3C%2Fsvg%3E",
       "sizes": "192x192",
       "type": "image/svg+xml",
       "purpose": "any"
     },
     {
-      "src": "data:image/svg+xml,%3Csvg%20xmlns='http://www.w3.org/2000/svg'%20viewBox='0%200%20512%20512'%3E%3Cdefs%3E%3ClinearGradient%20id='g'%20x1='0%25'%20y1='0%25'%20x2='100%25'%20y2='100%25'%3E%3Cstop%20offset='0%25'%20stop-color='%25232A4FCF'/%3E%3Cstop%20offset='100%25'%20stop-color='%25236B8FFF'/%3E%3C/linearGradient%3E%3C/defs%3E%3Crect%20width='512'%20height='512'%20rx='115'%20fill='url(%2523g)'/%3E%3Ctext%20x='256'%20y='320'%20font-size='260'%20text-anchor='middle'%20font-family='Apple%20Color%20Emoji,Segoe%20UI%20Emoji,Noto%20Color%20Emoji,sans-serif'%3E%F0%9F%92%B0%3C/text%3E%3C/svg%3E",
+      "src": "data:image/svg+xml,%3Csvg%20xmlns='http://www.w3.org/2000/svg'%20viewBox='0%200%20512%20512'%3E%3Cdefs%3E%3ClinearGradient%20id='g'%20x1='0%25'%20y1='0%25'%20x2='100%25'%20y2='100%25'%3E%3Cstop%20offset='0%25'%20stop-color='%231A2FA8'/%3E%3Cstop%20offset='100%25'%20stop-color='%233D6BDF'/%3E%3C%2FlinearGradient%3E%3C%2Fdefs%3E%3Crect%20width='512'%20height='512'%20rx='115'%20fill='url(%23g)'/%3E%3Ctext%20x='256'%20y='320'%20font-size='260'%20text-anchor='middle'%20font-family='Apple%20Color%20Emoji%2CSegoe%20UI%20Emoji%2CNoto%20Color%20Emoji%2Csans-serif'%3E%F0%9F%92%B0%3C%2Ftext%3E%3C%2Fsvg%3E",
       "sizes": "512x512",
       "type": "image/svg+xml",
       "purpose": "any maskable"
     }
   ],
-  "id": "flowhq-app"
+  "id": "flohq-app"
 }
