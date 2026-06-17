@@ -1,16 +1,15 @@
 {
-  "name": "FlowHQ",
-  "short_name": "FlowHQ",
+  "name": "FloHQ",
+  "short_name": "FloHQ",
   "description": "",
   "start_url": "./",
   "scope": "./",
   "display": "standalone",
   "display_override": [
-    "standalone",
-    "minimal-ui"
+    "standalone"
   ],
-  "theme_color": "#0D1120",
-  "background_color": "#0D1120",
+  "theme_color": "#1A2FA8",
+  "background_color": "#1A2FA8",
   "orientation": "portrait",
   "categories": [
     "finance",
@@ -36,5 +35,5 @@
       "purpose": "any maskable"
     }
   ],
-  "id": "flowhq-app"
+  "id": "flohq-app"
 }
