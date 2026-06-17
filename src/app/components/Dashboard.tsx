@@ -1,8 +1,9 @@
-import React from 'react';
-import { TrendingUp, TrendingDown, Hash } from 'lucide-react';
+import React, { useState } from 'react';
+import { TrendingUp, TrendingDown, Hash, Eye, EyeOff } from 'lucide-react';
 import type { Transaction, Person } from '../types';
 import { pColor, pInit, fmtAmt, pStats, fmtDate } from '../utils';
 import { TxItem } from './TxItem';
+import { TxDetailModal } from './TxDetailModal';
 
 interface Props {
   txs: Transaction[];
@@ -15,6 +16,9 @@ interface Props {
 }
 
 export function Dashboard({ txs, people, currency, businessName, onPersonFilter, onEdit, onDelete }: Props) {
+  const [hidden, setHidden] = useState(false);
+  const [detailTx, setDetailTx] = useState<Transaction | null>(null);
+
   let totalIn = 0, totalOut = 0, ownerIn = 0, ownerOut = 0;
   for (const t of txs) {
     if (t.type === 'income')  totalIn  += t.amount;
@@ -23,57 +27,41 @@ export function Dashboard({ txs, people, currency, businessName, onPersonFilter,
     else if (t.type === 'fund-return') { totalOut += t.amount; ownerOut += t.amount; }
     else if (t.type === 'credit') totalIn += (t.creditPaid || 0);
     else if (t.type === 'transfer') {
-      // Only count transfer to biz as business-in if it came from the owner (fund injection context).
-      // A transfer from a regular user (non-owner) to biz is just internal remittance — do NOT add to totalIn.
-      // A transfer FROM biz to someone is still an outflow.
-      if (t.transferTo === 'biz') {
-        const sender = people.find(p => p.id === t.transferFrom);
-        const senderIsOwner = sender?.role?.toLowerCase().includes('owner');
-        if (senderIsOwner) {
-          totalIn += t.amount;
-        }
-        // Non-owner → biz: money is just moving internally, no net change to main balance
-      }
-      if (t.transferFrom === 'biz') totalOut += t.amount;
+      // BIZ → Person: internal disbursement — NOT a business outflow from total cash
+      // (money stays within the system, just moves from biz pocket to person pocket)
+      // Person → BIZ: internal remittance — NOT a business inflow to total cash
+      // Only owner-fund / fund-return track real capital injection/withdrawal
+      // So transfers are PURELY internal and should NOT affect totalIn / totalOut.
+      // (Leave totalIn/totalOut untouched for transfers)
+      void t; // satisfy linter
     }
   }
   const bal = totalIn - totalOut;
   const netOwner = ownerIn - ownerOut;
 
-  // Biz account balance: all money in/out of the 'biz' account
+  // Biz account balance: tracks what sits in the biz pocket
   let bizBalance = 0;
   for (const t of txs) {
-    // Transfers: biz receives or sends
     if (t.type === 'transfer') {
       if (t.transferTo   === 'biz') bizBalance += t.amount;
       if (t.transferFrom === 'biz') bizBalance -= t.amount;
     }
-    // Income / Sales: money received BY biz
-    if (t.type === 'income' && t.receiver === 'biz') bizBalance += t.amount;
-    // Salary: paid FROM biz account
+    if (t.type === 'income' && (t as any).receiver === 'biz') bizBalance += t.amount;
     if (t.type === 'salary' && t.salaryPaidBy === 'biz') bizBalance -= t.amount;
-    // Expense: paid by biz (person === 'biz')
     if (t.type === 'expense' && t.person === 'biz') bizBalance -= t.amount;
-    // Owner fund injection received by biz
     if (t.type === 'owner-fund' && t.ownerReceiver === 'biz') bizBalance += t.amount;
-    // Fund return sent from biz
     if (t.type === 'fund-return' && t.frSender === 'biz') bizBalance -= t.amount;
-    // Credit sale: all payments (initial + subsequent) received by biz
-    // payments[] array is the single source of truth — always use it to avoid double-counting
     if (t.type === 'credit') {
       if (Array.isArray(t.payments) && t.payments.length > 0) {
-        // Sum all payment entries where biz was the receiver
         for (const p of t.payments) {
           if (p.receiver === 'biz') bizBalance += p.amount;
         }
       } else if (t.creditReceiver === 'biz' && (t.creditPaid || 0) > 0) {
-        // Fallback: old records that have no payments array yet
         bizBalance += (t.creditPaid || 0);
       }
     }
   }
 
-  // Members: exclude owner and biz account
   const members = people.filter(p => {
     const r = (p.role || '').toLowerCase();
     return !r.includes('owner') && p.id !== 'biz';
@@ -84,8 +72,6 @@ export function Dashboard({ txs, people, currency, businessName, onPersonFilter,
   const todayStr = new Date().toISOString().split('T')[0];
   const byBuyer: Record<string, { total: number; paid: number }> = {};
   for (const t of txs.filter(t => t.type === 'credit')) {
-    // Skip future pickups — they haven't happened yet, amount may be unknown,
-    // and the buyer might pay on pickup, so don't count as outstanding yet.
     if (t.isPickup && t.date > todayStr) continue;
     const b = t.creditBuyer || 'Unknown';
     if (!byBuyer[b]) byBuyer[b] = { total: 0, paid: 0 };
@@ -96,13 +82,19 @@ export function Dashboard({ txs, people, currency, businessName, onPersonFilter,
     .map(([n, d]) => ({ n, o: d.total - d.paid }))
     .filter(x => x.o > 0.005);
 
-  // Upcoming egg pickups: credit txs with a future date and isPickup flag
   const upcomingPickups = txs
     .filter(t => t.type === 'credit' && t.isPickup && t.date > todayStr)
     .sort((a, b) => (a.date || '').localeCompare(b.date || ''));
 
+  // Mask helper
+  const mask = (v: string) => hidden ? '••••••' : v;
+
+  // Auto-fit font size for balance
+  const balStr = fmtAmt(bal, currency);
+  const balFontSize = balStr.length > 16 ? '1.55rem' : balStr.length > 12 ? '2rem' : '2.5rem';
+
   return (
-    <div style={{ padding: '16px 16px 100px' }}>
+    <div style={{ padding: '16px 16px 120px' }}>
       {/* Balance Card */}
       <div style={{
         background: 'linear-gradient(135deg, #1A2FA8 0%, #3D6BDF 55%, #5580F0 100%)',
@@ -112,32 +104,59 @@ export function Dashboard({ txs, people, currency, businessName, onPersonFilter,
         position: 'relative', overflow: 'hidden',
       }}>
         {/* Decorative circles */}
-        <div style={{ position: 'absolute', top: -50, right: -50, width: 180, height: 180, borderRadius: '50%', background: 'rgba(255,255,255,0.06)' }} />
-        <div style={{ position: 'absolute', bottom: -30, left: -20, width: 120, height: 120, borderRadius: '50%', background: 'rgba(255,255,255,0.04)' }} />
+        <div style={{ position: 'absolute', top: -50, right: -50, width: 180, height: 180, borderRadius: '50%', background: 'rgba(255,255,255,0.06)', pointerEvents: 'none' }} />
+        <div style={{ position: 'absolute', bottom: -30, left: -20, width: 120, height: 120, borderRadius: '50%', background: 'rgba(255,255,255,0.04)', pointerEvents: 'none' }} />
 
         {businessName && (
           <div style={{ fontSize: '0.95rem', fontWeight: 700, letterSpacing: '0.05em', color: 'rgba(255,255,255,0.75)', marginBottom: 4, display: 'flex', alignItems: 'center', gap: 5 }}>
             <span style={{ fontSize: '0.75rem' }}>🏢</span> {businessName}
           </div>
         )}
-        <div style={{ fontSize: '0.6rem', fontWeight: 700, letterSpacing: '0.14em', textTransform: 'uppercase', color: 'rgba(255,255,255,0.6)', marginBottom: 8 }}>
-          Total Cash Available
+
+        {/* Label + eye toggle */}
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6, position: 'relative', zIndex: 1 }}>
+          <div style={{ fontSize: '0.6rem', fontWeight: 700, letterSpacing: '0.14em', textTransform: 'uppercase', color: 'rgba(255,255,255,0.6)' }}>
+            Total Cash Available
+          </div>
+          <button
+            onClick={() => setHidden(h => !h)}
+            style={{
+              background: 'rgba(255,255,255,0.12)',
+              border: '1px solid rgba(255,255,255,0.18)',
+              borderRadius: 8, width: 30, height: 30,
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              cursor: 'pointer', color: 'rgba(255,255,255,0.75)',
+              backdropFilter: 'blur(6px)',
+              transition: 'background 0.15s',
+            }}
+            onMouseEnter={e => e.currentTarget.style.background = 'rgba(255,255,255,0.22)'}
+            onMouseLeave={e => e.currentTarget.style.background = 'rgba(255,255,255,0.12)'}
+            title={hidden ? 'Show balances' : 'Hide balances'}
+          >
+            {hidden ? <EyeOff size={14} /> : <Eye size={14} />}
+          </button>
         </div>
+
+        {/* Balance amount — auto-fits, stays one line */}
         <div style={{
           fontFamily: "'DM Mono', monospace",
-          fontSize: bal < 0 ? '2rem' : '2.6rem',
-          fontWeight: 500, color: bal < 0 ? '#FFB3C0' : '#fff',
-          letterSpacing: '-0.02em', lineHeight: 1, marginBottom: 20, position: 'relative', zIndex: 1,
+          fontSize: balFontSize,
+          fontWeight: 500,
+          color: bal < 0 ? '#FFB3C0' : '#fff',
+          letterSpacing: '-0.02em', lineHeight: 1, marginBottom: 20,
+          position: 'relative', zIndex: 1,
+          whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
+          transition: 'font-size 0.2s ease',
         }}>
-          {fmtAmt(bal, currency)}
+          {hidden ? '••••••••' : balStr}
         </div>
 
         {/* Stats row */}
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 8, position: 'relative', zIndex: 1 }}>
           {[
-            { lbl: 'Total In',  val: fmtAmt(totalIn, ''),  col: '#A8C4FF', icon: <TrendingUp size={12} /> },
-            { lbl: 'Total Out', val: fmtAmt(totalOut, ''), col: '#FFB3C0', icon: <TrendingDown size={12} /> },
-            { lbl: 'Entries',   val: String(txs.length),   col: '#B3D4FF', icon: <Hash size={12} /> },
+            { lbl: 'Total In',  val: hidden ? '••••' : fmtAmt(totalIn, ''),  col: '#A8C4FF', icon: <TrendingUp size={12} /> },
+            { lbl: 'Total Out', val: hidden ? '••••' : fmtAmt(totalOut, ''), col: '#FFB3C0', icon: <TrendingDown size={12} /> },
+            { lbl: 'Entries',   val: String(txs.length),                     col: '#B3D4FF', icon: <Hash size={12} /> },
           ].map(s => (
             <div key={s.lbl} style={{
               background: 'rgba(255,255,255,0.12)',
@@ -167,13 +186,13 @@ export function Dashboard({ txs, people, currency, businessName, onPersonFilter,
               🟠 Fund Injection (net)
             </span>
             <span style={{ fontFamily: "'DM Mono',monospace", fontSize: '0.78rem', fontWeight: 500, color: '#FFD080' }}>
-              {fmtAmt(netOwner, currency)}
+              {hidden ? '••••' : fmtAmt(netOwner, currency)}
             </span>
           </div>
         )}
       </div>
 
-      {/* Biz Account standalone strip */}
+      {/* Biz Account strip */}
       <div style={{
         background: 'linear-gradient(135deg, #EEF2FF 0%, #DBEAFE 100%)',
         borderRadius: 14, padding: '12px 16px',
@@ -188,20 +207,18 @@ export function Dashboard({ txs, people, currency, businessName, onPersonFilter,
             background: 'rgba(61,107,223,0.12)', border: '1.5px solid rgba(61,107,223,0.25)',
             display: 'flex', alignItems: 'center', justifyContent: 'center',
             fontSize: '0.78rem', fontWeight: 800, color: '#3D6BDF',
-          }}>
-            BIZ
-          </div>
+          }}>BIZ</div>
           <div>
             <div style={{ fontSize: '0.7rem', fontWeight: 800, color: '#1A2FA8', letterSpacing: '0.06em' }}>Biz Account</div>
             <div style={{ fontSize: '0.55rem', color: '#7A8FC4', letterSpacing: '0.08em', textTransform: 'uppercase', marginTop: 1 }}>Internal funds held</div>
           </div>
         </div>
         <div style={{ fontFamily: "'DM Mono',monospace", fontSize: '1rem', fontWeight: 600, color: bizBalance >= 0 ? '#1A2FA8' : '#E83E5C' }}>
-          {fmtAmt(bizBalance, currency)}
+          {hidden ? '••••••' : fmtAmt(bizBalance, currency)}
         </div>
       </div>
 
-      {/* Upcoming Egg Pickups */}
+      {/* Upcoming Pickups */}
       {upcomingPickups.length > 0 && (
         <div style={{
           background: 'rgba(61,107,223,0.06)', borderRadius: 14, padding: '12px 14px', marginBottom: 16,
@@ -215,7 +232,7 @@ export function Dashboard({ txs, people, currency, businessName, onPersonFilter,
                 <div style={{ fontSize: '0.65rem', color: '#7A8FC4', marginTop: 1 }}>{fmtDate(t.date)}</div>
               </div>
               <div style={{ fontFamily: "'DM Mono',monospace", fontSize: '0.85rem', fontWeight: 600, color: '#1A2FA8' }}>
-                {fmtAmt(t.creditTotal || 0, currency)}
+                {hidden ? '••••' : fmtAmt(t.creditTotal || 0, currency)}
               </div>
             </div>
           ))}
@@ -233,17 +250,17 @@ export function Dashboard({ txs, people, currency, businessName, onPersonFilter,
             <div key={x.n} style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4 }}>
               <span style={{ fontSize: '0.8rem', color: '#5A5F7A' }}>{x.n}</span>
               <span style={{ fontFamily: "'DM Mono',monospace", fontSize: '0.8rem', fontWeight: 700, color: '#E83E5C' }}>
-                {fmtAmt(x.o, currency)}
+                {hidden ? '••••' : fmtAmt(x.o, currency)}
               </span>
             </div>
           ))}
         </div>
       )}
 
-      {/* People Grid — members only (no biz, no owner) */}
+      {/* People Grid */}
       <div style={sh}>Balances by Person</div>
       {members.length === 0 ? (
-        <p style={{ fontSize: '0.78rem', color: '#9A9FB8', marginBottom: 16 }}>No staff added yet.</p>
+        <p style={{ fontSize: '0.78rem', color: '#9A9FB8', marginBottom: 16 }}>No team members added yet.</p>
       ) : (
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 16 }}>
           {members.map(p => {
@@ -273,23 +290,25 @@ export function Dashboard({ txs, people, currency, businessName, onPersonFilter,
                 <div style={{ fontSize: '0.82rem', fontWeight: 700, color: '#1A1D2E', marginBottom: 2, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{p.name}</div>
                 <div style={{ fontSize: '0.58rem', color: '#9A9FB8', letterSpacing: '0.06em', textTransform: 'uppercase', marginBottom: 8 }}>{p.role}</div>
                 <div style={{ fontFamily: "'DM Mono',monospace", fontSize: '1rem', fontWeight: 600, color: pBal >= 0 ? '#1A2FA8' : '#E83E5C' }}>
-                  {fmtAmt(pBal, currency)}
+                  {hidden ? '••••' : fmtAmt(pBal, currency)}
                 </div>
-                <div style={{ display: 'flex', gap: 6, marginTop: 6, flexWrap: 'wrap' }}>
-                  <span style={{ fontSize: '0.56rem', fontWeight: 700, padding: '2px 8px', borderRadius: 6, background: 'rgba(61,107,223,0.12)', color: '#3D6BDF' }}>
-                    ↑ {fmtAmt(pIn, currency)}
-                  </span>
-                  <span style={{ fontSize: '0.56rem', fontWeight: 700, padding: '2px 8px', borderRadius: 6, background: 'rgba(232,62,92,0.12)', color: '#E83E5C' }}>
-                    ↓ {fmtAmt(pOut, currency)}
-                  </span>
-                </div>
+                {!hidden && (
+                  <div style={{ display: 'flex', gap: 6, marginTop: 6, flexWrap: 'wrap' }}>
+                    <span style={{ fontSize: '0.56rem', fontWeight: 700, padding: '2px 8px', borderRadius: 6, background: 'rgba(61,107,223,0.12)', color: '#3D6BDF' }}>
+                      ↑ {fmtAmt(pIn, currency)}
+                    </span>
+                    <span style={{ fontSize: '0.56rem', fontWeight: 700, padding: '2px 8px', borderRadius: 6, background: 'rgba(232,62,92,0.12)', color: '#E83E5C' }}>
+                      ↓ {fmtAmt(pOut, currency)}
+                    </span>
+                  </div>
+                )}
               </div>
             );
           })}
         </div>
       )}
 
-      {/* Recent */}
+      {/* Recent Transactions */}
       <div style={sh}>Recent Transactions</div>
       {recent.length === 0 ? (
         <div style={{ textAlign: 'center', padding: '32px 20px', fontSize: '0.78rem', color: '#9A9FB8' }}>
@@ -305,9 +324,18 @@ export function Dashboard({ txs, people, currency, businessName, onPersonFilter,
             showActions={false}
             onEdit={onEdit}
             onDelete={onDelete}
+            onClick={() => setDetailTx(t)}
           />
         ))
       )}
+
+      {/* Transaction detail modal */}
+      <TxDetailModal
+        tx={detailTx}
+        people={people}
+        currency={currency}
+        onClose={() => setDetailTx(null)}
+      />
     </div>
   );
 }

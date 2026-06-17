@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { TxDetailModal } from './TxDetailModal';
 import type { Transaction, Person, TxType } from '../types';
 import { fmtDate, pColor } from '../utils';
 import { TxItem } from './TxItem';
@@ -29,6 +30,7 @@ const TYPE_FILTERS: { id: FilterType; label: string }[] = [
 export function LedgerTab({ txs, people, currency, initialPersonFilter = 'all', isReadOnly, onEdit, onDelete }: Props) {
   const [typeFilter, setTypeFilter]     = useState<FilterType>('all');
   const [personFilter, setPersonFilter] = useState(initialPersonFilter);
+  const [detailTx, setDetailTx] = useState<import('../types').Transaction | null>(null);
 
   let filtered = [...txs];
   if (typeFilter !== 'all') filtered = filtered.filter(t => t.type === typeFilter);
@@ -138,6 +140,7 @@ export function LedgerTab({ txs, people, currency, initialPersonFilter = 'all', 
                 people={people}
                 currency={currency}
                 showActions={!isReadOnly}
+            onClick={() => setDetailTx(t)}
                 onEdit={onEdit}
                 onDelete={onDelete}
               />
@@ -145,6 +148,13 @@ export function LedgerTab({ txs, people, currency, initialPersonFilter = 'all', 
           </div>
         ))
       )}
+
+      <TxDetailModal
+        tx={detailTx}
+        people={people}
+        currency={currency}
+        onClose={() => setDetailTx(null)}
+      />
     </div>
   );
 }

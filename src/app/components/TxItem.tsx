@@ -10,6 +10,7 @@ interface Props {
   showActions: boolean;
   onEdit?: (tx: Transaction) => void;
   onDelete?: (id: string, desc: string) => void;
+  onClick?: () => void;
 }
 
 // All circle icons — different fill levels as visual distinction
@@ -23,7 +24,7 @@ const TX_CIRCLE: Record<string, React.ReactNode> = {
   'fund-return': <svg viewBox="0 0 20 20" width="18" height="18"><circle cx="10" cy="10" r="9" fill="none" stroke="currentColor" strokeWidth="2.5"/></svg>,
 };
 
-export function TxItem({ tx, people, currency, showActions, onEdit, onDelete }: Props) {
+export function TxItem({ tx, people, currency, showActions, onEdit, onDelete, onClick }: Props) {
   const person = people.find(p => p.id === tx.person);
   const c = person ? pColor(person) : { bg: 'rgba(61,107,223,0.12)', text: '#3D6BDF' };
 
@@ -131,12 +132,19 @@ export function TxItem({ tx, people, currency, showActions, onEdit, onDelete }: 
   }
 
   return (
-    <div style={{
-      display: 'flex', alignItems: 'flex-start', gap: 12,
-      padding: '13px 14px', borderRadius: 14, background: '#fff',
-      boxShadow: '0 1px 3px rgba(0,0,0,0.07), 0 4px 12px rgba(0,0,0,0.04)',
-      marginBottom: 8, border: '1px solid rgba(0,0,0,0.05)',
-    }}>
+    <div
+      onClick={onClick}
+      style={{
+        display: 'flex', alignItems: 'flex-start', gap: 12,
+        padding: '13px 14px', borderRadius: 14, background: '#fff',
+        boxShadow: '0 1px 3px rgba(0,0,0,0.07), 0 4px 12px rgba(0,0,0,0.04)',
+        marginBottom: 8, border: '1px solid rgba(0,0,0,0.05)',
+        cursor: onClick ? 'pointer' : 'default',
+        transition: 'box-shadow 0.15s, transform 0.15s',
+      }}
+      onMouseEnter={onClick ? e => { (e.currentTarget as HTMLDivElement).style.boxShadow = '0 4px 18px rgba(61,107,223,0.14)'; } : undefined}
+      onMouseLeave={onClick ? e => { (e.currentTarget as HTMLDivElement).style.boxShadow = '0 1px 3px rgba(0,0,0,0.07), 0 4px 12px rgba(0,0,0,0.04)'; } : undefined}
+    >
       {/* Circle icon */}
       <div style={{
         width: 40, height: 40, borderRadius: '50%',

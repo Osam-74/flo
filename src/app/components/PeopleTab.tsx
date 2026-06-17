@@ -37,7 +37,7 @@ export function PeopleTab({ people, txs, currency, isReadOnly, onAdd, onDelete }
       <div style={sh}>Team Members</div>
 
       {displayPeople.length === 0 ? (
-        <p style={{ fontSize: '0.78rem', color: '#9A9FB8', marginBottom: 16 }}>No people added yet.</p>
+        <p style={{ fontSize: '0.78rem', color: '#9A9FB8', marginBottom: 16 }}>No team members added yet.</p>
       ) : (
         <div style={{ display: 'grid', gap: 8, marginBottom: 20 }}>
           {displayPeople.map(p => {

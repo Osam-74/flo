@@ -58,7 +58,7 @@ export function ToastContainer() {
     <div style={{
       position: 'fixed', top: 0, left: 0, right: 0, zIndex: 9999,
       display: 'flex', flexDirection: 'column', alignItems: 'center',
-      gap: 8, padding: '52px 16px 0',
+      gap: 8, padding: '72px 16px 0',
       pointerEvents: 'none',
       fontFamily: 'Plus Jakarta Sans, sans-serif',
     }}>
