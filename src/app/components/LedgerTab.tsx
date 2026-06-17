@@ -154,6 +154,8 @@ export function LedgerTab({ txs, people, currency, initialPersonFilter = 'all', 
         people={people}
         currency={currency}
         onClose={() => setDetailTx(null)}
+        onEdit={!isReadOnly ? (tx) => { setDetailTx(null); onEdit(tx); } : undefined}
+        onDelete={!isReadOnly ? (id, desc) => { setDetailTx(null); onDelete(id, desc); } : undefined}
       />
     </div>
   );

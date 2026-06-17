@@ -1,7 +1,8 @@
-import React from 'react';
+import React, { useState } from 'react';
 import type { Transaction, Person } from '../types';
 import { fmtAmt } from '../utils';
 import { TxItem } from './TxItem';
+import { TxDetailModal } from './TxDetailModal';
 
 interface Props {
   txs: Transaction[];
@@ -15,6 +16,7 @@ interface Props {
 }
 
 export function CreditTab({ txs, people, currency, isReadOnly, onPayment, onPickup, onEdit, onDelete }: Props) {
+  const [detailTx, setDetailTx] = useState<import('../types').Transaction | null>(null);
   const creditTxs = txs.filter(t => t.type === 'credit');
 
   const byBuyer: Record<string, { total: number; paid: number; count: number; seller: string }> = {};
@@ -145,9 +147,18 @@ export function CreditTab({ txs, people, currency, isReadOnly, onPayment, onPick
             showActions={!isReadOnly}
             onEdit={onEdit}
             onDelete={onDelete}
+            onClick={() => setDetailTx(t)}
           />
         ))
       )}
+      <TxDetailModal
+        tx={detailTx}
+        people={people}
+        currency={currency}
+        onClose={() => setDetailTx(null)}
+        onEdit={!isReadOnly ? (tx) => { setDetailTx(null); onEdit(tx); } : undefined}
+        onDelete={!isReadOnly ? (id, desc) => { setDetailTx(null); onDelete(id, desc); } : undefined}
+      />
     </div>
   );
 }

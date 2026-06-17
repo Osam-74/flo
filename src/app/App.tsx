@@ -61,6 +61,7 @@ export default function App() {
   const [dbStatus,    setDbStatus]    = useState('Connecting to Firebase…');
   const [installReady, setInstallReady] = useState(false);
   const [personFilterForLedger, setPersonFilterForLedger] = useState('all');
+  const [balanceHidden, setBalanceHidden] = useState(false);
 
   /* ── Modal states ──────────────────────────────── */
   const [deleteModal, setDeleteModal] = useState<{ open: boolean; id: string; desc: string }>({ open: false, id: '', desc: '' });
@@ -736,6 +737,8 @@ export default function App() {
               onPersonFilter={handlePersonFilter}
               onEdit={tx => { if (!guardWrite()) return; setEditModal({ open: true, tx }); }}
               onDelete={(id, desc) => { if (!guardWrite()) return; setDeleteModal({ open: true, id, desc }); }}
+              balanceHidden={balanceHidden}
+              onToggleHidden={() => setBalanceHidden(h => !h)}
             />
           )}
           {activeTab === 'ledger' && (
@@ -787,6 +790,7 @@ export default function App() {
           appMode={appMode}
           onTab={handleTab}
           onAdd={openAdd}
+          fabActive={isAddOpen}
         />
 
         <AddEntrySheet

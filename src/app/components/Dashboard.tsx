@@ -13,10 +13,12 @@ interface Props {
   onPersonFilter: (pid: string) => void;
   onEdit: (tx: Transaction) => void;
   onDelete: (id: string, desc: string) => void;
+  balanceHidden: boolean;
+  onToggleHidden: () => void;
 }
 
-export function Dashboard({ txs, people, currency, businessName, onPersonFilter, onEdit, onDelete }: Props) {
-  const [hidden, setHidden] = useState(false);
+export function Dashboard({ txs, people, currency, businessName, onPersonFilter, onEdit, onDelete, balanceHidden, onToggleHidden }: Props) {
+  const hidden = balanceHidden;
   const [detailTx, setDetailTx] = useState<Transaction | null>(null);
 
   let totalIn = 0, totalOut = 0, ownerIn = 0, ownerOut = 0;
@@ -119,7 +121,7 @@ export function Dashboard({ txs, people, currency, businessName, onPersonFilter,
             Total Cash Available
           </div>
           <button
-            onClick={() => setHidden(h => !h)}
+            onClick={onToggleHidden}
             style={{
               background: 'rgba(255,255,255,0.12)',
               border: '1px solid rgba(255,255,255,0.18)',
