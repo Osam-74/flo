@@ -399,7 +399,7 @@ export function BusinessSelector({
 
       {/* Logo */}
       <div onClick={secretTap} style={{ width: 76, height: 76, borderRadius: 24, background: 'linear-gradient(145deg, #2A4FCF, #6B8FFF)', boxShadow: '0 8px 32px rgba(61,107,223,0.45)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '2.2rem', marginBottom: 20, cursor: 'pointer' }}>💰</div>
-      <div style={{ fontSize: '1.9rem', fontWeight: 800, letterSpacing: '-0.04em', marginBottom: 4, fontFamily: 'Plus Jakarta Sans, sans-serif' }}>Flow<span style={{ color: '#00B4D8' }}>HQ</span></div>
+      <div style={{ fontSize: '1.9rem', fontWeight: 800, letterSpacing: '-0.04em', marginBottom: 4, fontFamily: 'Plus Jakarta Sans, sans-serif' }}>Flo<span style={{ color: '#00B4D8' }}>HQ</span></div>
       <div style={{ fontSize: '0.68rem', color: '#9A9FB8', letterSpacing: '0.16em', textTransform: 'uppercase', marginBottom: 36 }}>Farm Expense Tracker</div>
 
       {/* ══ MASTER ADMIN VIEW ══ */}

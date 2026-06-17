@@ -25,7 +25,7 @@ export function AppHeader({ appMode, installReady, onLock, onInstall, onTab }: P
     }}>
       {/* Brand */}
       <div style={{ fontSize: '1.15rem', fontWeight: 800, letterSpacing: '-0.03em', color: '#fff' }}>
-        Flow<span style={{ color: '#00B4D8' }}>HQ</span>
+        Flo<span style={{ color: '#00B4D8' }}>HQ</span>
       </div>
 
       {/* Actions */}

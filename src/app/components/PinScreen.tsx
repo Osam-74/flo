@@ -140,7 +140,7 @@ export function PinScreen({ onUnlock, onBack, businessName, masterHash, viewHash
       }}>💰</div>
 
       <div style={{ fontSize: '1.9rem', fontWeight: 800, letterSpacing: '-0.04em', marginBottom: 4, fontFamily: 'Plus Jakarta Sans, sans-serif' }}>
-        Flow<span style={{ color: '#00B4D8' }}>HQ</span>
+        Flo<span style={{ color: '#00B4D8' }}>HQ</span>
       </div>
       <div style={{ fontSize: '0.78rem', fontWeight: 700, color: '#1A2FA8', letterSpacing: '0.02em', marginBottom: 2, fontFamily: 'Plus Jakarta Sans, sans-serif' }}>
         {businessName}
