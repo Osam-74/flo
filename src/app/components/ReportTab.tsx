@@ -289,17 +289,6 @@ const primaryBtn: React.CSSProperties = {
 };
 
 const printStyles = `
-/* print styles removed — PDF download handles output */
-  html, body { background: #fff !important; }
-  .report-preview { display: block !important; }
-  .pdf-doc { box-shadow: none !important; border-radius: 0 !important; padding: 12mm 14mm 16mm !important; }
-  .pdf-table th, .pdf-summary-table th { background: #1a1a2e !important; color: #fff !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
-  .pdf-table tr.pdf-total td, .pdf-summary-table tr.pdf-total td { background: #e8f4e8 !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
-  .pdf-table tr.pdf-outstanding td { background: #fff8f0 !important; color: #cc5500 !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
-  .pdf-table tr:nth-child(even) td, .pdf-summary-table tr:nth-child(even) td { background: #f5f5f5 !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
-  .pdf-divider { border-top: 2px solid #1a1a2e !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
-  .pdf-section { page-break-inside: avoid; }
-}
 .pdf-section { margin-bottom: 28px; }
 .pdf-header { font-size: 1.6rem; font-weight: 800; color: #1a2fa8; margin-bottom: 20px; letter-spacing: -0.01em; }
 .pdf-section-title { font-size: 1rem; font-weight: 800; color: #1a1a2e; margin-bottom: 2px; letter-spacing: -0.01em; }
