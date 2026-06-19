@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { FileText, Printer } from 'lucide-react';
+import { FileText, Download } from 'lucide-react';
 import { showToast } from './Modals';
 import type { Transaction, Person } from '../types';
 import { fmtDate, fmtN } from '../utils';
@@ -19,6 +19,7 @@ export function ReportTab({ businessName, txs, people, currency }: Props) {
   const [rType, setRType]     = useState('all');
   const [reportHtml, setReportHtml] = useState('');
   const [generated, setGenerated]   = useState(false);
+  const [downloading, setDownloading] = useState(false);
 
   function esc(s: any): string {
     const d = document.createElement('div');
@@ -125,6 +126,76 @@ export function ReportTab({ businessName, txs, people, currency }: Props) {
     setTimeout(() => document.getElementById('report-preview')?.scrollIntoView({ behavior: 'smooth' }), 100);
   }
 
+  async function downloadPDF() {
+    const el = document.getElementById('pdf-download-target');
+    if (!el) return;
+    setDownloading(true);
+    try {
+      const { default: html2canvas } = await import('html2canvas');
+      const { jsPDF } = await import('jspdf');
+
+      // A4 dimensions in mm
+      const PAGE_W_MM = 210;
+      const PAGE_H_MM = 297;
+      const MARGIN_MM = 14;
+      const CONTENT_W_MM = PAGE_W_MM - MARGIN_MM * 2;
+
+      // Render the element to a canvas at 2x scale for sharpness
+      const canvas = await html2canvas(el, {
+        scale: 2,
+        useCORS: true,
+        backgroundColor: '#ffffff',
+        logging: false,
+      });
+
+      const imgW = canvas.width;
+      const imgH = canvas.height;
+
+      // Work out how tall the content is in mm
+      const pxPerMm = imgW / (CONTENT_W_MM * 2); // accounts for scale:2
+      const contentHmm = (imgH / pxPerMm) / 2;
+
+      const pdf = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
+
+      let yOffset = 0; // how many px into the canvas we've already placed
+      let pageIndex = 0;
+
+      // Page height in px (at scale:2)
+      const pageHpx = (PAGE_H_MM - MARGIN_MM * 2) * pxPerMm * 2;
+
+      while (yOffset < imgH) {
+        if (pageIndex > 0) pdf.addPage();
+
+        const sliceH = Math.min(pageHpx, imgH - yOffset);
+
+        // Slice that portion of the canvas
+        const pageCanvas = document.createElement('canvas');
+        pageCanvas.width  = imgW;
+        pageCanvas.height = sliceH;
+        const ctx = pageCanvas.getContext('2d')!;
+        ctx.drawImage(canvas, 0, yOffset, imgW, sliceH, 0, 0, imgW, sliceH);
+
+        const imgData = pageCanvas.toDataURL('image/png');
+        const sliceHmm = sliceH / pxPerMm / 2;
+
+        pdf.addImage(imgData, 'PNG', MARGIN_MM, MARGIN_MM, CONTENT_W_MM, sliceHmm);
+
+        yOffset += sliceH;
+        pageIndex++;
+      }
+
+      // Build a sensible filename
+      const safeName = (businessName || 'report').replace(/[^a-z0-9]/gi, '_').toLowerCase();
+      pdf.save(`${safeName}_report.pdf`);
+      showToast('PDF downloaded', 'success');
+    } catch (err) {
+      console.error('PDF generation failed', err);
+      showToast('Download failed — try again', 'error');
+    } finally {
+      setDownloading(false);
+    }
+  }
+
   return (
     <div style={{ padding: '16px 16px 100px' }}>
       <style>{printStyles}</style>
@@ -159,8 +230,12 @@ export function ReportTab({ businessName, txs, people, currency }: Props) {
           <button onClick={generate} style={{ ...primaryBtn, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8 }}>
             <FileText size={16} /> Generate
           </button>
-          <button onClick={() => window.print()} style={{ ...primaryBtn, background: 'linear-gradient(135deg, #2a4a9a, #3d6bdf)', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8 }}>
-            <Printer size={16} /> Print
+          <button
+            onClick={downloadPDF}
+            disabled={!generated || downloading}
+            style={{ ...primaryBtn, background: generated ? 'linear-gradient(135deg, #2a4a9a, #3d6bdf)' : '#ccc', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, opacity: downloading ? 0.7 : 1, cursor: generated && !downloading ? 'pointer' : 'not-allowed' }}
+          >
+            <Download size={16} /> {downloading ? 'Generating…' : 'Download PDF'}
           </button>
         </div>
       </div>
@@ -169,7 +244,7 @@ export function ReportTab({ businessName, txs, people, currency }: Props) {
       {generated && (
         <div id="report-preview" className="report-preview">
           <div
-            className="pdf-doc"
+            id="pdf-download-target" className="pdf-doc"
             style={{ background: '#fff', borderRadius: 12, padding: '24px 22px 32px', boxShadow: '0 4px 24px rgba(0,0,0,0.1)', fontFamily: 'Plus Jakarta Sans, sans-serif', color: '#1a1a2e' }}
             dangerouslySetInnerHTML={{ __html: reportHtml }}
           />
@@ -214,8 +289,7 @@ const primaryBtn: React.CSSProperties = {
 };
 
 const printStyles = `
-@media print {
-  .no-print, #app .topbar, nav, .overlay { display: none !important; }
+/* print styles removed — PDF download handles output */
   html, body { background: #fff !important; }
   .report-preview { display: block !important; }
   .pdf-doc { box-shadow: none !important; border-radius: 0 !important; padding: 12mm 14mm 16mm !important; }
