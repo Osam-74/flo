@@ -1,22 +1,19 @@
-const CACHE_NAME = 'cashbook-v12';
+const CACHE_NAME = 'cashbook-v13';
 
-// Detect base path from the SW's own location at runtime.
-// On GitHub Pages:  self.location = https://osam-74.github.io/flo/sw.js  → BASE = '/flo'
-// On Vercel:        self.location = https://yourapp.vercel.app/sw.js      → BASE = ''
-const swPath = self.location.pathname; // e.g. '/flo/sw.js' or '/sw.js'
-const BASE = swPath.replace(/\/sw\.js$/, ''); // e.g. '/flo' or ''
+const swPath = self.location.pathname;
+const BASE = swPath.replace(/\/sw\.js$/, '');
 
 const PRECACHE = [
   BASE + '/',
   BASE + '/index.html',
   BASE + '/manifest.json',
-].filter((v, i, a) => a.indexOf(v) === i); // dedupe (in case BASE is empty, '/' appears once)
+].filter((v, i, a) => a.indexOf(v) === i);
 
 self.addEventListener('install', event => {
   event.waitUntil(
     caches.open(CACHE_NAME)
       .then(cache => cache.addAll(PRECACHE))
-      .then(() => self.skipWaiting())
+      .then(() => self.skipWaiting())   // activate immediately, don't wait
   );
 });
 
@@ -26,15 +23,16 @@ self.addEventListener('activate', event => {
       .then(keys => Promise.all(
         keys.filter(k => k !== CACHE_NAME).map(k => caches.delete(k))
       ))
-      .then(() => self.clients.claim())
+      .then(() => self.clients.claim())  // take over all existing tabs
   );
 });
 
 self.addEventListener('fetch', event => {
   const url = new URL(event.request.url);
 
-  // Never intercept Firebase, Google APIs, extensions
+  // Skip non-GET and external requests
   if (
+    event.request.method !== 'GET' ||
     url.hostname.includes('firebase') ||
     url.hostname.includes('firebaseio') ||
     url.hostname.includes('googleapis') ||
@@ -46,8 +44,27 @@ self.addEventListener('fetch', event => {
     return;
   }
 
-  if (event.request.method !== 'GET') return;
+  // JS and CSS assets: NETWORK-FIRST so new deployments always load fresh.
+  // Only fall back to cache when fully offline.
+  const isAsset = url.pathname.match(/\.(js|css|mjs)$/i);
+  if (isAsset) {
+    event.respondWith(
+      fetch(event.request)
+        .then(response => {
+          if (response && response.status === 200) {
+            const clone = response.clone();
+            caches.open(CACHE_NAME).then(cache => cache.put(event.request, clone));
+          }
+          return response;
+        })
+        .catch(() => caches.match(event.request).then(cached =>
+          cached || new Response('Offline — asset unavailable', { status: 503 })
+        ))
+    );
+    return;
+  }
 
+  // Everything else: network-first with cache fallback
   event.respondWith(
     fetch(event.request)
       .then(response => {
@@ -60,7 +77,6 @@ self.addEventListener('fetch', event => {
       .catch(() => {
         return caches.match(event.request).then(cached => {
           if (cached) return cached;
-
           if (event.request.mode === 'navigate') {
             return caches.match(BASE + '/index.html')
               .then(html => html || caches.match(BASE + '/'))
@@ -69,7 +85,6 @@ self.addEventListener('fetch', event => {
                 { headers: { 'Content-Type': 'text/html' } }
               ));
           }
-
           return new Response('Offline — resource unavailable', {
             status: 503,
             headers: { 'Content-Type': 'text/plain' },

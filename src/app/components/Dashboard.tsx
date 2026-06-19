@@ -69,6 +69,18 @@ export function Dashboard({ txs, people, currency, businessName, onPersonFilter,
     return !r.includes('owner') && p.id !== 'biz';
   });
 
+  // Total Cash Available = sum of ONLY positive balances.
+  // Negative balances (debts) are excluded — they represent money owed, not cash in hand.
+  // This prevents a person who was advanced money (negative balance) from reducing the total.
+  const totalCashAvailable = (() => {
+    let sum = Math.max(0, bizBalance); // biz pocket — only if positive
+    for (const p of members) {
+      const { pBal } = pStats(p.id, txs);
+      if (pBal > 0) sum += pBal;       // only count positive balances
+    }
+    return sum;
+  })();
+
   const recent = [...txs].sort((a, b) => (b.ts || 0) - (a.ts || 0)).slice(0, 5);
 
   const todayStr = new Date().toISOString().split('T')[0];
@@ -92,7 +104,7 @@ export function Dashboard({ txs, people, currency, businessName, onPersonFilter,
   const mask = (v: string) => hidden ? '••••••' : v;
 
   // Auto-fit font size for balance
-  const balStr = fmtAmt(bal, currency);
+  const balStr = fmtAmt(totalCashAvailable, currency);
   const balFontSize = balStr.length > 16 ? '1.55rem' : balStr.length > 12 ? '2rem' : '2.5rem';
 
   return (
@@ -144,7 +156,7 @@ export function Dashboard({ txs, people, currency, businessName, onPersonFilter,
           fontFamily: "'DM Mono', monospace",
           fontSize: balFontSize,
           fontWeight: 500,
-          color: bal < 0 ? '#FFB3C0' : '#fff',
+          color: totalCashAvailable < 0 ? '#FFB3C0' : '#fff',
           letterSpacing: '-0.02em', lineHeight: 1, marginBottom: 20,
           position: 'relative', zIndex: 1,
           whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',

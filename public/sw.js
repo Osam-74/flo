@@ -1,6 +1,5 @@
-// FloHQ Service Worker v2
-// Uses relative paths so it works on both GitHub Pages (/flo/) and Vercel (/)
-const CACHE_NAME = 'flohq-v3';
+// FloHQ Service Worker v4 — network-first for JS/CSS assets
+const CACHE_NAME = 'flohq-v4';
 
 self.addEventListener('install', event => {
   event.waitUntil(
@@ -22,7 +21,6 @@ self.addEventListener('activate', event => {
 
 self.addEventListener('fetch', event => {
   const url = new URL(event.request.url);
-  // Skip non-GET and external/firebase/google requests
   if (
     event.request.method !== 'GET' ||
     url.hostname.includes('firebase') ||
@@ -33,6 +31,25 @@ self.addEventListener('fetch', event => {
     url.hostname.includes('fonts.') ||
     url.protocol === 'chrome-extension:'
   ) {
+    return;
+  }
+
+  // JS/CSS: always try network first so deployments load fresh
+  const isAsset = url.pathname.match(/\.(js|css|mjs)$/i);
+  if (isAsset) {
+    event.respondWith(
+      fetch(event.request)
+        .then(response => {
+          if (response && response.status === 200) {
+            const clone = response.clone();
+            caches.open(CACHE_NAME).then(cache => cache.put(event.request, clone));
+          }
+          return response;
+        })
+        .catch(() => caches.match(event.request).then(cached =>
+          cached || new Response('Offline', { status: 503 })
+        ))
+    );
     return;
   }
 
