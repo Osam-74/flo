@@ -1,4 +1,4 @@
-const CACHE_NAME = 'cashbook-v11';
+const CACHE_NAME = 'cashbook-v12';
 
 // Detect base path from the SW's own location at runtime.
 // On GitHub Pages:  self.location = https://osam-74.github.io/flo/sw.js  → BASE = '/flo'
