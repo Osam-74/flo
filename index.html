@@ -22,21 +22,21 @@
       #root { height: 100%; }
     </style>
   
-    <!-- SW Kill Switch v3: kills zombie SWs + all stale caches before React loads -->
+    <!-- SW Kill Switch v8: clears stale caches on every page load if SW version changed -->
     <script>
       (function() {
         if (!('serviceWorker' in navigator)) return;
-        var CLEAN_KEY = 'flo-sw-v3';
-        if (localStorage.getItem(CLEAN_KEY)) return;
-
-        // Delete ALL caches immediately
+        var CLEAN_KEY = 'flo-sw-v8';
+        // Always clear caches that don't match the current version
         if ('caches' in window) {
           caches.keys().then(function(keys) {
-            keys.forEach(function(k) { caches.delete(k); });
+            keys.forEach(function(k) {
+              if (k !== 'flohq-v8') caches.delete(k);
+            });
           });
         }
-
-        // Unregister every registered service worker
+        // Only do the full unregister+reload once per version
+        if (localStorage.getItem(CLEAN_KEY)) return;
         navigator.serviceWorker.getRegistrations().then(function(regs) {
           if (!regs.length) {
             try { localStorage.setItem(CLEAN_KEY, '1'); } catch(e) {}
@@ -44,8 +44,7 @@
           }
           Promise.all(regs.map(function(r) { return r.unregister(); })).then(function() {
             try { localStorage.setItem(CLEAN_KEY, '1'); } catch(e) {}
-            // Hard reload — bypasses any remaining cache
-            window.location.reload(true);
+            window.location.reload();
           });
         });
       })();

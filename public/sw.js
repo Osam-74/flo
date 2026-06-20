@@ -1,4 +1,4 @@
-const CACHE_NAME = 'flohq-v7';
+const CACHE_NAME = 'flohq-v8';
 
 const swPath = self.location.pathname;
 const BASE = swPath.replace(/\/sw\.js$/, '');
@@ -65,19 +65,30 @@ self.addEventListener('fetch', event => {
     return;
   }
 
-  // HTML navigation: network-first with cache fallback
+  // HTML navigation: STRICT network-first — never serve stale HTML
   if (event.request.mode === 'navigate') {
     event.respondWith(
       fetch(event.request)
         .then(response => {
           if (response.ok) {
-            caches.open(CACHE_NAME).then(c => c.put(event.request, response.clone()));
+            // Only cache if the response is actually HTML (not a JS blob)
+            const ct = response.headers.get('content-type') || '';
+            if (ct.includes('text/html')) {
+              caches.open(CACHE_NAME).then(c => c.put(event.request, response.clone()));
+            }
           }
           return response;
         })
         .catch(() =>
           caches.match(event.request)
-            .then(cached => cached || caches.match(BASE + '/index.html') || caches.match(BASE + '/'))
+            .then(cached => {
+              if (cached) return cached;
+              // Last resort: return a minimal page that reloads when back online
+              return new Response(
+                '<!DOCTYPE html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>FloHQ</title><style>body{font-family:sans-serif;display:flex;align-items:center;justify-content:center;height:100vh;margin:0;background:#F0F2F7;color:#1A1D2E}div{text-align:center}p{color:#9A9FB8}</style></head><body><div><h2>You are offline</h2><p>Reconnecting…</p></div><script>setTimeout(()=>location.reload(),3000)</script></body></html>',
+                { headers: { 'Content-Type': 'text/html' } }
+              );
+            })
         )
     );
     return;
