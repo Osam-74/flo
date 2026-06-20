@@ -22,36 +22,31 @@
       #root { height: 100%; }
     </style>
   
-    <!-- SW Kill Switch: runs before React, unregisters zombie SWs + clears stale caches -->
+    <!-- SW Kill Switch v3: kills zombie SWs + all stale caches before React loads -->
     <script>
       (function() {
         if (!('serviceWorker' in navigator)) return;
-        // Check if we need to nuke everything
-        var CLEAN_VERSION = 'flo-clean-v2';
-        var alreadyCleaned = localStorage.getItem(CLEAN_VERSION);
-        if (alreadyCleaned) return; // already ran this cleanup
-        
-        // Mark as cleaned immediately to avoid repeated nukes
-        try { localStorage.setItem(CLEAN_VERSION, '1'); } catch(e) {}
-        
-        // Unregister ALL service workers
-        navigator.serviceWorker.getRegistrations().then(function(regs) {
-          regs.forEach(function(reg) { reg.unregister(); });
-        });
-        
-        // Clear ALL caches
+        var CLEAN_KEY = 'flo-sw-v3';
+        if (localStorage.getItem(CLEAN_KEY)) return;
+
+        // Delete ALL caches immediately
         if ('caches' in window) {
           caches.keys().then(function(keys) {
-            keys.forEach(function(key) { caches.delete(key); });
+            keys.forEach(function(k) { caches.delete(k); });
           });
         }
-        
-        // Force a fresh reload ONCE if we had any registrations
+
+        // Unregister every registered service worker
         navigator.serviceWorker.getRegistrations().then(function(regs) {
-          if (regs.length > 0) {
-            // Give unregister time to complete, then reload
-            setTimeout(function() { window.location.reload(); }, 500);
+          if (!regs.length) {
+            try { localStorage.setItem(CLEAN_KEY, '1'); } catch(e) {}
+            return;
           }
+          Promise.all(regs.map(function(r) { return r.unregister(); })).then(function() {
+            try { localStorage.setItem(CLEAN_KEY, '1'); } catch(e) {}
+            // Hard reload — bypasses any remaining cache
+            window.location.reload(true);
+          });
         });
       })();
     </script>

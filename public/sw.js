@@ -1,102 +1,107 @@
-const CACHE_NAME = 'flohq-v6';
+const CACHE_NAME = 'flohq-v7';
 
 const swPath = self.location.pathname;
 const BASE = swPath.replace(/\/sw\.js$/, '');
 
+// Resources to precache (minimal — just navigation shells)
 const PRECACHE = [
   BASE + '/',
   BASE + '/index.html',
   BASE + '/manifest.json',
 ].filter((v, i, a) => a.indexOf(v) === i);
 
+// ── Install: cache shells, skip waiting immediately ──────────────────────────
 self.addEventListener('install', event => {
   event.waitUntil(
     caches.open(CACHE_NAME)
-      .then(cache => cache.addAll(PRECACHE))
-      .then(() => self.skipWaiting())
+      .then(cache => cache.addAll(PRECACHE).catch(() => {})) // non-fatal
+      .then(() => self.skipWaiting()) // take over immediately without waiting
   );
 });
 
+// ── Activate: delete ALL old caches, claim all clients, force reload ──────────
 self.addEventListener('activate', event => {
-  // Delete ALL old caches unconditionally — fresh start
   event.waitUntil(
     caches.keys()
-      .then(keys => Promise.all(keys.filter(k => k !== CACHE_NAME).map(k => caches.delete(k))))
-      .then(() => self.clients.claim())
+      .then(keys => Promise.all(
+        keys.filter(k => k !== CACHE_NAME).map(k => caches.delete(k))
+      ))
+      .then(() => self.clients.claim()) // take control of all open tabs
+      .then(() => {
+        // Tell all existing clients to reload so they get fresh JS/CSS
+        return self.clients.matchAll({ type: 'window' }).then(clients => {
+          clients.forEach(client => {
+            client.postMessage({ type: 'RELOAD_PAGE' });
+          });
+        });
+      })
   );
 });
 
+// ── Fetch: smart strategy per resource type ───────────────────────────────────
 self.addEventListener('fetch', event => {
   const url = new URL(event.request.url);
 
+  // Never intercept: non-GET, Firebase/Google APIs, Chrome extensions
   if (
     event.request.method !== 'GET' ||
     url.hostname.includes('firebase') ||
     url.hostname.includes('firebaseio') ||
     url.hostname.includes('googleapis') ||
     url.hostname.includes('gstatic') ||
-    url.hostname.includes('google') ||
-    url.hostname.includes('fonts.') ||
+    url.hostname.includes('paystack') ||
     url.protocol === 'chrome-extension:'
   ) {
-    return; // pass through
+    return; // pass through to network
   }
 
-  // JS / CSS / module assets: NETWORK ONLY when online.
-  // Never serve from cache — ensures every deploy reaches the PWA immediately.
-  const isAsset = /\.(js|mjs|css)($|\?)/.test(url.pathname);
-  if (isAsset) {
+  // JS / CSS / module assets: NETWORK ONLY (never cache — ensures deploys are instant)
+  if (/\.(js|mjs|css)($|\?)/.test(url.pathname)) {
     event.respondWith(
-      fetch(event.request)
-        .catch(() => caches.match(event.request)
-          .then(c => c || new Response('Offline', { status: 503 })))
+      fetch(event.request).catch(() =>
+        caches.match(event.request).then(c => c || new Response('Offline', { status: 503 }))
+      )
     );
     return;
   }
 
-  // HTML navigation: network-first, cache fallback for offline
+  // HTML navigation: network-first with cache fallback
   if (event.request.mode === 'navigate') {
     event.respondWith(
       fetch(event.request)
         .then(response => {
-          if (response && response.status === 200) {
+          if (response.ok) {
             caches.open(CACHE_NAME).then(c => c.put(event.request, response.clone()));
           }
           return response;
         })
         .catch(() =>
           caches.match(event.request)
-            .then(cached => cached ||
-              caches.match(BASE + '/index.html') ||
-              caches.match(BASE + '/') ||
-              new Response(
-                '<!DOCTYPE html><html><body style="font-family:sans-serif;padding:2rem"><h2>You are offline</h2></body></html>',
-                { headers: { 'Content-Type': 'text/html' } }
-              )
-            )
+            .then(cached => cached || caches.match(BASE + '/index.html') || caches.match(BASE + '/'))
         )
     );
     return;
   }
 
-  // Everything else: stale-while-revalidate
+  // Images and other static assets: stale-while-revalidate
   event.respondWith(
     caches.open(CACHE_NAME).then(cache =>
       cache.match(event.request).then(cached => {
         const networkFetch = fetch(event.request).then(response => {
-          if (response && response.status === 200 && response.type !== 'opaque') {
+          if (response.ok && response.type !== 'opaque') {
             cache.put(event.request, response.clone());
           }
           return response;
-        }).catch(() => cached);
+        }).catch(() => cached || new Response('Offline', { status: 503 }));
         return cached || networkFetch;
       })
     )
   );
 });
 
+// ── Message handler ───────────────────────────────────────────────────────────
 self.addEventListener('message', event => {
-  if (event.data && event.data.type === 'SKIP_WAITING') {
+  if (event.data?.type === 'SKIP_WAITING') {
     self.skipWaiting();
   }
 });

@@ -110,6 +110,15 @@ export default function App() {
   /* ── Service Worker ─────────────────────────────── */
   useEffect(() => {
     if (!('serviceWorker' in navigator)) return;
+
+    // Listen for RELOAD_PAGE message from newly activated SW
+    // (new SW sends this to all open clients after taking over)
+    navigator.serviceWorker.addEventListener('message', (event) => {
+      if (event.data?.type === 'RELOAD_PAGE') {
+        window.location.reload();
+      }
+    });
+
     // Determine SW URL based on deployment environment
     const onGhPages = window.location.pathname.startsWith('/flo');
     const swUrl = onGhPages ? '/flo/sw.js' : '/sw.js';
@@ -117,7 +126,11 @@ export default function App() {
 
     navigator.serviceWorker.register(swUrl, { scope: swScope })
       .then(reg => {
-        // When a new SW is found, activate it immediately
+        // If there is already a waiting SW, activate it now (no waiting for tab close)
+        if (reg.waiting) {
+          reg.waiting.postMessage({ type: 'SKIP_WAITING' });
+        }
+        // When a new SW is found, activate it immediately without waiting
         reg.addEventListener('updatefound', () => {
           const newSW = reg.installing;
           if (!newSW) return;
@@ -127,10 +140,6 @@ export default function App() {
             }
           });
         });
-        // If there is already a waiting SW, activate it now
-        if (reg.waiting) {
-          reg.waiting.postMessage({ type: 'SKIP_WAITING' });
-        }
       })
       .catch(err => console.warn('[SW] registration failed:', err));
   }, []);
