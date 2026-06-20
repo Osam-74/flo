@@ -109,29 +109,30 @@ export default function App() {
 
   /* ── Service Worker ─────────────────────────────── */
   useEffect(() => {
-    if ('serviceWorker' in navigator) {
-      // Detect base path so this works on both Vercel (/) and GitHub Pages (/flo/)
-      const swBase = window.location.pathname.replace(/\/$/, '').split('/').slice(0, -1).join('/');
-      // sw.js sits at the app root (same level as index.html)
-      const swUrl = (window.location.pathname === '/' || !window.location.pathname.includes('/flo'))
-        ? '/sw.js'
-        : '/flo/sw.js';
-      const swScope = (window.location.pathname === '/' || !window.location.pathname.includes('/flo'))
-        ? '/'
-        : '/flo/';
-      navigator.serviceWorker.register(swUrl, { scope: swScope })
-        .then(reg => {
-          reg.addEventListener('updatefound', () => {
-            const sw = reg.installing;
-            if (!sw) return;
-            sw.addEventListener('statechange', () => {
-              if (sw.state === 'installed' && navigator.serviceWorker.controller) {
-                sw.postMessage({ type: 'SKIP_WAITING' });
-              }
-            });
+    if (!('serviceWorker' in navigator)) return;
+    // Determine SW URL based on deployment environment
+    const onGhPages = window.location.pathname.startsWith('/flo');
+    const swUrl = onGhPages ? '/flo/sw.js' : '/sw.js';
+    const swScope = onGhPages ? '/flo/' : '/';
+
+    navigator.serviceWorker.register(swUrl, { scope: swScope })
+      .then(reg => {
+        // When a new SW is found, activate it immediately
+        reg.addEventListener('updatefound', () => {
+          const newSW = reg.installing;
+          if (!newSW) return;
+          newSW.addEventListener('statechange', () => {
+            if (newSW.state === 'installed') {
+              newSW.postMessage({ type: 'SKIP_WAITING' });
+            }
           });
-        }).catch(err => console.warn('[SW]', err));
-    }
+        });
+        // If there is already a waiting SW, activate it now
+        if (reg.waiting) {
+          reg.waiting.postMessage({ type: 'SKIP_WAITING' });
+        }
+      })
+      .catch(err => console.warn('[SW] registration failed:', err));
   }, []);
 
   /* ── Init Firebase & load business registry ─────── */
