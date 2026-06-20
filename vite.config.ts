@@ -21,7 +21,7 @@ function figmaAssetResolver() {
 // Vercel / any root deploy needs base = '/'
 // Set VITE_BASE_PATH env var in Vercel to '/' (or leave it unset — defaults to '/')
 // GitHub Actions workflow sets it to '/flo/' automatically
-const base = process.env.VITE_BASE_PATH ?? '/flo/';
+const base = process.env.VITE_BASE_PATH ?? '/';
 
 export default defineConfig({
   base,
