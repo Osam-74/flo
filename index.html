@@ -22,21 +22,26 @@
       #root { height: 100%; }
     </style>
   
-    <!-- SW Kill Switch v8: clears stale caches on every page load if SW version changed -->
+    <!-- SW Kill Switch v9: force-unregister ALL service workers + clear ALL caches on version change -->
     <script>
       (function() {
         if (!('serviceWorker' in navigator)) return;
-        var CLEAN_KEY = 'flo-sw-v8';
-        // Always clear caches that don't match the current version
+        var CLEAN_KEY = 'flo-sw-v9';
+        if (localStorage.getItem(CLEAN_KEY)) {
+          // Already cleaned for this version — just clear any stray caches
+          if ('caches' in window) {
+            caches.keys().then(function(keys) {
+              keys.forEach(function(k) { if (k !== 'flohq-v9') caches.delete(k); });
+            });
+          }
+          return;
+        }
+        // Full nuke: unregister ALL service workers + delete ALL caches
         if ('caches' in window) {
           caches.keys().then(function(keys) {
-            keys.forEach(function(k) {
-              if (k !== 'flohq-v8') caches.delete(k);
-            });
+            keys.forEach(function(k) { caches.delete(k); });
           });
         }
-        // Only do the full unregister+reload once per version
-        if (localStorage.getItem(CLEAN_KEY)) return;
         navigator.serviceWorker.getRegistrations().then(function(regs) {
           if (!regs.length) {
             try { localStorage.setItem(CLEAN_KEY, '1'); } catch(e) {}

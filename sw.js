@@ -1,4 +1,4 @@
-const CACHE_NAME = 'cashbook-v14';
+const CACHE_NAME = 'flohq-v9';
 
 const swPath = self.location.pathname;
 const BASE = swPath.replace(/\/sw\.js$/, '');
@@ -23,6 +23,12 @@ self.addEventListener('activate', event => {
     caches.keys()
       .then(keys => Promise.all(keys.filter(k => k !== CACHE_NAME).map(k => caches.delete(k))))
       .then(() => self.clients.claim())
+      .then(() => {
+        // Notify all open clients to reload so they get the new assets
+        self.clients.matchAll({ includeUncontrolled: true }).then(clients => {
+          clients.forEach(c => c.postMessage({ type: 'RELOAD_PAGE' }));
+        });
+      })
   );
 });
 
