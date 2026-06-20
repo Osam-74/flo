@@ -22,16 +22,17 @@
       #root { height: 100%; }
     </style>
   
-    <!-- SW Kill Switch v9: force-unregister ALL service workers + clear ALL caches on version change -->
+    <!-- SW Kill Switch v10: force-unregister ALL service workers + clear ALL caches -->
+    <!-- This is the ONLY reliable way to break out of a stale SW loop on mobile PWAs -->
     <script>
       (function() {
         if (!('serviceWorker' in navigator)) return;
-        var CLEAN_KEY = 'flo-sw-v9';
+        var CLEAN_KEY = 'flo-sw-v10';
         if (localStorage.getItem(CLEAN_KEY)) {
-          // Already cleaned for this version — just clear any stray caches
+          // Already cleaned for this version — just clear any non-v10 caches
           if ('caches' in window) {
             caches.keys().then(function(keys) {
-              keys.forEach(function(k) { if (k !== 'flohq-v9') caches.delete(k); });
+              keys.forEach(function(k) { if (k !== 'flohq-v10') caches.delete(k); });
             });
           }
           return;
@@ -49,6 +50,7 @@
           }
           Promise.all(regs.map(function(r) { return r.unregister(); })).then(function() {
             try { localStorage.setItem(CLEAN_KEY, '1'); } catch(e) {}
+            // Reload once to get fresh page without any SW intercepting
             window.location.reload();
           });
         });

@@ -1,4 +1,4 @@
-const CACHE_NAME = 'flohq-v9';
+const CACHE_NAME = 'flohq-v10';
 
 const swPath = self.location.pathname;
 const BASE = swPath.replace(/\/sw\.js$/, '');
@@ -18,23 +18,18 @@ self.addEventListener('install', event => {
 });
 
 self.addEventListener('activate', event => {
-  // Delete ALL old caches unconditionally — fresh start
+  // Delete ALL old caches — no RELOAD_PAGE broadcast (caused infinite loop)
   event.waitUntil(
     caches.keys()
       .then(keys => Promise.all(keys.filter(k => k !== CACHE_NAME).map(k => caches.delete(k))))
       .then(() => self.clients.claim())
-      .then(() => {
-        // Notify all open clients to reload so they get the new assets
-        self.clients.matchAll({ includeUncontrolled: true }).then(clients => {
-          clients.forEach(c => c.postMessage({ type: 'RELOAD_PAGE' }));
-        });
-      })
   );
 });
 
 self.addEventListener('fetch', event => {
   const url = new URL(event.request.url);
 
+  // Pass through non-GET, Firebase, Google, fonts
   if (
     event.request.method !== 'GET' ||
     url.hostname.includes('firebase') ||
@@ -45,11 +40,10 @@ self.addEventListener('fetch', event => {
     url.hostname.includes('fonts.') ||
     url.protocol === 'chrome-extension:'
   ) {
-    return; // pass through
+    return;
   }
 
   // JS / CSS / module assets: NETWORK ONLY when online.
-  // Never serve from cache — ensures every deploy reaches the PWA immediately.
   const isAsset = /\.(js|mjs|css)($|\?)/.test(url.pathname);
   if (isAsset) {
     event.respondWith(
@@ -66,7 +60,8 @@ self.addEventListener('fetch', event => {
       fetch(event.request)
         .then(response => {
           if (response && response.status === 200) {
-            caches.open(CACHE_NAME).then(c => c.put(event.request, response.clone()));
+            const clone = response.clone();
+            caches.open(CACHE_NAME).then(c => c.put(event.request, clone));
           }
           return response;
         })
@@ -74,11 +69,7 @@ self.addEventListener('fetch', event => {
           caches.match(event.request)
             .then(cached => cached ||
               caches.match(BASE + '/index.html') ||
-              caches.match(BASE + '/') ||
-              new Response(
-                '<!DOCTYPE html><html><body style="font-family:sans-serif;padding:2rem"><h2>You are offline</h2></body></html>',
-                { headers: { 'Content-Type': 'text/html' } }
-              )
+              caches.match(BASE + '/')
             )
         )
     );

@@ -108,16 +108,12 @@ export default function App() {
   }, []);
 
   /* ── Service Worker ─────────────────────────────── */
+  // NOTE: We register the SW but do NOT listen for RELOAD_PAGE messages.
+  // The previous RELOAD_PAGE listener caused an infinite reload loop:
+  // SW activates → sends RELOAD_PAGE → page reloads → SW activates again → loop.
+  // The kill switch in index.html handles cache busting on version changes.
   useEffect(() => {
     if (!('serviceWorker' in navigator)) return;
-
-    // Listen for RELOAD_PAGE message from newly activated SW
-    // (new SW sends this to all open clients after taking over)
-    navigator.serviceWorker.addEventListener('message', (event) => {
-      if (event.data?.type === 'RELOAD_PAGE') {
-        window.location.reload();
-      }
-    });
 
     // Determine SW URL based on deployment environment
     const onGhPages = window.location.pathname.startsWith('/flo');
@@ -126,11 +122,11 @@ export default function App() {
 
     navigator.serviceWorker.register(swUrl, { scope: swScope })
       .then(reg => {
-        // If there is already a waiting SW, activate it now (no waiting for tab close)
+        // If there is already a waiting SW, activate it now
         if (reg.waiting) {
           reg.waiting.postMessage({ type: 'SKIP_WAITING' });
         }
-        // When a new SW is found, activate it immediately without waiting
+        // When a new SW is found, activate it immediately
         reg.addEventListener('updatefound', () => {
           const newSW = reg.installing;
           if (!newSW) return;
