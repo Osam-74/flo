@@ -17,15 +17,17 @@ export function AppHeader({ appMode, installReady, onLock, onInstall, onTab }: P
   return (
     <div style={{
       position: 'sticky', top: 0, zIndex: 100,
-      background: '#0D1120',
+      background: 'linear-gradient(180deg, #0A0F1F 0%, #0D1120 100%)',
       padding: '0 16px',
       height: 56,
       display: 'flex', alignItems: 'center', justifyContent: 'space-between',
       flexShrink: 0,
+      borderBottom: '1px solid rgba(255,255,255,0.06)',
+      boxShadow: '0 2px 12px rgba(0,0,0,0.25)',
     }}>
       {/* Brand */}
-      <div style={{ fontSize: '1.15rem', fontWeight: 800, letterSpacing: '-0.03em', color: '#fff' }}>
-        Flo<span style={{ color: '#00B4D8' }}>HQ</span>
+      <div style={{ fontSize: '1.2rem', fontWeight: 800, letterSpacing: '-0.03em', color: '#fff', textShadow: '0 1px 8px rgba(0,180,216,0.25)' }}>
+        Flo<span style={{ color: '#00D9F0' }}>HQ</span>
       </div>
 
       {/* Actions */}
@@ -74,10 +76,10 @@ export function AppHeader({ appMode, installReady, onLock, onInstall, onTab }: P
 }
 
 const iconBtn: React.CSSProperties = {
-  background: 'rgba(255,255,255,0.08)', border: 'none', borderRadius: 10,
+  background: 'rgba(255,255,255,0.08)', border: '1px solid rgba(255,255,255,0.06)', borderRadius: 10,
   width: 36, height: 36,
   display: 'flex', alignItems: 'center', justifyContent: 'center',
-  cursor: 'pointer',
+  cursor: 'pointer', transition: 'background 0.15s',
 };
 
 function headerBtn(color: string): React.CSSProperties {

@@ -394,13 +394,13 @@ export function BusinessSelector({
   const cardStyle: React.CSSProperties = { background: '#fff', borderRadius: 20, padding: 24, width: '100%', maxWidth: 340, boxShadow: '0 8px 40px rgba(0,0,0,0.2)', fontFamily: 'Plus Jakarta Sans, sans-serif' };
 
   return (
-    <div style={{ position: 'fixed', inset: 0, background: '#F0F2F7', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: 28, zIndex: 9999, userSelect: 'none', overflowY: 'auto' }}>
+    <div style={{ position: 'fixed', inset: 0, background: 'linear-gradient(180deg, #F2F4F9 0%, #E8ECF5 100%)', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: 28, zIndex: 9999, userSelect: 'none', overflowY: 'auto' }}>
       <style>{`@keyframes pulse{0%,100%{opacity:1}50%{opacity:0.4}} @keyframes shake{0%,100%{transform:translateX(0)}20%,60%{transform:translateX(-8px)}40%,80%{transform:translateX(8px)}} .admin-shake{animation:shake 0.45s ease}`}</style>
 
       {/* Logo */}
-      <div onClick={secretTap} style={{ width: 76, height: 76, borderRadius: 24, background: 'linear-gradient(145deg, #2A4FCF, #6B8FFF)', boxShadow: '0 8px 32px rgba(61,107,223,0.45)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '2.2rem', marginBottom: 20, cursor: 'pointer' }}>💰</div>
-      <div style={{ fontSize: '1.9rem', fontWeight: 800, letterSpacing: '-0.04em', marginBottom: 4, fontFamily: 'Plus Jakarta Sans, sans-serif' }}>Flo<span style={{ color: '#00B4D8' }}>HQ</span></div>
-      <div style={{ fontSize: '0.68rem', color: '#9A9FB8', letterSpacing: '0.16em', textTransform: 'uppercase', marginBottom: 36 }}>Farm Expense Tracker</div>
+      <div onClick={secretTap} style={{ width: 80, height: 80, borderRadius: 26, background: 'linear-gradient(145deg, #0D1B6E 0%, #2A4FCF 50%, #6B8FFF 100%)', boxShadow: '0 10px 40px rgba(13,27,110,0.4)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '2.4rem', marginBottom: 22, cursor: 'pointer' }}>💰</div>
+      <div style={{ fontSize: '2rem', fontWeight: 800, letterSpacing: '-0.04em', marginBottom: 4, fontFamily: 'Plus Jakarta Sans, sans-serif', color: '#0A0F1F' }}>Flo<span style={{ color: '#00D9F0' }}>HQ</span></div>
+      <div style={{ fontSize: '0.68rem', color: '#5A5F7A', fontWeight: 600, letterSpacing: '0.16em', textTransform: 'uppercase', marginBottom: 36 }}>Farm Expense Tracker</div>
 
       {/* ══ MASTER ADMIN VIEW ══ */}
       {isMasterAdmin ? (

@@ -111,15 +111,16 @@ export function Dashboard({ txs, people, currency, businessName, onPersonFilter,
     <div style={{ padding: '16px 16px 120px' }}>
       {/* Balance Card */}
       <div style={{
-        background: 'linear-gradient(135deg, #1A2FA8 0%, #3D6BDF 55%, #5580F0 100%)',
-        borderRadius: 22, padding: '22px 20px 20px',
+        background: 'linear-gradient(145deg, #0D1B6E 0%, #1A2FA8 35%, #2D52E0 70%, #4B7AF5 100%)',
+        borderRadius: 24, padding: '24px 22px 22px',
         marginBottom: 16,
-        boxShadow: '0 10px 40px rgba(61,107,223,0.38)',
+        boxShadow: '0 12px 48px rgba(13,27,110,0.45), 0 2px 8px rgba(26,47,168,0.25)',
         position: 'relative', overflow: 'hidden',
       }}>
-        {/* Decorative circles */}
-        <div style={{ position: 'absolute', top: -50, right: -50, width: 180, height: 180, borderRadius: '50%', background: 'rgba(255,255,255,0.06)', pointerEvents: 'none' }} />
-        <div style={{ position: 'absolute', bottom: -30, left: -20, width: 120, height: 120, borderRadius: '50%', background: 'rgba(255,255,255,0.04)', pointerEvents: 'none' }} />
+        {/* Decorative elements */}
+        <div style={{ position: 'absolute', top: -60, right: -60, width: 200, height: 200, borderRadius: '50%', background: 'rgba(255,255,255,0.07)', pointerEvents: 'none' }} />
+        <div style={{ position: 'absolute', bottom: -40, left: -30, width: 140, height: 140, borderRadius: '50%', background: 'rgba(255,255,255,0.05)', pointerEvents: 'none' }} />
+        <div style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, borderRadius: 24, border: '1px solid rgba(255,255,255,0.12)', pointerEvents: 'none' }} />
 
         {businessName && (
           <div style={{ fontSize: '0.95rem', fontWeight: 700, letterSpacing: '0.05em', color: 'rgba(255,255,255,0.75)', marginBottom: 4, display: 'flex', alignItems: 'center', gap: 5 }}>
@@ -155,34 +156,35 @@ export function Dashboard({ txs, people, currency, businessName, onPersonFilter,
         <div style={{
           fontFamily: "'DM Mono', monospace",
           fontSize: balFontSize,
-          fontWeight: 500,
+          fontWeight: 600,
           color: totalCashAvailable < 0 ? '#FFB3C0' : '#fff',
-          letterSpacing: '-0.02em', lineHeight: 1, marginBottom: 20,
+          letterSpacing: '-0.02em', lineHeight: 1.1, marginBottom: 22,
           position: 'relative', zIndex: 1,
           whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
           transition: 'font-size 0.2s ease',
+          textShadow: '0 2px 12px rgba(0,0,0,0.18)',
         }}>
           {hidden ? '••••••••' : balStr}
         </div>
 
         {/* Stats row */}
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 8, position: 'relative', zIndex: 1 }}>
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 10, position: 'relative', zIndex: 1 }}>
           {[
             { lbl: 'Total In',  val: hidden ? '••••' : fmtAmt(totalIn, ''),  col: '#A8C4FF', icon: <TrendingUp size={12} /> },
             { lbl: 'Total Out', val: hidden ? '••••' : fmtAmt(totalOut, ''), col: '#FFB3C0', icon: <TrendingDown size={12} /> },
             { lbl: 'Entries',   val: String(txs.length),                     col: '#B3D4FF', icon: <Hash size={12} /> },
           ].map(s => (
             <div key={s.lbl} style={{
-              background: 'rgba(255,255,255,0.12)',
-              backdropFilter: 'blur(8px)',
-              borderRadius: 12, padding: '10px 10px',
-              border: '1px solid rgba(255,255,255,0.1)',
+              background: 'rgba(255,255,255,0.14)',
+              backdropFilter: 'blur(10px)',
+              borderRadius: 14, padding: '12px 11px',
+              border: '1px solid rgba(255,255,255,0.15)',
             }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 4, marginBottom: 5, color: 'rgba(255,255,255,0.5)' }}>
                 {s.icon}
                 <span style={{ fontSize: '0.52rem', fontWeight: 700, letterSpacing: '0.1em', textTransform: 'uppercase' }}>{s.lbl}</span>
               </div>
-              <div style={{ fontFamily: "'DM Mono',monospace", fontSize: '0.75rem', fontWeight: 500, color: s.col }}>
+              <div style={{ fontFamily: "'DM Mono',monospace", fontSize: '0.78rem', fontWeight: 600, color: s.col }}>
                 {s.val}
               </div>
             </div>
@@ -208,12 +210,12 @@ export function Dashboard({ txs, people, currency, businessName, onPersonFilter,
 
       {/* Biz Account strip */}
       <div style={{
-        background: 'linear-gradient(135deg, #EEF2FF 0%, #DBEAFE 100%)',
-        borderRadius: 14, padding: '12px 16px',
+        background: 'linear-gradient(135deg, #EEF2FF 0%, #DBE5FF 100%)',
+        borderRadius: 16, padding: '14px 18px',
         marginBottom: 16,
-        boxShadow: '0 2px 8px rgba(61,107,223,0.10)',
+        boxShadow: '0 3px 12px rgba(26,47,168,0.12)',
         display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-        border: '1px solid rgba(61,107,223,0.18)',
+        border: '1px solid rgba(26,47,168,0.15)',
       }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
           <div style={{
@@ -285,8 +287,8 @@ export function Dashboard({ txs, people, currency, businessName, onPersonFilter,
                 key={p.id}
                 onClick={() => onPersonFilter(p.id)}
                 style={{
-                  background: '#fff', borderRadius: 16, padding: '16px 14px',
-                  boxShadow: '0 1px 3px rgba(0,0,0,0.07), 0 4px 16px rgba(0,0,0,0.04)',
+                  background: '#fff', borderRadius: 18, padding: '18px 15px',
+                  boxShadow: '0 2px 6px rgba(26,47,168,0.06), 0 6px 20px rgba(26,47,168,0.05)',
                   cursor: 'pointer', transition: 'transform 0.18s, box-shadow 0.18s',
                   border: '1.5px solid transparent',
                 }}
@@ -355,6 +357,6 @@ export function Dashboard({ txs, people, currency, businessName, onPersonFilter,
 }
 
 const sh: React.CSSProperties = {
-  fontSize: '0.62rem', fontWeight: 800, letterSpacing: '0.14em',
-  textTransform: 'uppercase', color: '#9A9FB8', marginBottom: 10, marginTop: 4,
+  fontSize: '0.64rem', fontWeight: 800, letterSpacing: '0.14em',
+  textTransform: 'uppercase', color: '#5A5F7A', marginBottom: 12, marginTop: 6,
 };

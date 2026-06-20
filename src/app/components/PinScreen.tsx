@@ -100,7 +100,7 @@ export function PinScreen({ onUnlock, onBack, businessName, masterHash, viewHash
 
   return (
     <div style={{
-      position: 'fixed', inset: 0, background: '#F0F2F7',
+      position: 'fixed', inset: 0, background: 'linear-gradient(180deg, #F2F4F9 0%, #E8ECF5 100%)',
       display: 'flex', flexDirection: 'column', alignItems: 'center',
       justifyContent: 'center', padding: 28, zIndex: 9999, userSelect: 'none',
     }}>
@@ -133,7 +133,7 @@ export function PinScreen({ onUnlock, onBack, businessName, masterHash, viewHash
       {/* Logo */}
       <div style={{
         width: 76, height: 76, borderRadius: 24,
-        background: 'linear-gradient(145deg, #2A4FCF, #6B8FFF)',
+        background: 'linear-gradient(145deg, #0D1B6E 0%, #2A4FCF 50%, #6B8FFF 100%)',
         boxShadow: '0 8px 32px rgba(61,107,223,0.45)',
         display: 'flex', alignItems: 'center', justifyContent: 'center',
         fontSize: '2.2rem', marginBottom: 20,
