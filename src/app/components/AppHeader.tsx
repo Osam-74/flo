@@ -1,5 +1,5 @@
-import React from 'react';
-import { Lock, Printer, Settings, Download } from 'lucide-react';
+import React, { useState } from 'react';
+import { Lock, Printer, Settings, Download, X } from 'lucide-react';
 import type { Tab, AppMode } from '../types';
 
 interface Props {
@@ -13,6 +13,16 @@ interface Props {
 
 export function AppHeader({ appMode, installReady, onLock, onInstall, onTab }: Props) {
   const isReadOnly = appMode === 'view';
+  const isStandalone = !!(window.__pwaIsStandalone);
+  const [showHelp, setShowHelp] = useState(false);
+
+  const handleInstallClick = () => {
+    if (installReady) {
+      onInstall();
+    } else {
+      setShowHelp(true);
+    }
+  };
 
   return (
     <div style={{
@@ -32,8 +42,8 @@ export function AppHeader({ appMode, installReady, onLock, onInstall, onTab }: P
 
       {/* Actions */}
       <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
-        {installReady && (
-          <button onClick={onInstall} style={headerBtn('#00A8A0')}>
+        {!isStandalone && (
+          <button onClick={handleInstallClick} style={headerBtn('#00A8A0')}>
             <Download size={14} strokeWidth={2.5} />
             <span style={{ fontSize: '0.65rem', fontWeight: 700, letterSpacing: '0.04em' }}>Install</span>
           </button>
@@ -71,6 +81,74 @@ export function AppHeader({ appMode, installReady, onLock, onInstall, onTab }: P
           <Lock size={18} strokeWidth={2} color="#C8CDE8" />
         </button>
       </div>
+
+      {/* Manual install instructions modal */}
+      {showHelp && (
+        <div
+          onClick={() => setShowHelp(false)}
+          style={{
+            position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            zIndex: 10001, padding: 24,
+          }}
+        >
+          <div
+            onClick={e => e.stopPropagation()}
+            style={{
+              background: '#fff', borderRadius: 20, padding: 28,
+              maxWidth: 340, width: '100%',
+              boxShadow: '0 20px 60px rgba(0,0,0,0.3)',
+              fontFamily: "'Plus Jakarta Sans', sans-serif",
+              position: 'relative',
+            }}
+          >
+            <button
+              onClick={() => setShowHelp(false)}
+              style={{
+                position: 'absolute', top: 12, right: 12,
+                background: 'rgba(0,0,0,0.06)', border: 'none', borderRadius: 8,
+                width: 30, height: 30, cursor: 'pointer',
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+              }}
+            >
+              <X size={16} color="#5A5F7A" />
+            </button>
+            <div style={{ fontSize: '1.3rem', fontWeight: 800, marginBottom: 16, color: '#0A0F1F' }}>
+              📲 Install FloHQ
+            </div>
+            <div style={{ fontSize: '0.82rem', color: '#5A5F7A', lineHeight: 1.6, marginBottom: 20 }}>
+              To install FloHQ as an app on your phone:
+            </div>
+            <div style={{ fontSize: '0.8rem', color: '#1A1D2E', lineHeight: 1.8, marginBottom: 8 }}>
+              <strong>Chrome (Android):</strong>
+              <div style={{ color: '#5A5F7A', marginTop: 4 }}>
+                1. Tap the three-dot menu (⋮) in Chrome<br/>
+                2. Select <strong>"Install app"</strong> or <strong>"Add to Home screen"</strong><br/>
+                3. Confirm installation
+              </div>
+            </div>
+            <div style={{ fontSize: '0.8rem', color: '#1A1D2E', lineHeight: 1.8, marginBottom: 20, marginTop: 12 }}>
+              <strong>Safari (iPhone):</strong>
+              <div style={{ color: '#5A5F7A', marginTop: 4 }}>
+                1. Tap the Share button (□↑)<br/>
+                2. Scroll down and tap <strong>"Add to Home Screen"</strong><br/>
+                3. Tap <strong>"Add"</strong>
+              </div>
+            </div>
+            <button
+              onClick={() => setShowHelp(false)}
+              style={{
+                width: '100%', background: 'linear-gradient(135deg, #1A2FA8, #3D6BDF)',
+                color: '#fff', border: 'none', borderRadius: 12,
+                padding: '12px', fontSize: '0.85rem', fontWeight: 700,
+                cursor: 'pointer', fontFamily: "'Plus Jakarta Sans', sans-serif",
+              }}
+            >
+              Got it
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

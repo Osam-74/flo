@@ -12,21 +12,28 @@ declare global {
   interface Window {
     __pwaInstallPrompt?: any;
     __pwaInstallReady?: boolean;
+    __pwaIsStandalone?: boolean;
   }
 }
 
 window.__pwaInstallReady = false;
+// Detect if already running as installed PWA
+window.__pwaIsStandalone = window.matchMedia('(display-mode: standalone)').matches
+  || (window.navigator as any).standalone === true;
 window.addEventListener('beforeinstallprompt', (e: any) => {
   e.preventDefault();
   window.__pwaInstallPrompt = e;
   window.__pwaInstallReady = true;
   // Notify any already-mounted React listeners
   window.dispatchEvent(new Event('pwa-install-ready'));
-}, { once: true });
+});
 
 window.addEventListener('appinstalled', () => {
   window.__pwaInstallPrompt = undefined;
   window.__pwaInstallReady = false;
+// Detect if already running as installed PWA
+window.__pwaIsStandalone = window.matchMedia('(display-mode: standalone)').matches
+  || (window.navigator as any).standalone === true;
   window.dispatchEvent(new Event('pwa-install-done'));
 });
 

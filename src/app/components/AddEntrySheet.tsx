@@ -407,6 +407,7 @@ export function AddEntrySheet({ open, onClose, people, currency, onSave, initial
                     type="number" placeholder="0.00" min="0" step="0.01"
                     value={tfAmt} onChange={e => setTfAmt(e.target.value)} />
                 </Field>
+                <div style={{ height: 6 }} />
                 <Row>
                   <Field label="Sent By *">
                     <Select value={tfFrom} onChange={setTfFrom}>
@@ -428,6 +429,7 @@ export function AddEntrySheet({ open, onClose, people, currency, onSave, initial
                       value={tfRef} onChange={e => setTfRef(e.target.value)} />
                   </Field>
                 </Row>
+                <div style={{ height: 4 }} />
               </div>
             )}
 
@@ -514,6 +516,7 @@ export function AddEntrySheet({ open, onClose, people, currency, onSave, initial
                     type="number" placeholder="0.00" min="0" step="0.01"
                     value={ofAmt} onChange={e => setOfAmt(e.target.value)} />
                 </Field>
+                <div style={{ height: 6 }} />
                 <Row>
                   <Field label="Date *">
                     <input style={inp} type="date" value={ofDate} max={today()} onChange={e => setOfDate(e.target.value)} />
@@ -535,6 +538,7 @@ export function AddEntrySheet({ open, onClose, people, currency, onSave, initial
                     </Select>
                   </Field>
                 </Row>
+                <div style={{ height: 4 }} />
               </div>
             )}
 
@@ -547,6 +551,7 @@ export function AddEntrySheet({ open, onClose, people, currency, onSave, initial
                     type="number" placeholder="0.00" min="0" step="0.01"
                     value={frAmt} onChange={e => setFrAmt(e.target.value)} />
                 </Field>
+                <div style={{ height: 6 }} />
                 <Row>
                   <Field label="Date *">
                     <input style={inp} type="date" value={frDate} max={today()} onChange={e => setFrDate(e.target.value)} />
@@ -568,6 +573,7 @@ export function AddEntrySheet({ open, onClose, people, currency, onSave, initial
                     </Select>
                   </Field>
                 </Row>
+                <div style={{ height: 4 }} />
               </div>
             )}
 
@@ -620,7 +626,7 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
 }
 
 function Row({ children }: { children: React.ReactNode }) {
-  return <div style={{ display: 'flex', gap: 10, marginBottom: 10, flexWrap: 'wrap' }}>{children}</div>;
+  return <div style={{ display: 'flex', gap: 12, marginBottom: 14, flexWrap: 'wrap' }}>{children}</div>;
 }
 
 function Select({ value, onChange, children }: { value: string; onChange: (v: string) => void; children: React.ReactNode }) {

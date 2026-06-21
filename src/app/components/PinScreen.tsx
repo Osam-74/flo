@@ -19,6 +19,8 @@ export function PinScreen({ onUnlock, onBack, businessName, masterHash, viewHash
   const [errMsg, setErrMsg] = useState('');
   const [lastPress, setLastPress] = useState(0);
   const [installReady, setInstallReady] = useState(!!(window.__pwaInstallReady && window.__pwaInstallPrompt));
+  const [showInstallHelp, setShowInstallHelp] = useState(false);
+  const isStandalone = !!(window.__pwaIsStandalone);
 
   /* ── Listen for install prompt ── */
   useEffect(() => {
@@ -34,7 +36,11 @@ export function PinScreen({ onUnlock, onBack, businessName, masterHash, viewHash
 
   const handleInstall = async () => {
     const p = window.__pwaInstallPrompt;
-    if (!p) { return; }
+    if (!p) {
+      // No beforeinstallprompt event — show manual instructions
+      setShowInstallHelp(true);
+      return;
+    }
     try {
       p.prompt();
       const choice = await p.userChoice;
@@ -46,7 +52,10 @@ export function PinScreen({ onUnlock, onBack, businessName, masterHash, viewHash
       } else {
         showToast('Installation cancelled', 'info');
       }
-    } catch (e) { console.warn('[Install]', e); }
+    } catch (e) {
+      console.warn('[Install]', e);
+      setShowInstallHelp(true);
+    }
   };
 
   const checkPin = useCallback(async (pin: string) => {
@@ -169,8 +178,8 @@ export function PinScreen({ onUnlock, onBack, businessName, masterHash, viewHash
         })}
       </div>
 
-      {/* Install App button — shown only when PWA install is available */}
-      {installReady && (
+      {/* Install App button — always visible when not running as installed PWA */}
+      {!isStandalone && (
         <button
           onClick={handleInstall}
           style={{
@@ -186,6 +195,62 @@ export function PinScreen({ onUnlock, onBack, businessName, masterHash, viewHash
           <Download size={15} strokeWidth={2.5} />
           Install App
         </button>
+      )}
+
+      {/* Manual install instructions modal */}
+      {showInstallHelp && (
+        <div
+          onClick={() => setShowInstallHelp(false)}
+          style={{
+            position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            zIndex: 10001, padding: 24,
+          }}
+        >
+          <div
+            onClick={e => e.stopPropagation()}
+            style={{
+              background: '#fff', borderRadius: 20, padding: 28,
+              maxWidth: 340, width: '100%',
+              boxShadow: '0 20px 60px rgba(0,0,0,0.3)',
+              fontFamily: 'Plus Jakarta Sans, sans-serif',
+            }}
+          >
+            <div style={{ fontSize: '1.3rem', fontWeight: 800, marginBottom: 16, color: '#0A0F1F' }}>
+              📲 Install FloHQ
+            </div>
+            <div style={{ fontSize: '0.82rem', color: '#5A5F7A', lineHeight: 1.6, marginBottom: 20 }}>
+              To install FloHQ as an app on your phone:
+            </div>
+            <div style={{ fontSize: '0.8rem', color: '#1A1D2E', lineHeight: 1.8, marginBottom: 8 }}>
+              <strong>Chrome (Android):</strong>
+              <div style={{ color: '#5A5F7A', marginTop: 4 }}>
+                1. Tap the three-dot menu (⋮) in Chrome<br/>
+                2. Select <strong>"Install app"</strong> or <strong>"Add to Home screen"</strong><br/>
+                3. Confirm installation
+              </div>
+            </div>
+            <div style={{ fontSize: '0.8rem', color: '#1A1D2E', lineHeight: 1.8, marginBottom: 20, marginTop: 12 }}>
+              <strong>Safari (iPhone):</strong>
+              <div style={{ color: '#5A5F7A', marginTop: 4 }}>
+                1. Tap the Share button (□↑)<br/>
+                2. Scroll down and tap <strong>"Add to Home Screen"</strong><br/>
+                3. Tap <strong>"Add"</strong>
+              </div>
+            </div>
+            <button
+              onClick={() => setShowInstallHelp(false)}
+              style={{
+                width: '100%', background: 'linear-gradient(135deg, #1A2FA8, #3D6BDF)',
+                color: '#fff', border: 'none', borderRadius: 12,
+                padding: '12px', fontSize: '0.85rem', fontWeight: 700,
+                cursor: 'pointer', fontFamily: 'Plus Jakarta Sans, sans-serif',
+              }}
+            >
+              Got it
+            </button>
+          </div>
+        </div>
       )}
 
       {/* Number pad */}

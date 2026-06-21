@@ -110,10 +110,6 @@ export function PeopleTab({ people, txs, currency, isReadOnly, onAdd, onDelete }
               </Field>
             </div>
 
-            <div style={{ background: '#F5F7FF', borderRadius: 10, padding: '10px 13px', fontSize: '0.72rem', color: '#5A5F7A', lineHeight: 1.6, marginBottom: 12 }}>
-              💡 Role <strong>"Owner"</strong> → appears only in Fund Injection & Fund Return fields.
-            </div>
-
             <div style={{ display: 'flex', gap: 8, marginBottom: 14, alignItems: 'center' }}>
               <span style={{ fontSize: '0.6rem', fontWeight: 700, color: '#9A9FB8', letterSpacing: '0.1em', textTransform: 'uppercase' }}>Colour:</span>
               {COLOR_OPTS.map(col => {

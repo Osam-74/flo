@@ -27,7 +27,7 @@
     <script>
       (function() {
         if (!('serviceWorker' in navigator)) return;
-        var CLEAN_KEY = 'flo-sw-v11';
+        var CLEAN_KEY = 'flo-sw-v12';
         if (localStorage.getItem(CLEAN_KEY)) {
           // Already cleaned for this version — just clear any non-v10 caches
           if ('caches' in window) {
