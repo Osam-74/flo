@@ -4,7 +4,6 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
     <!-- Manifest uses relative path so it works on both Vercel (/) and GitHub Pages (/flo/) -->
-    <link rel="manifest" href="./manifest.json" />
     <link rel="icon" href="./icons/icon-192.png" type="image/png" />
     <link rel="apple-touch-icon" href="./icons/apple-touch-icon.png" />
     <meta name="theme-color" content="#1A2FA8" />
@@ -22,17 +21,30 @@
       #root { height: 100%; }
     </style>
   
+    <!-- Dynamic manifest link — bypasses Vite asset hashing -->
+    <script>
+      (function() {
+        var basePath = window.location.pathname;
+        // GitHub Pages: /flo/ → base = /flo/; Vercel: / → base = /
+        var base = basePath.startsWith('/flo') ? '/flo/' : '/';
+        var link = document.createElement('link');
+        link.rel = 'manifest';
+        link.href = base + 'manifest.json';
+        document.head.appendChild(link);
+      })();
+    </script>
+
     <!-- SW Kill Switch v10: force-unregister ALL service workers + clear ALL caches -->
     <!-- This is the ONLY reliable way to break out of a stale SW loop on mobile PWAs -->
     <script>
       (function() {
         if (!('serviceWorker' in navigator)) return;
-        var CLEAN_KEY = 'flo-sw-v12';
+        var CLEAN_KEY = 'flo-sw-v13';
         if (localStorage.getItem(CLEAN_KEY)) {
           // Already cleaned for this version — just clear any non-v10 caches
           if ('caches' in window) {
             caches.keys().then(function(keys) {
-              keys.forEach(function(k) { if (k !== 'flohq-v10') caches.delete(k); });
+              keys.forEach(function(k) { if (k !== 'flohq-v13') caches.delete(k); });
             });
           }
           return;

@@ -35,27 +35,27 @@ export function PinScreen({ onUnlock, onBack, businessName, masterHash, viewHash
   }, []);
 
   const handleInstall = async () => {
+    // Try to use the captured beforeinstallprompt event
     const p = window.__pwaInstallPrompt;
-    if (!p) {
-      // No beforeinstallprompt event — show manual instructions
-      setShowInstallHelp(true);
-      return;
-    }
-    try {
-      p.prompt();
-      const choice = await p.userChoice;
-      if (choice?.outcome === 'accepted') {
-        window.__pwaInstallPrompt = undefined;
-        window.__pwaInstallReady = false;
-        setInstallReady(false);
-        showToast('✅ FloHQ installed!', 'success');
-      } else {
-        showToast('Installation cancelled', 'info');
+    if (p) {
+      try {
+        p.prompt();
+        const choice = await p.userChoice;
+        if (choice?.outcome === 'accepted') {
+          window.__pwaInstallPrompt = undefined;
+          window.__pwaInstallReady = false;
+          setInstallReady(false);
+          showToast('✅ FloHQ installed!', 'success');
+        } else {
+          showToast('Installation cancelled', 'info');
+        }
+        return;
+      } catch (e) {
+        console.warn('[Install] prompt failed:', e);
       }
-    } catch (e) {
-      console.warn('[Install]', e);
-      setShowInstallHelp(true);
     }
+    // If no prompt available, show instructions as last resort
+    setShowInstallHelp(true);
   };
 
   const checkPin = useCallback(async (pin: string) => {
