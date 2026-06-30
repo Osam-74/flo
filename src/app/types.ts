@@ -40,6 +40,7 @@ export interface Transaction {
   desc: string;
   cat?: string;
   note?: string;
+  crates?: number;
   source?: string;
   buyer?: string;
   transferFrom?: string;

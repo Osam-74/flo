@@ -72,6 +72,8 @@ export function AddEntrySheet({ open, onClose, people, currency, onSave, initial
   const [frSender, setFrSender] = useState('');
   const [frReceiver, setFrReceiver] = useState('');
   const [salPaidBy, setSalPaidBy] = useState('');
+  const [crates, setCrates]         = useState('');
+  const [crCrates, setCrCrates]     = useState('');
 
   // ── Swipe gesture state ──────────────────────────────────────────────────
   const swipeStartX = useRef<number | null>(null);
@@ -139,6 +141,7 @@ export function AddEntrySheet({ open, onClose, people, currency, onSave, initial
   useEffect(() => {
     const t = today();
     setDate(t); setTfDate(t); setCrDate(t); setOfDate(t); setFrDate(t);
+    setCrates(''); setCrCrates('');
     const no = nonOwners(people);
     const hu = humans(people);
     if (no.length > 0) {
@@ -182,7 +185,8 @@ export function AddEntrySheet({ open, onClose, people, currency, onSave, initial
         if (!receiver) { showToast('Select who received the money', 'error'); return; }
         const sellerName = people.find(p => p.id === person)?.name || '';
         const desc = `Sale${buyer ? ' — to ' + buyer : ''}${sellerName ? ' by ' + sellerName : ''}${cat ? ' — ' + cat : ''}`;
-        onSave(stripUndefined({ id, ts, type, amount: amt, person: receiver, seller: person, sellerName, date, cat, note, source, buyer: buyer || undefined, receiver: receiver || undefined, desc }));
+        const cratesNum = parseFloat(crates) || undefined;
+        onSave(stripUndefined({ id, ts, type, amount: amt, person: receiver, seller: person, sellerName, date, cat, note, source, buyer: buyer || undefined, receiver: receiver || undefined, crates: cratesNum, desc }));
       } else {
         if (!person) { showToast('Select a person', 'error'); return; }
         const pn = people.find(p => p.id === person)?.name || '';
@@ -220,7 +224,8 @@ export function AddEntrySheet({ open, onClose, people, currency, onSave, initial
       const desc = isPickup
         ? `Egg Pickup Scheduled — ${crBuyer} on ${crDate}`
         : `Credit sale — ${crBuyer}`;
-      onSave(stripUndefined({ id, ts, type, amount: paid, creditTotal: total, creditPaid: paid, creditBuyer: crBuyer, creditSeller: crSeller, creditReceiver: receiver, person: crSeller, date: crDate, cat: crCat, note: crNote, source: crSource, desc, isPickup, payments: paid > 0 ? [{ amount: paid, receiver, date: crDate, note: 'Initial payment' }] : [] }));
+      const crCratesNum = parseFloat(crCrates) || undefined;
+      onSave(stripUndefined({ id, ts, type, amount: paid, creditTotal: total, creditPaid: paid, creditBuyer: crBuyer, creditSeller: crSeller, creditReceiver: receiver, person: crSeller, date: crDate, cat: crCat, note: crNote, source: crSource, crates: crCratesNum, desc, isPickup, payments: paid > 0 ? [{ amount: paid, receiver, date: crDate, note: 'Initial payment' }] : [] }));
     }
     if (type === 'owner-fund') {
       const amt = parseFloat(ofAmt) || 0;
@@ -388,6 +393,13 @@ export function AddEntrySheet({ open, onClose, people, currency, onSave, initial
                       value={note} onChange={e => setNote(e.target.value)} />
                   </Field>
                 </Row>
+                {type === 'income' && (
+                  <Field label="Crates">
+                    <input style={inp} type="number" placeholder="Please enter the number of crates"
+                      min="0" step="1"
+                      value={crates} onChange={e => setCrates(e.target.value)} />
+                  </Field>
+                )}
                 {type === 'salary' && (
                   <Field label="Paid By (Deducted from) *">
                     <Select value={salPaidBy} onChange={setSalPaidBy}>
@@ -504,6 +516,11 @@ export function AddEntrySheet({ open, onClose, people, currency, onSave, initial
                       value={crNote} onChange={e => setCrNote(e.target.value)} />
                   </Field>
                 </Row>
+                <Field label="Crates">
+                  <input style={inp} type="number" placeholder="Please enter the number of crates"
+                    min="0" step="1"
+                    value={crCrates} onChange={e => setCrCrates(e.target.value)} />
+                </Field>
               </div>
             )}
 
