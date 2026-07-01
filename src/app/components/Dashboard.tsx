@@ -22,23 +22,26 @@ function haptic() {
 }
 
 const PALETTE = [
-  { grad: 'linear-gradient(148deg,#0D1B6E 0%,#1A2FA8 50%,#3D6BDF 100%)', glow: 'rgba(26,47,168,0.55)' },
-  { grad: 'linear-gradient(148deg,#0A3D62 0%,#0E5FA3 50%,#1B87D6 100%)', glow: 'rgba(14,95,163,0.5)'  },
-  { grad: 'linear-gradient(148deg,#2D0080 0%,#5E2BFF 50%,#9D6FFF 100%)', glow: 'rgba(94,43,255,0.5)'  },
-  { grad: 'linear-gradient(148deg,#003049 0%,#006494 50%,#00A8CC 100%)', glow: 'rgba(0,100,148,0.5)'  },
-  { grad: 'linear-gradient(148deg,#0B3D2E 0%,#1B6B47 50%,#2DB37D 100%)', glow: 'rgba(27,107,71,0.5)'  },
-  { grad: 'linear-gradient(148deg,#4A1040 0%,#7B1FA2 50%,#BA68C8 100%)', glow: 'rgba(123,31,162,0.5)' },
+  { grad: 'linear-gradient(148deg,#0D1B6E 0%,#1A2FA8 50%,#3D6BDF 100%)', glow: 'rgba(26,47,168,0.5)' },
+  { grad: 'linear-gradient(148deg,#0A3D62 0%,#0E5FA3 50%,#1B87D6 100%)', glow: 'rgba(14,95,163,0.45)' },
+  { grad: 'linear-gradient(148deg,#2D0080 0%,#5E2BFF 50%,#9D6FFF 100%)', glow: 'rgba(94,43,255,0.45)' },
+  { grad: 'linear-gradient(148deg,#003049 0%,#006494 50%,#00A8CC 100%)', glow: 'rgba(0,100,148,0.45)' },
+  { grad: 'linear-gradient(148deg,#0B3D2E 0%,#1B6B47 50%,#2DB37D 100%)', glow: 'rgba(27,107,71,0.45)' },
+  { grad: 'linear-gradient(148deg,#4A1040 0%,#7B1FA2 50%,#BA68C8 100%)', glow: 'rgba(123,31,162,0.45)' },
 ];
 
-const CSS = `
-  @keyframes reorder-blink { 0%,100%{opacity:1}50%{opacity:0.35} }
-  .card-wrap { will-change: transform, opacity; }
-`;
+const CSS = `@keyframes reorder-blink { 0%,100%{opacity:1}50%{opacity:0.35} }`;
 
-// PEEK_H: how many px of each background card shows above the front card
-const PEEK_H    = 36;   // height of the peeking name tab
-const PEEK_STEP = 30;   // vertical gap between each peeking tab
-const CARD_H    = 200;  // height of the fully visible front card body
+// ── Deck geometry ──────────────────────────────────────────────────────────
+// Every card — front AND background — has the EXACT same rectangle: same
+// width (full, no horizontal inset), same height, same border-radius.
+// Background cards are positioned higher up (smaller `top`) so a STEP-px
+// band of their header peeks out above the card in front of them. The rest
+// of their body sits physically behind the cards drawn on top of them
+// (higher z-index) — nothing is scaled or squeezed, they're identical cards
+// resting in a fanned deck.
+const CARD_H = 226; // fixed full height for every card in the stack
+const STEP   = 42;  // peek band height revealed per layer
 
 export function Dashboard({
   txs, people, currency, businessName,
@@ -46,13 +49,12 @@ export function Dashboard({
   balanceHidden, onToggleHidden,
 }: Props) {
   const hidden = balanceHidden;
-  const [detailTx,    setDetailTx]    = useState<Transaction | null>(null);
-  const [order,       setOrder]       = useState<number[]>([]); // order[0] = front card index
-  const [animating,   setAnimating]   = useState(false);
+  const [detailTx,  setDetailTx]  = useState<Transaction | null>(null);
+  const [order,     setOrder]     = useState<number[]>([]);
+  const [animating, setAnimating] = useState(false);
   const [trayVisible, setTrayVisible] = useState(true);
   const initialized = useRef(false);
 
-  // ── Totals ───────────────────────────────────────────────────────────────
   let totalIn = 0, totalOut = 0, ownerIn = 0, ownerOut = 0;
   for (const t of txs) {
     if      (t.type === 'income')                          { totalIn  += t.amount; }
@@ -63,7 +65,6 @@ export function Dashboard({
   }
   const netOwner = ownerIn - ownerOut;
 
-  // ── Biz balance ──────────────────────────────────────────────────────────
   let bizBalance = 0;
   for (const t of txs) {
     if (t.type === 'transfer') {
@@ -95,7 +96,6 @@ export function Dashboard({
     return sum;
   })();
 
-  // ── Tray inventory ────────────────────────────────────────────────────────
   const trayInventory = (() => {
     let stock = 0, eggs = 0, hasTrayData = false;
     for (const t of txs) {
@@ -125,7 +125,7 @@ export function Dashboard({
       pal:     PALETTE[0],
       body: () => (
         <>
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 8, marginTop: 18 }}>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 8, marginTop: 16 }}>
             {[
               { lbl: 'Total In',  val: hidden ? '••••' : fmtAmt(totalIn,  ''), col: '#A8C8FF' },
               { lbl: 'Total Out', val: hidden ? '••••' : fmtAmt(totalOut, ''), col: '#FFB3C0' },
@@ -138,7 +138,7 @@ export function Dashboard({
             ))}
           </div>
           {netOwner > 0.005 && (
-            <div style={{ marginTop: 9, background: 'rgba(255,255,255,0.07)', borderRadius: 9, padding: '6px 12px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <div style={{ marginTop: 8, background: 'rgba(255,255,255,0.07)', borderRadius: 9, padding: '6px 12px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
               <span style={{ fontSize: '0.48rem', fontWeight: 700, letterSpacing: '0.1em', textTransform: 'uppercase', color: 'rgba(255,255,255,0.45)' }}>Fund Injection</span>
               <span style={{ fontFamily: "'DM Mono',monospace", fontSize: '0.7rem', fontWeight: 600, color: '#FFD080' }}>{hidden ? '••••' : fmtAmt(netOwner, currency)}</span>
             </div>
@@ -146,7 +146,7 @@ export function Dashboard({
         </>
       ),
     },
-    { label: 'Biz Saving', sub: 'Internal funds', balance: bizBalance, pal: PALETTE[1], body: () => null },
+    { label: 'Biz Saving', sub: 'Internal funds held', balance: bizBalance, pal: PALETTE[1], body: () => null },
     ...members.map((p, i) => {
       const { pIn, pOut, pBal } = pStats(p.id, txs);
       return {
@@ -168,7 +168,6 @@ export function Dashboard({
     }),
   ];
 
-  // Initialise order on first render / card count change
   useEffect(() => {
     if (!initialized.current || order.length !== cards.length) {
       setOrder(cards.map((_, i) => i));
@@ -176,33 +175,22 @@ export function Dashboard({
     }
   }, [cards.length]);
 
-  if (order.length !== cards.length) return null; // not ready yet
+  if (order.length !== cards.length) return null;
 
-  // order[0] = front card, order[1] = first card behind, etc.
   const N = cards.length;
 
   function bringToFront(cardIdx: number) {
-    if (animating) return;
-    if (order[0] === cardIdx) return;
+    if (animating || order[0] === cardIdx) return;
     haptic();
     setAnimating(true);
-    // rotate order so cardIdx is first
     const pos = order.indexOf(cardIdx);
-    const newOrder = [...order.slice(pos), ...order.slice(0, pos)];
-    setOrder(newOrder);
+    setOrder([...order.slice(pos), ...order.slice(0, pos)]);
     setTimeout(() => setAnimating(false), 480);
   }
 
-  // Each card in the stack:
-  //   - position: absolute, all cards anchored at the same top
-  //   - front (order[0]): full card visible, z-index = N, no offset
-  //   - behind cards: offset upward and slightly right so name peeks
-  //     above the front card's top edge; z-index descends
-  //   - Container height = PEEK_H * (N-1) peeks + CARD_H front card
-
-  const containerH = PEEK_H + (N - 1) * PEEK_STEP + CARD_H;
-  // Front card top = total peek area above it
-  const frontTop = (N - 1) * PEEK_STEP;
+  // Container needs room for the front card (bottom-most box) plus the
+  // peek bands of every card stacked above it.
+  const containerH = (N - 1) * STEP + CARD_H;
 
   const recent = [...txs].sort((a, b) => (b.ts || 0) - (a.ts || 0)).slice(0, 5);
   const todayStr = new Date().toISOString().split('T')[0];
@@ -242,40 +230,22 @@ export function Dashboard({
       )}
 
       {/* ══════════════════════════════════════════
-          TRUE STACKED DECK
-          All cards sit inside one relative container.
-          They are all absolutely positioned at the same
-          left/right edges. The front card sits lower (at
-          frontTop px from top). Background cards sit higher
-          in the container, peeking out above the front card.
-          Each background card is offset slightly to the right
-          and shows only its name tab at the top.
+          FANNED CARD DECK — every card is an identical,
+          full-width, full-height rectangle. Background
+          cards sit at a smaller `top` so a STEP-px band
+          of their header peeks above the card in front of
+          them. Everything below that band is physically
+          covered by the cards with higher z-index drawn
+          over it — nothing is scaled, squeezed or inset.
       ══════════════════════════════════════════ */}
       <div style={{ position: 'relative', height: containerH, marginBottom: 24 }}>
         {order.map((cardIdx, stackPos) => {
           const card    = cards[cardIdx];
           const isFront = stackPos === 0;
-          // stackPos 0 = front, 1 = first behind, 2 = second behind …
-          const depth   = stackPos; // 0 = front
-
-          // Background cards peek above the front card
-          // stackPos 1 is closest behind → sits just above front top
-          // stackPos 2 is further behind → peeking above stackPos 1, etc.
-          // We invert: deepest card at top of peek stack (smallest top value)
-          const peekFromTop = isFront
-            ? frontTop                          // front card anchored at frontTop
-            : (N - 1 - stackPos) * PEEK_STEP;   // background cards peek above
-
-          // Horizontal offset: background cards shift right so peek tabs are visible
-          const leftOff  = isFront ? 0 : (N - 1 - stackPos) * 10;
-          const rightOff = 0;
-
-          // Scale & opacity for depth
-          const scale   = isFront ? 1 : 1 - depth * 0.025;
-          const opacity = isFront ? 1 : 1 - depth * 0.15;
-
-          // z-index: front on top, deeper cards further back
-          const zIdx = N - depth;
+          const top     = (N - 1 - stackPos) * STEP;
+          const zIdx    = N - stackPos;
+          const opacity = isFront ? 1 : Math.max(1 - stackPos * 0.13, 0.5);
+          const blurPx  = isFront ? 0 : Math.min(3 + stackPos * 2, 10);
 
           const balStr      = fmtAmt(Math.abs(card.balance), currency);
           const balFontSize = balStr.length > 16 ? '1.3rem' : balStr.length > 11 ? '1.7rem' : '2rem';
@@ -283,47 +253,44 @@ export function Dashboard({
           return (
             <div
               key={cardIdx}
-              className="card-wrap"
+              onClick={() => { if (!isFront) bringToFront(cardIdx); }}
               style={{
-                position:   'absolute',
-                top:        peekFromTop,
-                left:       leftOff,
-                right:      rightOff,
-                zIndex:     zIdx,
-                borderRadius: 22,
-                overflow:   'hidden',
-                cursor:     isFront ? 'default' : 'pointer',
+                position: 'absolute',
+                left: 0, right: 0, top,
+                height: CARD_H,
+                zIndex: zIdx,
+                borderRadius: 24,
+                overflow: 'hidden',
+                cursor: isFront ? 'default' : 'pointer',
                 userSelect: 'none',
                 background: card.pal.grad,
                 opacity,
-                transform:  `scale(${scale})`,
-                transformOrigin: 'top center',
-                backdropFilter:       isFront ? 'none' : 'blur(6px)',
-                WebkitBackdropFilter: isFront ? 'none' : 'blur(6px)',
+                backdropFilter:       isFront ? 'none' : `blur(${blurPx}px)`,
+                WebkitBackdropFilter: isFront ? 'none' : `blur(${blurPx}px)`,
                 boxShadow: isFront
                   ? `0 20px 60px ${card.pal.glow}, 0 4px 20px rgba(0,0,0,0.25), inset 0 1px 0 rgba(255,255,255,0.15)`
-                  : `0 4px 16px rgba(0,0,0,0.2), inset 0 1px 0 rgba(255,255,255,0.08)`,
-                transition: 'top 0.46s cubic-bezier(0.34,1.26,0.64,1), left 0.4s ease, opacity 0.4s ease, box-shadow 0.4s ease, transform 0.4s ease',
+                  : `0 6px 20px rgba(0,0,0,0.18), inset 0 1px 0 rgba(255,255,255,0.08)`,
+                transition: 'top 0.48s cubic-bezier(0.34,1.25,0.64,1), opacity 0.4s ease, box-shadow 0.4s ease',
               }}
-              onClick={() => { if (!isFront) bringToFront(cardIdx); }}
             >
-              {/* Orb decorations — front only */}
+              {/* Orb decorations — front card only */}
               {isFront && (
                 <>
                   <div style={{ position: 'absolute', top: -55, right: -55, width: 180, height: 180, borderRadius: '50%', background: 'rgba(255,255,255,0.07)', pointerEvents: 'none' }} />
                   <div style={{ position: 'absolute', bottom: -35, left: -25, width: 130, height: 130, borderRadius: '50%', background: 'rgba(255,255,255,0.04)', pointerEvents: 'none' }} />
-                  <div style={{ position: 'absolute', inset: 0, borderRadius: 22, border: '1px solid rgba(255,255,255,0.13)', pointerEvents: 'none' }} />
+                  <div style={{ position: 'absolute', inset: 0, borderRadius: 24, border: '1px solid rgba(255,255,255,0.13)', pointerEvents: 'none' }} />
                 </>
               )}
 
-              <div style={{ padding: '16px 18px 18px', position: 'relative', zIndex: 1, minHeight: isFront ? CARD_H : PEEK_H }}>
-                {/* ── Name row (always visible) ── */}
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+              <div style={{ padding: '18px 20px 20px', position: 'relative', zIndex: 1 }}>
+                {/* ── Header row — identical padding/position on every card so
+                     the name text lines up perfectly as cards fan upward ── */}
+                <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between' }}>
                   <div>
-                    {isFront && businessName && cardIdx === 0 && (
+                    {businessName && cardIdx === 0 && (
                       <div style={{ fontSize: '0.56rem', fontWeight: 700, color: 'rgba(255,255,255,0.45)', letterSpacing: '0.05em', marginBottom: 3 }}>{businessName}</div>
                     )}
-                    <div style={{ fontSize: '0.6rem', fontWeight: 800, letterSpacing: '0.13em', textTransform: 'uppercase', color: isFront ? 'rgba(255,255,255,0.7)' : 'rgba(255,255,255,0.6)' }}>
+                    <div style={{ fontSize: '0.64rem', fontWeight: 800, letterSpacing: '0.13em', textTransform: 'uppercase', color: isFront ? 'rgba(255,255,255,0.72)' : 'rgba(255,255,255,0.62)' }}>
                       {card.label}
                     </div>
                     {isFront && (
@@ -331,61 +298,57 @@ export function Dashboard({
                     )}
                   </div>
 
-                  {/* Eye toggle — front card only, card 0 only */}
-                  {isFront && cardIdx === 0 && (
+                  {isFront && cardIdx === 0 ? (
                     <button
                       onClick={e => { e.stopPropagation(); haptic(); onToggleHidden(); }}
                       style={{ background: 'rgba(255,255,255,0.12)', border: '1px solid rgba(255,255,255,0.16)', borderRadius: 9, width: 30, height: 30, display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', color: 'rgba(255,255,255,0.75)', flexShrink: 0 }}
                     >
                       {hidden ? <EyeOff size={13} /> : <Eye size={13} />}
                     </button>
-                  )}
-
-                  {/* Background card: dim balance hint */}
-                  {!isFront && (
-                    <span style={{ fontFamily: "'DM Mono',monospace", fontSize: '0.66rem', fontWeight: 700, color: 'rgba(255,255,255,0.38)', letterSpacing: '-0.01em' }}>
+                  ) : !isFront ? (
+                    <span style={{ fontFamily: "'DM Mono',monospace", fontSize: '0.72rem', fontWeight: 700, color: 'rgba(255,255,255,0.55)', letterSpacing: '-0.01em' }}>
                       {hidden ? '•••' : fmtAmt(card.balance, currency)}
                     </span>
-                  )}
+                  ) : null}
                 </div>
 
-                {/* ── Front card body ── */}
+                {/* ── Body — always rendered so every card keeps identical
+                     geometry; for background cards this portion sits behind
+                     the cards drawn on top and is not visible ── */}
+                <div style={{
+                  fontFamily: "'DM Mono',monospace",
+                  fontSize: balFontSize,
+                  fontWeight: 700,
+                  color: card.balance < 0 ? '#FCA5A5' : '#FFFFFF',
+                  letterSpacing: '-0.025em',
+                  lineHeight: 1.05,
+                  marginTop: 10,
+                  whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
+                  textShadow: '0 2px 18px rgba(0,0,0,0.2)',
+                }}>
+                  {hidden ? '••••••••' : (card.balance < 0 ? '−' : '') + fmtAmt(Math.abs(card.balance), currency)}
+                </div>
+
+                {card.body()}
+
+                {/* Dot pips — front card only */}
                 {isFront && (
-                  <>
-                    <div style={{
-                      fontFamily: "'DM Mono',monospace",
-                      fontSize: balFontSize,
-                      fontWeight: 700,
-                      color: card.balance < 0 ? '#FCA5A5' : '#FFFFFF',
-                      letterSpacing: '-0.025em',
-                      lineHeight: 1.05,
-                      marginTop: 10,
-                      whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
-                      textShadow: '0 2px 18px rgba(0,0,0,0.2)',
-                    }}>
-                      {hidden ? '••••••••' : (card.balance < 0 ? '−' : '') + fmtAmt(Math.abs(card.balance), currency)}
-                    </div>
-
-                    {card.body()}
-
-                    {/* Dot pips */}
-                    <div style={{ display: 'flex', gap: 5, marginTop: 14, alignItems: 'center', justifyContent: 'center' }}>
-                      {order.map((ci, sp) => (
-                        <div
-                          key={ci}
-                          onClick={e => { e.stopPropagation(); bringToFront(ci); }}
-                          style={{
-                            width:  sp === 0 ? 18 : 6,
-                            height: 5,
-                            borderRadius: 3,
-                            background: sp === 0 ? 'rgba(255,255,255,0.88)' : 'rgba(255,255,255,0.28)',
-                            cursor: 'pointer',
-                            transition: 'width 0.3s cubic-bezier(0.34,1.2,0.64,1)',
-                          }}
-                        />
-                      ))}
-                    </div>
-                  </>
+                  <div style={{ display: 'flex', gap: 5, marginTop: 14, alignItems: 'center', justifyContent: 'center' }}>
+                    {order.map((ci, sp) => (
+                      <div
+                        key={ci}
+                        onClick={e => { e.stopPropagation(); bringToFront(ci); }}
+                        style={{
+                          width:  sp === 0 ? 18 : 6,
+                          height: 5,
+                          borderRadius: 3,
+                          background: sp === 0 ? 'rgba(255,255,255,0.88)' : 'rgba(255,255,255,0.28)',
+                          cursor: 'pointer',
+                          transition: 'width 0.3s cubic-bezier(0.34,1.2,0.64,1)',
+                        }}
+                      />
+                    ))}
+                  </div>
                 )}
               </div>
             </div>
