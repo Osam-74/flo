@@ -68,5 +68,6 @@ export interface Transaction {
   // Tray inventory fields
   trayPacks?: number;          // set when expense cat === 'Tray Stock'
   trayPiecesPerPack?: number;  // set when expense cat === 'Tray Stock'
-  eggTraysUsed?: number;       // set when expense cat === 'Egg Collection'
+  eggTraysUsed?: number;       // trays deducted (computed from eggPieces ÷ 30)
+  eggPieces?: number;          // raw eggs collected in pieces
 }

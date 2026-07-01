@@ -263,10 +263,11 @@ export function AddEntrySheet({ open, onClose, people, currency, onSave, initial
     }
 
     if (type === 'egg-collection') {
-      const trays = parseFloat(eggTraysUsed) || 0;
-      if (!date)    { showToast('Select a date', 'error'); return; }
-      if (trays <= 0) { showToast('Enter number of trays used', 'error'); return; }
-      onSave(stripUndefined({ id, ts, type, amount: 0, date, eggTraysUsed: trays, desc: `Egg Collection — ${trays} tray${trays !== 1 ? 's' : ''} used` }));
+      const eggs  = parseFloat(eggTraysUsed) || 0;
+      if (!date)     { showToast('Select a date', 'error'); return; }
+      if (eggs <= 0) { showToast('Enter total eggs collected', 'error'); return; }
+      const trays = Math.ceil(eggs / 30);
+      onSave(stripUndefined({ id, ts, type, amount: 0, date, eggTraysUsed: trays, eggPieces: eggs, desc: `Egg Collection — ${eggs} eggs (${trays} tray${trays !== 1 ? 's' : ''})` }));
     }
 
     setAmount(''); setNote(''); setBuyer(''); setTfRef('');
@@ -650,13 +651,13 @@ export function AddEntrySheet({ open, onClose, people, currency, onSave, initial
               <div style={card}>
                 <div style={{ background: 'rgba(217,119,6,0.08)', border: '1px solid rgba(217,119,6,0.25)', borderRadius: 10, padding: '8px 13px', marginBottom: 12, display: 'flex', alignItems: 'center', gap: 8 }}>
                   <span style={{ fontSize: '1rem' }}>🥚</span>
-                  <span style={{ fontSize: '0.74rem', fontWeight: 700, color: '#92400E' }}>Log trays used during egg collection — deducted from your tray inventory.</span>
+                  <span style={{ fontSize: '0.74rem', fontWeight: 700, color: '#92400E' }}>Enter total eggs collected. 30 eggs = 1 tray — trays are auto-deducted from inventory.</span>
                 </div>
                 <Row>
-                  <Field label="Trays Used *">
+                  <Field label="Eggs Collected (pieces) *">
                     <input
                       style={{ ...inp, fontSize: '1.4rem', fontFamily: "'DM Mono',monospace" }}
-                      type="number" placeholder="e.g. 12" min="1" step="1"
+                      type="number" placeholder="e.g. 300" min="1" step="1"
                       value={eggTraysUsed} onChange={e => setEggTraysUsed(e.target.value)}
                     />
                   </Field>
@@ -664,11 +665,15 @@ export function AddEntrySheet({ open, onClose, people, currency, onSave, initial
                     <input style={inp} type="date" value={date} max={today()} onChange={e => setDate(e.target.value)} />
                   </Field>
                 </Row>
-                {eggTraysUsed && Number(eggTraysUsed) > 0 && (
-                  <div style={{ ...infoBox, color: '#D97706', marginBottom: 4 }}>
-                    📦 <strong>{Number(eggTraysUsed)} tray{Number(eggTraysUsed) !== 1 ? 's' : ''}</strong> will be deducted from tray inventory
-                  </div>
-                )}
+                {eggTraysUsed && Number(eggTraysUsed) > 0 && (() => {
+                  const eggs  = Number(eggTraysUsed);
+                  const trays = Math.ceil(eggs / 30);
+                  return (
+                    <div style={{ ...infoBox, color: '#D97706', marginBottom: 4 }}>
+                      {eggs} eggs ÷ 30 = <strong>{trays} tray{trays !== 1 ? 's' : ''}</strong> deducted from inventory
+                    </div>
+                  );
+                })()}
               </div>
             )}
 
