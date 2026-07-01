@@ -91,7 +91,7 @@ export function Dashboard({ txs, people, currency, businessName, onPersonFilter,
       if (t.type === 'expense' && t.cat === 'Tray Stock' && t.trayPacks) {
         totalTrayPieces += (t.trayPacks || 0) * (t.trayPiecesPerPack || 100);
         hasTrayData = true;
-      } else if (t.type === 'expense' && t.cat === 'Egg Collection' && t.eggTraysUsed) {
+      } else if (t.type === 'egg-collection' && t.eggTraysUsed) {
         totalTrayPieces -= (t.eggTraysUsed || 0);
         hasTrayData = true;
       }

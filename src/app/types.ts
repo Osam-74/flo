@@ -4,6 +4,7 @@ export type TxType =
   | 'salary'
   | 'transfer'
   | 'credit'
+  | 'egg-collection'
   | 'owner-fund'
   | 'fund-return';
 

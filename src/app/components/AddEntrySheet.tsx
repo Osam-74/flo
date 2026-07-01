@@ -31,11 +31,12 @@ const TYPE_OPTS: { id: TxType; emoji: string; label: string; color: string }[] =
   { id: 'salary',      emoji: '●', label: 'Salary',         color: '#03045E' },
   { id: 'transfer',    emoji: '●', label: 'Transfer',       color: '#00B4D8' },
   { id: 'credit',      emoji: '●', label: 'Credit Sale',    color: '#0077B6' },
-  { id: 'owner-fund',  emoji: '●', label: 'Fund Injection', color: '#00B4D8' },
+  { id: 'egg-collection', emoji: '●', label: 'Egg Collection', color: '#D97706' },
+  { id: 'owner-fund',     emoji: '●', label: 'Fund Injection', color: '#00B4D8' },
   { id: 'fund-return', emoji: '●', label: 'Fund Return',    color: '#03045E' },
 ];
 
-const CATS = ['', 'Feed & Supplies', 'Transport', 'Utilities', 'Equipment', 'Medical / Vet', 'Labour', 'Sales Revenue', 'Loan / Advance', 'Salary', 'Tray Stock', 'Egg Collection', 'Other'];
+const CATS = ['', 'Feed & Supplies', 'Transport', 'Utilities', 'Equipment', 'Medical / Vet', 'Labour', 'Sales Revenue', 'Loan / Advance', 'Salary', 'Tray Stock', 'Other'];
 
 export function AddEntrySheet({ open, onClose, people, currency, onSave, initialType = 'income', isReadOnly = false }: Props) {
   const [type, setType] = useState<TxType>(initialType);
@@ -82,7 +83,7 @@ export function AddEntrySheet({ open, onClose, people, currency, onSave, initial
 
   // ── Swipe gesture state ──────────────────────────────────────────────────
   const swipeStartX = useRef<number | null>(null);
-  const TYPES_ORDER: TxType[] = ['income', 'expense', 'salary', 'transfer', 'credit', 'owner-fund', 'fund-return'];
+  const TYPES_ORDER: TxType[] = ['income', 'expense', 'salary', 'transfer', 'credit', 'egg-collection', 'owner-fund', 'fund-return'];
 
   const handleSwipeStart = (e: React.TouchEvent) => {
     swipeStartX.current = e.touches[0].clientX;
@@ -199,19 +200,12 @@ export function AddEntrySheet({ open, onClose, people, currency, onSave, initial
           const packs = parseFloat(trayPacks) || 0;
           if (packs <= 0) { showToast('Enter number of tray packs', 'error'); return; }
         }
-        // Egg Collection — validate trays used field
-        if (cat === 'Egg Collection') {
-          const trays = parseFloat(eggTraysUsed) || 0;
-          if (trays <= 0) { showToast('Enter number of trays used', 'error'); return; }
-        }
-        const packs     = cat === 'Tray Stock'      ? (parseFloat(trayPacks) || 0)       : undefined;
-        const ppp       = cat === 'Tray Stock'      ? (parseFloat(trayPiecesPerPack) || 100) : undefined;
-        const eggTrays  = cat === 'Egg Collection'  ? (parseFloat(eggTraysUsed) || 0)    : undefined;
-        const pn        = people.find(p => p.id === person)?.name || '';
-        const trayInfo  = packs   ? ` — ${packs} pack${packs !== 1 ? 's' : ''} × ${ppp} trays` : '';
-        const eggInfo   = eggTrays ? ` — ${eggTrays} tray${eggTrays !== 1 ? 's' : ''} used` : '';
-        const desc      = `Expense${pn ? ' by ' + pn : ''}${cat ? ' — ' + cat : ''}${trayInfo}${eggInfo}`;
-        onSave(stripUndefined({ id, ts, type, amount: amt, person, date, cat, note, source, buyer: buyer || undefined, receiver: receiver || undefined, trayPacks: packs, trayPiecesPerPack: ppp, eggTraysUsed: eggTrays, desc }));
+        const packs    = cat === 'Tray Stock' ? (parseFloat(trayPacks) || 0)        : undefined;
+        const ppp      = cat === 'Tray Stock' ? (parseFloat(trayPiecesPerPack) || 100) : undefined;
+        const pn       = people.find(p => p.id === person)?.name || '';
+        const trayInfo = packs ? ` — ${packs} pack${packs !== 1 ? 's' : ''} × ${ppp} trays` : '';
+        const desc     = `Expense${pn ? ' by ' + pn : ''}${cat ? ' — ' + cat : ''}${trayInfo}`;
+        onSave(stripUndefined({ id, ts, type, amount: amt, person, date, cat, note, source, buyer: buyer || undefined, receiver: receiver || undefined, trayPacks: packs, trayPiecesPerPack: ppp, desc }));
       }
     }
     if (type === 'salary') {
@@ -268,11 +262,19 @@ export function AddEntrySheet({ open, onClose, people, currency, onSave, initial
       onSave(stripUndefined({ id, ts, type, amount: amt, date: frDate, frSender, frReceiver, person: frSender, cat: 'Fund Return', note: frNote, desc: `Fund return: ${sn} → ${rn}` }));
     }
 
+    if (type === 'egg-collection') {
+      const trays = parseFloat(eggTraysUsed) || 0;
+      if (!date)    { showToast('Select a date', 'error'); return; }
+      if (trays <= 0) { showToast('Enter number of trays used', 'error'); return; }
+      onSave(stripUndefined({ id, ts, type, amount: 0, date, eggTraysUsed: trays, desc: `Egg Collection — ${trays} tray${trays !== 1 ? 's' : ''} used` }));
+    }
+
     setAmount(''); setNote(''); setBuyer(''); setTfRef('');
     setCrBuyer(''); setCrTotal(''); setCrPaid(''); setCrNote('');
     setOfNote(''); setFrNote('');
     setTrayPacks(''); setTrayPiecesPerPack('100');
     setEggTraysUsed('');
+
     const td = today();
     setDate(td); setTfDate(td); setCrDate(td); setOfDate(td); setFrDate(td);
     onClose();
@@ -280,9 +282,9 @@ export function AddEntrySheet({ open, onClose, people, currency, onSave, initial
 
   const no = nonOwners(people);
   const ow = owners(people);
-  const isStandard = ['income', 'expense', 'salary'].includes(type);
-  const isTrayExpense          = type === 'expense' && cat === 'Tray Stock';
-  const isEggCollectionExpense = type === 'expense' && cat === 'Egg Collection';
+  const isStandard       = ['income', 'expense', 'salary'].includes(type);
+  const isTrayExpense    = type === 'expense' && cat === 'Tray Stock';
+  const isEggCollection  = type === 'egg-collection';
   const crPaidAmt  = parseFloat(crPaid)  || 0;
   const crTotalAmt = parseFloat(crTotal) || 0;
   const crOutstanding = crTotalAmt - crPaidAmt;
@@ -438,25 +440,6 @@ export function AddEntrySheet({ open, onClose, people, currency, onSave, initial
                     {trayPacks && Number(trayPacks) > 0 && (
                       <div style={{ ...infoBox, color: '#7C3AED', marginBottom: 10 }}>
                         📦 {Number(trayPacks)} pack{Number(trayPacks) !== 1 ? 's' : ''} × {Number(trayPiecesPerPack) || 100} = <strong>{Number(trayPacks) * (Number(trayPiecesPerPack) || 100)} trays</strong> incoming
-                      </div>
-                    )}
-                  </>
-                )}
-                {/* ── Egg Collection extra field ── */}
-                {isEggCollectionExpense && (
-                  <>
-                    <Row>
-                      <Field label="Trays Used *">
-                        <input
-                          style={{ ...inp, fontSize: '1.2rem', fontFamily: "'DM Mono',monospace" }}
-                          type="number" placeholder="e.g. 12" min="1" step="1"
-                          value={eggTraysUsed} onChange={e => setEggTraysUsed(e.target.value)}
-                        />
-                      </Field>
-                    </Row>
-                    {eggTraysUsed && Number(eggTraysUsed) > 0 && (
-                      <div style={{ ...infoBox, color: '#D97706', marginBottom: 10 }}>
-                        🥚 <strong>{Number(eggTraysUsed)} tray{Number(eggTraysUsed) !== 1 ? 's' : ''}</strong> will be deducted from inventory
                       </div>
                     )}
                   </>
@@ -659,6 +642,33 @@ export function AddEntrySheet({ open, onClose, people, currency, onSave, initial
                   </Field>
                 </Row>
                 <div style={{ height: 4 }} />
+              </div>
+            )}
+
+            {/* ── EGG COLLECTION ── */}
+            {isEggCollection && (
+              <div style={card}>
+                <div style={{ background: 'rgba(217,119,6,0.08)', border: '1px solid rgba(217,119,6,0.25)', borderRadius: 10, padding: '8px 13px', marginBottom: 12, display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <span style={{ fontSize: '1rem' }}>🥚</span>
+                  <span style={{ fontSize: '0.74rem', fontWeight: 700, color: '#92400E' }}>Log trays used during egg collection — deducted from your tray inventory.</span>
+                </div>
+                <Row>
+                  <Field label="Trays Used *">
+                    <input
+                      style={{ ...inp, fontSize: '1.4rem', fontFamily: "'DM Mono',monospace" }}
+                      type="number" placeholder="e.g. 12" min="1" step="1"
+                      value={eggTraysUsed} onChange={e => setEggTraysUsed(e.target.value)}
+                    />
+                  </Field>
+                  <Field label="Date *">
+                    <input style={inp} type="date" value={date} max={today()} onChange={e => setDate(e.target.value)} />
+                  </Field>
+                </Row>
+                {eggTraysUsed && Number(eggTraysUsed) > 0 && (
+                  <div style={{ ...infoBox, color: '#D97706', marginBottom: 4 }}>
+                    📦 <strong>{Number(eggTraysUsed)} tray{Number(eggTraysUsed) !== 1 ? 's' : ''}</strong> will be deducted from tray inventory
+                  </div>
+                )}
               </div>
             )}
 
