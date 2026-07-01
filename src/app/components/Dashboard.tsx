@@ -40,8 +40,8 @@ const CSS = `@keyframes reorder-blink { 0%,100%{opacity:1}50%{opacity:0.35} }`;
 // of their body sits physically behind the cards drawn on top of them
 // (higher z-index) — nothing is scaled or squeezed, they're identical cards
 // resting in a fanned deck.
-const CARD_H = 226; // fixed full height for every card in the stack
-const STEP   = 42;  // peek band height revealed per layer
+const CARD_H = 168; // fixed full height for every card in the stack (compact)
+const STEP   = 14;  // peek band height revealed per layer (tight index-card stack)
 
 export function Dashboard({
   txs, people, currency, businessName,
@@ -125,7 +125,7 @@ export function Dashboard({
       pal:     PALETTE[0],
       body: () => (
         <>
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 8, marginTop: 16 }}>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 6, marginTop: 10 }}>
             {[
               { lbl: 'Total In',  val: hidden ? '••••' : fmtAmt(totalIn,  ''), col: '#A8C8FF' },
               { lbl: 'Total Out', val: hidden ? '••••' : fmtAmt(totalOut, ''), col: '#FFB3C0' },
@@ -138,7 +138,7 @@ export function Dashboard({
             ))}
           </div>
           {netOwner > 0.005 && (
-            <div style={{ marginTop: 8, background: 'rgba(255,255,255,0.07)', borderRadius: 9, padding: '6px 12px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <div style={{ marginTop: 6, background: 'rgba(255,255,255,0.07)', borderRadius: 9, padding: '5px 12px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
               <span style={{ fontSize: '0.48rem', fontWeight: 700, letterSpacing: '0.1em', textTransform: 'uppercase', color: 'rgba(255,255,255,0.45)' }}>Fund Injection</span>
               <span style={{ fontFamily: "'DM Mono',monospace", fontSize: '0.7rem', fontWeight: 600, color: '#FFD080' }}>{hidden ? '••••' : fmtAmt(netOwner, currency)}</span>
             </div>
@@ -155,7 +155,7 @@ export function Dashboard({
         balance: pBal,
         pal:   PALETTE[2 + (i % (PALETTE.length - 2))],
         body: () => !hidden ? (
-          <div style={{ display: 'flex', gap: 7, marginTop: 16 }}>
+          <div style={{ display: 'flex', gap: 7, marginTop: 10 }}>
             {[{ l: 'Total In', v: fmtAmt(pIn, currency), c: '#A8C8FF' }, { l: 'Total Out', v: fmtAmt(pOut, currency), c: '#FFB3C0' }].map(s => (
               <div key={s.l} style={{ background: 'rgba(255,255,255,0.1)', backdropFilter: 'blur(8px)', borderRadius: 10, padding: '9px 12px', flex: 1, border: '1px solid rgba(255,255,255,0.1)' }}>
                 <div style={{ fontSize: '0.46rem', fontWeight: 800, letterSpacing: '0.13em', textTransform: 'uppercase', color: 'rgba(255,255,255,0.4)', marginBottom: 4 }}>{s.l}</div>
@@ -268,8 +268,8 @@ export function Dashboard({
                 backdropFilter:       isFront ? 'none' : `blur(${blurPx}px)`,
                 WebkitBackdropFilter: isFront ? 'none' : `blur(${blurPx}px)`,
                 boxShadow: isFront
-                  ? `0 20px 60px ${card.pal.glow}, 0 4px 20px rgba(0,0,0,0.25), inset 0 1px 0 rgba(255,255,255,0.15)`
-                  : `0 6px 20px rgba(0,0,0,0.18), inset 0 1px 0 rgba(255,255,255,0.08)`,
+                  ? `0 6px 16px rgba(0,0,0,0.10), 0 2px 6px rgba(0,0,0,0.06), inset 0 1px 0 rgba(255,255,255,0.15)`
+                  : `0 2px 6px rgba(0,0,0,0.06), inset 0 1px 0 rgba(255,255,255,0.08)`,
                 transition: 'top 0.48s cubic-bezier(0.34,1.25,0.64,1), opacity 0.4s ease, box-shadow 0.4s ease',
               }}
             >
@@ -282,7 +282,7 @@ export function Dashboard({
                 </>
               )}
 
-              <div style={{ padding: '18px 20px 20px', position: 'relative', zIndex: 1 }}>
+              <div style={{ padding: '14px 18px 16px', position: 'relative', zIndex: 1 }}>
                 {/* ── Header row — identical padding/position on every card so
                      the name text lines up perfectly as cards fan upward ── */}
                 <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between' }}>
@@ -312,43 +312,27 @@ export function Dashboard({
                   ) : null}
                 </div>
 
-                {/* ── Body — always rendered so every card keeps identical
-                     geometry; for background cards this portion sits behind
-                     the cards drawn on top and is not visible ── */}
-                <div style={{
-                  fontFamily: "'DM Mono',monospace",
-                  fontSize: balFontSize,
-                  fontWeight: 700,
-                  color: card.balance < 0 ? '#FCA5A5' : '#FFFFFF',
-                  letterSpacing: '-0.025em',
-                  lineHeight: 1.05,
-                  marginTop: 10,
-                  whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
-                  textShadow: '0 2px 18px rgba(0,0,0,0.2)',
-                }}>
-                  {hidden ? '••••••••' : (card.balance < 0 ? '−' : '') + fmtAmt(Math.abs(card.balance), currency)}
-                </div>
-
-                {card.body()}
-
-                {/* Dot pips — front card only */}
+                {/* ── Body — FRONT CARD ONLY. Background cards render nothing
+                     below their header band, so there is no ghosted balance
+                     number or content bleeding/overlapping underneath. */}
                 {isFront && (
-                  <div style={{ display: 'flex', gap: 5, marginTop: 14, alignItems: 'center', justifyContent: 'center' }}>
-                    {order.map((ci, sp) => (
-                      <div
-                        key={ci}
-                        onClick={e => { e.stopPropagation(); bringToFront(ci); }}
-                        style={{
-                          width:  sp === 0 ? 18 : 6,
-                          height: 5,
-                          borderRadius: 3,
-                          background: sp === 0 ? 'rgba(255,255,255,0.88)' : 'rgba(255,255,255,0.28)',
-                          cursor: 'pointer',
-                          transition: 'width 0.3s cubic-bezier(0.34,1.2,0.64,1)',
-                        }}
-                      />
-                    ))}
-                  </div>
+                  <>
+                    <div style={{
+                      fontFamily: "'DM Mono',monospace",
+                      fontSize: balFontSize,
+                      fontWeight: 700,
+                      color: card.balance < 0 ? '#FCA5A5' : '#FFFFFF',
+                      letterSpacing: '-0.025em',
+                      lineHeight: 1.05,
+                      marginTop: 6,
+                      whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
+                      textShadow: '0 2px 18px rgba(0,0,0,0.2)',
+                    }}>
+                      {hidden ? '••••••••' : (card.balance < 0 ? '−' : '') + fmtAmt(Math.abs(card.balance), currency)}
+                    </div>
+
+                    {card.body()}
+                  </>
                 )}
               </div>
             </div>
