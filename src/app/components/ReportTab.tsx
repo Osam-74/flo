@@ -262,7 +262,7 @@ export function ReportTab({ businessName, txs, people, currency }: Props) {
     if (businessName) html += `<div class="pdf-header">${esc(businessName)}</div>`;
     if (rType === 'all' || rType === 'expense' || rType === 'salary') html += makeExpenseTable(expenseTxs, 'Expenses', dateLabel);
     if (rType === 'all' || rType === 'income'  || rType === 'credit') html += makeSalesTable(salesTxs, 'Sales / Dispatch', dateLabel, true);
-    if (rType === 'all' && (expenseTxs.length || salesTxs.length)) {
+    if (rType === 'all' && (expenseTxs.length || salesTxs.length || eggCollectionTxs.length)) {
       html += `<hr class="pdf-divider">`;
       const rows: { label: string; amount: number; isTotal?: boolean; prefix?: string; isNeg?: boolean }[] = [];
       if (totalShopSales > 0) rows.push({ label: 'Shop Sales', amount: totalShopSales });
@@ -272,6 +272,8 @@ export function ReportTab({ businessName, txs, people, currency }: Props) {
       if (totalExpenses > 0) rows.push({ label: 'Total Expenses', amount: totalExpenses });
       if (cashInjection > 0) rows.push({ label: 'Cash Injection', amount: cashInjection, prefix: '+ ' });
       if (totalCrates > 0) rows.push({ label: 'Total Crates Sold', amount: totalCrates });
+      if (totalEggs > 0) rows.push({ label: 'Total Eggs Collected', amount: totalEggs });
+      if (totalBrokenEggs > 0) rows.push({ label: 'Broken Eggs', amount: totalBrokenEggs, isNeg: true });
       html += makeSummaryTable(rows);
     }
     if (rType === 'owner-fund' && ownerFunds.length) html += makeExpenseTable(ownerFunds, 'Cash Injections', dateLabel);

@@ -54,6 +54,7 @@ export function Dashboard({
   const [animating, setAnimating] = useState(false);
   const [trayVisible, setTrayVisible] = useState(true);
   const initialized = useRef(false);
+  const stackTouchStart = useRef<{ x: number; y: number } | null>(null);
 
   let totalIn = 0, totalOut = 0, ownerIn = 0, ownerOut = 0;
   for (const t of txs) {
@@ -188,6 +189,24 @@ export function Dashboard({
     setTimeout(() => setAnimating(false), 480);
   }
 
+  // ── Swipe gesture ── any swipe on the deck — down, left, or right —
+  // brings the next immediate card to the front, same as clicking it.
+  const SWIPE_THRESHOLD = 28;
+  function handleStackTouchStart(e: React.TouchEvent) {
+    const t = e.touches[0];
+    stackTouchStart.current = { x: t.clientX, y: t.clientY };
+  }
+  function handleStackTouchEnd(e: React.TouchEvent) {
+    const start = stackTouchStart.current;
+    stackTouchStart.current = null;
+    if (!start || N < 2) return;
+    const t = e.changedTouches[0];
+    const dx = t.clientX - start.x;
+    const dy = t.clientY - start.y;
+    if (Math.sqrt(dx * dx + dy * dy) < SWIPE_THRESHOLD) return; // just a tap, not a swipe
+    bringToFront(order[1]);
+  }
+
   // Container needs room for the front card (bottom-most box) plus the
   // peek bands of every card stacked above it.
   const containerH = (N - 1) * STEP + CARD_H;
@@ -238,7 +257,11 @@ export function Dashboard({
           covered by the cards with higher z-index drawn
           over it — nothing is scaled, squeezed or inset.
       ══════════════════════════════════════════ */}
-      <div style={{ position: 'relative', height: containerH, marginBottom: 24 }}>
+      <div
+        onTouchStart={handleStackTouchStart}
+        onTouchEnd={handleStackTouchEnd}
+        style={{ position: 'relative', height: containerH, marginBottom: 24 }}
+      >
         {order.map((cardIdx, stackPos) => {
           const card    = cards[cardIdx];
           const isFront = stackPos === 0;

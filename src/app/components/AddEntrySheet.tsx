@@ -377,6 +377,21 @@ export function AddEntrySheet({ open, onClose, people, currency, onSave, initial
                       value={amount} onChange={e => setAmount(e.target.value)} />
                   </Field>
                 </div>
+                <Row>
+                  <Field label="Category">
+                    <Select value={cat} onChange={setCat}>
+                      {CATS.map(c => <option key={c} value={c}>{c || '— Select —'}</option>)}
+                    </Select>
+                  </Field>
+                  {type === 'income' && (
+                    <Field label="Source">
+                      <Select value={source} onChange={setSource}>
+                        <option value="shop">Shop</option>
+                        <option value="farm">Farm</option>
+                      </Select>
+                    </Field>
+                  )}
+                </Row>
                 {type === 'income' && (
                   <Row>
                     <Field label="Buyer Name">
@@ -400,25 +415,6 @@ export function AddEntrySheet({ open, onClose, people, currency, onSave, initial
                   </Field>
                   <Field label="Date *">
                     <input style={inp} type="date" value={date} max={today()} onChange={e => setDate(e.target.value)} />
-                  </Field>
-                </Row>
-                <Row>
-                  <Field label="Category">
-                    <Select value={cat} onChange={setCat}>
-                      {CATS.map(c => <option key={c} value={c}>{c || '— Select —'}</option>)}
-                    </Select>
-                  </Field>
-                  {type === 'income' && (
-                    <Field label="Source">
-                      <Select value={source} onChange={setSource}>
-                        <option value="shop">Shop</option>
-                        <option value="farm">Farm</option>
-                      </Select>
-                    </Field>
-                  )}
-                  <Field label="Note">
-                    <input style={inp} type="text" placeholder="e.g. Receipt #007"
-                      value={note} onChange={e => setNote(e.target.value)} />
                   </Field>
                 </Row>
                 {/* ── Tray Stock extra fields (shown when category = Tray Stock on an Expense) ── */}
@@ -512,6 +508,20 @@ export function AddEntrySheet({ open, onClose, people, currency, onSave, initial
                   <InfoBox>Track buyer, total expected, and amount paid now.</InfoBox>
                 )}
                 <Row>
+                  <Field label="Category">
+                    <Select value={crCat} onChange={setCrCat}>
+                      <option value="Sales Revenue">Sales Revenue</option>
+                      <option value="Other">Other</option>
+                    </Select>
+                  </Field>
+                  <Field label="Source">
+                    <Select value={crSource} onChange={setCrSource}>
+                      <option value="farm">Farm</option>
+                      <option value="shop">Shop</option>
+                    </Select>
+                  </Field>
+                </Row>
+                <Row>
                   <Field label="Buyer Name *">
                     <input style={inp} type="text" placeholder="Buyer's full name"
                       value={crBuyer} onChange={e => setCrBuyer(e.target.value)} />
@@ -551,24 +561,6 @@ export function AddEntrySheet({ open, onClose, people, currency, onSave, initial
                     </Field>
                   )}
                 </Row>
-                <Row>
-                  <Field label="Category">
-                    <Select value={crCat} onChange={setCrCat}>
-                      <option value="Sales Revenue">Sales Revenue</option>
-                      <option value="Other">Other</option>
-                    </Select>
-                  </Field>
-                  <Field label="Source">
-                    <Select value={crSource} onChange={setCrSource}>
-                      <option value="farm">Farm</option>
-                      <option value="shop">Shop</option>
-                    </Select>
-                  </Field>
-                  <Field label="Note">
-                    <input style={inp} type="text" placeholder="Optional note"
-                      value={crNote} onChange={e => setCrNote(e.target.value)} />
-                  </Field>
-                </Row>
                 <Field label="Crates">
                   <input style={inp} type="number" placeholder="Please enter the number of crates"
                     min="0" step="1"
@@ -590,10 +582,6 @@ export function AddEntrySheet({ open, onClose, people, currency, onSave, initial
                 <Row>
                   <Field label="Date *">
                     <input style={inp} type="date" value={ofDate} max={today()} onChange={e => setOfDate(e.target.value)} />
-                  </Field>
-                  <Field label="Note">
-                    <input style={inp} type="text" placeholder="Optional reference"
-                      value={ofNote} onChange={e => setOfNote(e.target.value)} />
                   </Field>
                 </Row>
                 <Row>
@@ -626,10 +614,6 @@ export function AddEntrySheet({ open, onClose, people, currency, onSave, initial
                   <Field label="Date *">
                     <input style={inp} type="date" value={frDate} max={today()} onChange={e => setFrDate(e.target.value)} />
                   </Field>
-                  <Field label="Note">
-                    <input style={inp} type="text" placeholder="Optional reference"
-                      value={frNote} onChange={e => setFrNote(e.target.value)} />
-                  </Field>
                 </Row>
                 <Row>
                   <Field label="Returned By *">
@@ -650,18 +634,16 @@ export function AddEntrySheet({ open, onClose, people, currency, onSave, initial
             {/* ── EGG COLLECTION ── */}
             {isEggCollection && (
               <div style={card}>
-                <div style={{ background: 'rgba(217,119,6,0.08)', border: '1px solid rgba(217,119,6,0.25)', borderRadius: 10, padding: '8px 13px', marginBottom: 12, display: 'flex', alignItems: 'center', gap: 8 }}>
-                  <span style={{ fontSize: '1rem' }}>🥚</span>
-                  <span style={{ fontSize: '0.74rem', fontWeight: 700, color: '#92400E' }}>Enter total eggs collected. 30 eggs = 1 tray — trays are auto-deducted from inventory.</span>
-                </div>
                 <Row>
                   <Field label="Eggs Collected (pieces) *">
                     <input
-                      style={{ ...inp, fontSize: '1.4rem', fontFamily: "'DM Mono',monospace" }}
+                      style={inp}
                       type="number" placeholder="e.g. 300" min="1" step="1"
                       value={eggTraysUsed} onChange={e => setEggTraysUsed(e.target.value)}
                     />
                   </Field>
+                </Row>
+                <Row>
                   <Field label="Date *">
                     <input style={inp} type="date" value={date} max={today()} onChange={e => setDate(e.target.value)} />
                   </Field>
@@ -674,7 +656,6 @@ export function AddEntrySheet({ open, onClose, people, currency, onSave, initial
                       value={brokenEggs} onChange={e => setBrokenEggs(e.target.value)}
                     />
                   </Field>
-                  <div style={{ flex: 1 }} /> {/* spacer */}
                 </Row>
                 {eggTraysUsed && Number(eggTraysUsed) > 0 && (
                   <div style={{ ...infoBox, color: '#D97706', marginBottom: 4 }}>
