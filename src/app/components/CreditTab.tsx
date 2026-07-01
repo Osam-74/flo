@@ -19,15 +19,22 @@ export function CreditTab({ txs, people, currency, isReadOnly, onPayment, onPick
   const [detailTx, setDetailTx] = useState<import('../types').Transaction | null>(null);
   const creditTxs = txs.filter(t => t.type === 'credit');
 
-  const byBuyer: Record<string, { total: number; paid: number; count: number; seller: string }> = {};
+  const byBuyer: Record<string, { total: number; paid: number; count: number; seller: string; hasPickup: boolean }> = {};
   for (const t of creditTxs) {
     const b = t.creditBuyer || 'Unknown';
-    if (!byBuyer[b]) byBuyer[b] = { total: 0, paid: 0, count: 0, seller: '' };
+    if (!byBuyer[b]) byBuyer[b] = { total: 0, paid: 0, count: 0, seller: '', hasPickup: false };
     byBuyer[b].total  += t.creditTotal || 0;
     byBuyer[b].paid   += t.creditPaid  || 0;
     byBuyer[b].count  += 1;
     byBuyer[b].seller  = t.creditSeller || t.person || '';
+    if (t.isPickup) byBuyer[b].hasPickup = true;
   }
+
+  // Only show buyers who still owe money OR have a pending pickup — hide fully settled ones
+  const activeBuyers = Object.entries(byBuyer).filter(([, data]) => {
+    const outstanding = data.total - data.paid;
+    return outstanding > 0.005 || data.hasPickup;
+  });
 
   const sorted = [...creditTxs].sort((a, b) => (b.ts || 0) - (a.ts || 0));
 
@@ -41,7 +48,7 @@ export function CreditTab({ txs, people, currency, isReadOnly, onPayment, onPick
         </div>
       ) : (
         <div style={{ background: '#fff', borderRadius: 18, boxShadow: '0 1px 3px rgba(0,0,0,0.07), 0 4px 16px rgba(0,0,0,0.04)', marginBottom: 16, overflow: 'hidden', border: '1px solid rgba(0,0,0,0.05)' }}>
-          {Object.entries(byBuyer).map(([buyer, data], i, arr) => {
+          {activeBuyers.map(([buyer, data], i, arr) => {
             const outstanding = data.total - data.paid;
             const seller = people.find(p => p.id === data.seller);
             return (

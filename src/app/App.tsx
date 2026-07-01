@@ -524,7 +524,7 @@ export default function App() {
     const [col, doc] = selectedBiz.fsDoc.split('/');
     const s = await fsRef.current.getDoc(fsRef.current.doc(dbRef.current, col, doc));
     
-    if (s.exists()) { applyRemote(s.data()); showToast('Pulled from cloud', 'success'); }
+    if (s.exists()) { applyRemote(s.data(), selectedBiz?.id ?? ''); showToast('Pulled from cloud', 'success'); }
     else showToast('No cloud data', 'info');
   };
 
@@ -825,6 +825,7 @@ export default function App() {
           open={editModal.open}
           tx={editModal.tx}
           people={people}
+          currency={currency}
           onSave={confirmEdit}
           onClose={() => setEditModal({ open: false, tx: null })}
         />

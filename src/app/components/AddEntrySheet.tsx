@@ -26,13 +26,15 @@ const today = () => new Date().toISOString().split('T')[0];
 const isFutureDate = (d: string) => d > today();
 
 const TYPE_OPTS: { id: TxType; emoji: string; label: string; color: string }[] = [
-  { id: 'income',      emoji: '●', label: 'Sales',          color: '#0077B6' },
-  { id: 'expense',     emoji: '●', label: 'Expense',        color: '#E83E5C' },
-  { id: 'salary',      emoji: '●', label: 'Salary',         color: '#03045E' },
-  { id: 'transfer',    emoji: '●', label: 'Transfer',       color: '#00B4D8' },
-  { id: 'credit',      emoji: '●', label: 'Credit Sale',    color: '#0077B6' },
-  { id: 'owner-fund',  emoji: '●', label: 'Fund Injection', color: '#00B4D8' },
-  { id: 'fund-return', emoji: '●', label: 'Fund Return',    color: '#03045E' },
+  { id: 'income',         emoji: '●', label: 'Sales',          color: '#0077B6' },
+  { id: 'expense',        emoji: '●', label: 'Expense',        color: '#E83E5C' },
+  { id: 'salary',         emoji: '●', label: 'Salary',         color: '#03045E' },
+  { id: 'transfer',       emoji: '●', label: 'Transfer',       color: '#00B4D8' },
+  { id: 'credit',         emoji: '●', label: 'Credit Sale',    color: '#0077B6' },
+  { id: 'owner-fund',     emoji: '●', label: 'Fund Injection', color: '#00B4D8' },
+  { id: 'fund-return',    emoji: '●', label: 'Fund Return',    color: '#03045E' },
+  { id: 'tray-stock',     emoji: '●', label: 'Tray Stock',     color: '#7C3AED' },
+  { id: 'egg-collection', emoji: '●', label: 'Egg Collection', color: '#D97706' },
 ];
 
 const CATS = ['', 'Feed & Supplies', 'Transport', 'Utilities', 'Equipment', 'Medical / Vet', 'Labour', 'Sales Revenue', 'Loan / Advance', 'Salary', 'Other'];
@@ -74,10 +76,19 @@ export function AddEntrySheet({ open, onClose, people, currency, onSave, initial
   const [salPaidBy, setSalPaidBy] = useState('');
   const [crates, setCrates]         = useState('');
   const [crCrates, setCrCrates]     = useState('');
+  // Tray stock
+  const [trayPacks, setTrayPacks]           = useState('');
+  const [trayPiecesPerPack, setTrayPiecesPerPack] = useState('100');
+  const [trayNote, setTrayNote]             = useState('');
+  const [trayDate, setTrayDate]             = useState(today());
+  // Egg collection
+  const [eggTraysUsed, setEggTraysUsed]     = useState('');
+  const [eggDate, setEggDate]               = useState(today());
+  const [eggNote, setEggNote]               = useState('');
 
   // ── Swipe gesture state ──────────────────────────────────────────────────
   const swipeStartX = useRef<number | null>(null);
-  const TYPES_ORDER: TxType[] = ['income', 'expense', 'salary', 'transfer', 'credit', 'owner-fund', 'fund-return'];
+  const TYPES_ORDER: TxType[] = ['income', 'expense', 'salary', 'transfer', 'credit', 'owner-fund', 'fund-return', 'tray-stock', 'egg-collection'];
 
   const handleSwipeStart = (e: React.TouchEvent) => {
     swipeStartX.current = e.touches[0].clientX;
@@ -248,17 +259,36 @@ export function AddEntrySheet({ open, onClose, people, currency, onSave, initial
       onSave(stripUndefined({ id, ts, type, amount: amt, date: frDate, frSender, frReceiver, person: frSender, cat: 'Fund Return', note: frNote, desc: `Fund return: ${sn} → ${rn}` }));
     }
 
+    if (type === 'tray-stock') {
+      const packs = parseFloat(trayPacks) || 0;
+      const ppp   = parseFloat(trayPiecesPerPack) || 100;
+      if (!trayDate)  { showToast('Select a date', 'error'); return; }
+      if (packs <= 0) { showToast('Enter number of packs', 'error'); return; }
+      onSave(stripUndefined({ id, ts, type, amount: 0, date: trayDate, trayPacks: packs, trayPiecesPerPack: ppp, note: trayNote || undefined, desc: `Tray Restock — ${packs} pack${packs !== 1 ? 's' : ''} × ${ppp} trays` }));
+    }
+    if (type === 'egg-collection') {
+      const trays = parseFloat(eggTraysUsed) || 0;
+      if (!eggDate)   { showToast('Select a date', 'error'); return; }
+      if (trays <= 0) { showToast('Enter number of trays used', 'error'); return; }
+      onSave(stripUndefined({ id, ts, type, amount: 0, date: eggDate, eggTraysUsed: trays, note: eggNote || undefined, desc: `Egg Collection — ${trays} tray${trays !== 1 ? 's' : ''} used` }));
+    }
+
     setAmount(''); setNote(''); setBuyer(''); setTfRef('');
     setCrBuyer(''); setCrTotal(''); setCrPaid(''); setCrNote('');
     setOfNote(''); setFrNote('');
+    setTrayPacks(''); setTrayPiecesPerPack('100'); setTrayNote('');
+    setEggTraysUsed(''); setEggNote('');
     const td = today();
     setDate(td); setTfDate(td); setCrDate(td); setOfDate(td); setFrDate(td);
+    setTrayDate(td); setEggDate(td);
     onClose();
   };
 
   const no = nonOwners(people);
   const ow = owners(people);
   const isStandard = ['income', 'expense', 'salary'].includes(type);
+  const isTrayStock     = type === 'tray-stock';
+  const isEggCollection = type === 'egg-collection';
   const crPaidAmt  = parseFloat(crPaid)  || 0;
   const crTotalAmt = parseFloat(crTotal) || 0;
   const crOutstanding = crTotalAmt - crPaidAmt;
@@ -591,6 +621,59 @@ export function AddEntrySheet({ open, onClose, people, currency, onSave, initial
                   </Field>
                 </Row>
                 <div style={{ height: 4 }} />
+              </div>
+            )}
+
+            {/* ── TRAY STOCK ── */}
+            {isTrayStock && (
+              <div style={card}>
+                <InfoBox>Log incoming egg tray packs to restock inventory. Each pack contains a set number of individual trays.</InfoBox>
+                <Row>
+                  <Field label="Number of Packs *">
+                    <input style={{ ...inp, fontSize: '1.3rem', fontFamily: "'DM Mono',monospace" }}
+                      type="number" placeholder="e.g. 5" min="1" step="1"
+                      value={trayPacks} onChange={e => setTrayPacks(e.target.value)} />
+                  </Field>
+                  <Field label="Trays per Pack *">
+                    <input style={inp} type="number" placeholder="100" min="1" step="1"
+                      value={trayPiecesPerPack} onChange={e => setTrayPiecesPerPack(e.target.value)} />
+                  </Field>
+                </Row>
+                {trayPacks && trayPiecesPerPack && (
+                  <div style={{ ...infoBox, color: '#7C3AED', marginBottom: 10 }}>
+                    Total trays incoming: {(parseFloat(trayPacks)||0) * (parseFloat(trayPiecesPerPack)||100)} trays
+                  </div>
+                )}
+                <Row>
+                  <Field label="Date *">
+                    <input style={inp} type="date" value={trayDate} max={today()} onChange={e => setTrayDate(e.target.value)} />
+                  </Field>
+                  <Field label="Note">
+                    <input style={inp} type="text" placeholder="Supplier, batch ref, etc."
+                      value={trayNote} onChange={e => setTrayNote(e.target.value)} />
+                  </Field>
+                </Row>
+              </div>
+            )}
+
+            {/* ── EGG COLLECTION ── */}
+            {isEggCollection && (
+              <div style={card}>
+                <InfoBox>Log egg collection — trays used to pack eggs are deducted from inventory.</InfoBox>
+                <Row>
+                  <Field label="Trays Used *">
+                    <input style={{ ...inp, fontSize: '1.3rem', fontFamily: "'DM Mono',monospace" }}
+                      type="number" placeholder="e.g. 12" min="1" step="1"
+                      value={eggTraysUsed} onChange={e => setEggTraysUsed(e.target.value)} />
+                  </Field>
+                  <Field label="Date *">
+                    <input style={inp} type="date" value={eggDate} max={today()} onChange={e => setEggDate(e.target.value)} />
+                  </Field>
+                </Row>
+                <Field label="Note">
+                  <input style={inp} type="text" placeholder="e.g. Morning collection"
+                    value={eggNote} onChange={e => setEggNote(e.target.value)} />
+                </Field>
               </div>
             )}
 

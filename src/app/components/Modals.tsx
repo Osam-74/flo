@@ -312,7 +312,7 @@ export function EditModal({ open, tx, people, currency, onClose, onSave }: EditM
     setSource(t.source || 'shop');
     setBuyer(t.buyer || '');
     setPerson(t.seller || t.employee || t.person || '');
-    setReceiver(t.receiver || '');
+    setReceiver(t.person || '');  // income: receiver is stored as t.person
     setSalPaidBy(t.salaryPaidBy || t.person || '');
     // transfer
     setTfAmt(String(t.amount || 0));
@@ -363,7 +363,7 @@ export function EditModal({ open, tx, people, currency, onClose, onSave }: EditM
       if (amt <= 0) { showToast('Enter a valid amount', 'error'); return; }
       const sellerName = people.find(p => p.id === person)?.name || '';
       const desc = `Sale${buyer ? ' — to ' + buyer : ''}${sellerName ? ' by ' + sellerName : ''}${cat ? ' — ' + cat : ''}`;
-      onSave(tx.id, { amount: amt, date, note, cat, source, buyer: buyer || undefined, seller: person, sellerName, person: receiver, receiver: receiver || undefined, desc });
+      onSave(tx.id, { amount: amt, date, note, cat, source, buyer: buyer || undefined, seller: person, sellerName, person: receiver, desc });
     }
     else if (type === 'expense') {
       const amt = parseFloat(amount) || 0;

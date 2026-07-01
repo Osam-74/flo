@@ -81,6 +81,26 @@ export function Dashboard({ txs, people, currency, businessName, onPersonFilter,
     return sum;
   })();
 
+  // ── Tray inventory ──────────────────────────────────────────────────────
+  const trayInventory = (() => {
+    let totalTrayPieces = 0;
+    for (const t of txs) {
+      if (t.type === 'tray-stock') {
+        const packs = t.trayPacks || 0;
+        const ppp   = t.trayPiecesPerPack || 100;
+        totalTrayPieces += packs * ppp;
+      } else if (t.type === 'egg-collection') {
+        totalTrayPieces -= (t.eggTraysUsed || 0);
+      }
+    }
+    totalTrayPieces = Math.max(0, totalTrayPieces);
+    const piecesPerPack = 100; // standard pack size
+    const packs  = Math.floor(totalTrayPieces / piecesPerPack);
+    const pieces = totalTrayPieces % piecesPerPack;
+    const reorder = totalTrayPieces < (1 * piecesPerPack + 20); // below 1 pack + 20 pieces = 120
+    return { packs, pieces, totalTrayPieces, reorder };
+  })();
+
   const recent = [...txs].sort((a, b) => (b.ts || 0) - (a.ts || 0)).slice(0, 5);
 
   const todayStr = new Date().toISOString().split('T')[0];
@@ -109,6 +129,46 @@ export function Dashboard({ txs, people, currency, businessName, onPersonFilter,
 
   return (
     <div style={{ padding: '16px 16px 120px' }}>
+      {/* ── Tray Inventory Notice ── */}
+      {trayInventory.totalTrayPieces > 0 || txs.some(t => t.type === 'tray-stock') ? (
+        <div style={{ marginBottom: 10 }}>
+          {trayInventory.reorder && (
+            <div style={{
+              background: 'rgba(220,38,38,0.10)',
+              border: '1.5px solid #DC2626',
+              borderRadius: 12, padding: '8px 14px',
+              display: 'flex', alignItems: 'center', gap: 8,
+              marginBottom: 6,
+              animation: 'reorder-blink 1.1s ease-in-out infinite',
+            }}>
+              <span style={{ fontSize: '1rem' }}>📦</span>
+              <span style={{ fontSize: '0.72rem', fontWeight: 800, color: '#DC2626', letterSpacing: '0.06em', textTransform: 'uppercase' }}>
+                REORDER TRAY
+              </span>
+              <span style={{ fontSize: '0.68rem', color: '#991B1B', marginLeft: 'auto' }}>
+                Only {trayInventory.packs > 0 ? `${trayInventory.packs} pack${trayInventory.packs !== 1 ? 's' : ''} + ` : ''}{trayInventory.pieces} piece{trayInventory.pieces !== 1 ? 's' : ''} left
+              </span>
+            </div>
+          )}
+          <div style={{
+            background: trayInventory.reorder ? 'rgba(124,58,237,0.08)' : 'rgba(124,58,237,0.08)',
+            border: `1.5px solid ${trayInventory.reorder ? 'rgba(220,38,38,0.3)' : 'rgba(124,58,237,0.25)'}`,
+            borderRadius: 12, padding: '8px 14px',
+            display: 'flex', alignItems: 'center', gap: 8,
+          }}>
+            <span style={{ fontSize: '0.95rem' }}>🥚</span>
+            <span style={{ fontSize: '0.68rem', fontWeight: 700, color: '#5B21B6', letterSpacing: '0.04em' }}>Tray Stock:</span>
+            <span style={{ fontFamily: "'DM Mono',monospace", fontSize: '0.76rem', fontWeight: 700, color: trayInventory.reorder ? '#DC2626' : '#3730A3' }}>
+              {trayInventory.packs > 0 ? `${trayInventory.packs} pack${trayInventory.packs !== 1 ? 's' : ''} ` : ''}
+              {(trayInventory.packs > 0 && trayInventory.pieces > 0) ? '+ ' : ''}
+              {trayInventory.pieces > 0 || trayInventory.packs === 0 ? `${trayInventory.pieces} piece${trayInventory.pieces !== 1 ? 's' : ''}` : ''}
+            </span>
+            <span style={{ fontSize: '0.65rem', color: '#7C3AED', marginLeft: 'auto' }}>({trayInventory.totalTrayPieces} total)</span>
+          </div>
+          <style>{`@keyframes reorder-blink { 0%,100% { opacity:1; } 50% { opacity:0.45; } }`}</style>
+        </div>
+      ) : null}
+
       {/* Balance Card */}
       <div style={{
         background: 'linear-gradient(145deg, #0D1B6E 0%, #1A2FA8 35%, #2D52E0 70%, #4B7AF5 100%)',

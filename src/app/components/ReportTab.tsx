@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { FileText, Download, Sparkles } from 'lucide-react';
+import { FileText, Download, Sparkles, Sun } from 'lucide-react';
 import { showToast } from './Modals';
 import type { Transaction, Person } from '../types';
 import { fmtDate, fmtN, pStats } from '../utils';
@@ -127,7 +127,7 @@ export function ReportTab({ businessName, txs, people, currency }: Props) {
     // We use the FULL txs (all time) to compute current balances, then show them
     const allPeopleWithBiz = [
       // Biz account
-      { id: 'biz', name: 'Bees Account (Business)', isBiz: true },
+      { id: 'biz', name: 'Biz Saving', isBiz: true },
       // Real people from the people list
       ...people.map(p => ({ id: p.id, name: p.name, isBiz: false })),
     ];
@@ -160,7 +160,7 @@ export function ReportTab({ businessName, txs, people, currency }: Props) {
     const balRows: BalRow[] = [];
 
     // Bees (biz) account
-    balRows.push({ name: 'Bees Account (Business)', balance: bizBalance, isBiz: true });
+    balRows.push({ name: 'Biz Saving', balance: bizBalance, isBiz: true });
 
     // Each person
     for (const p of people) {
@@ -185,7 +185,7 @@ export function ReportTab({ businessName, txs, people, currency }: Props) {
           <th style="width:22%">Balance (${esc(currency)})</th>
         </tr></thead><tbody>
         ${rows.map(r => `<tr class="${r.balance < 0 ? 'pdf-negative' : ''}">
-          <td>${esc(r.name)}${r.isBiz ? ' <span style="font-size:0.68rem;background:#e8f0fe;color:#1a2fa8;border-radius:4px;padding:1px 6px;margin-left:4px;font-weight:700;">BEES</span>' : ''}</td>
+          <td>${esc(r.name)}${r.isBiz ? ' <span style="font-size:0.68rem;background:#e8f0fe;color:#1a2fa8;border-radius:4px;padding:1px 6px;margin-left:4px;font-weight:700;">BIZ</span>' : ''}</td>
           <td>${r.balance < 0 ? '–' : ''}${fmtN(Math.abs(r.balance))}</td>
         </tr>`).join('')}
         </tbody><tfoot>
@@ -472,6 +472,7 @@ export function ReportTab({ businessName, txs, people, currency }: Props) {
           position: 'relative',
         }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
+            <Sun size={16} color="#ca8a04" />
             <Sparkles size={16} color="#16a34a" />
             <span style={{ fontSize: '0.72rem', fontWeight: 800, letterSpacing: '0.1em', textTransform: 'uppercase', color: '#16a34a' }}>Report Summary</span>
           </div>
