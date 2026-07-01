@@ -82,23 +82,25 @@ export function Dashboard({ txs, people, currency, businessName, onPersonFilter,
   })();
 
   // ── Tray inventory ──────────────────────────────────────────────────────
+  // Restocks come from: expense transactions with category === 'Tray Stock'
+  // There is no separate deduction type — trays are consumed as eggs are sold (not tracked here)
   const trayInventory = (() => {
     let totalTrayPieces = 0;
+    let hasTrayData = false;
     for (const t of txs) {
-      if (t.type === 'tray-stock') {
+      if (t.type === 'expense' && t.cat === 'Tray Stock' && t.trayPacks) {
         const packs = t.trayPacks || 0;
         const ppp   = t.trayPiecesPerPack || 100;
         totalTrayPieces += packs * ppp;
-      } else if (t.type === 'egg-collection') {
-        totalTrayPieces -= (t.eggTraysUsed || 0);
+        hasTrayData = true;
       }
     }
     totalTrayPieces = Math.max(0, totalTrayPieces);
     const piecesPerPack = 100; // standard pack size
     const packs  = Math.floor(totalTrayPieces / piecesPerPack);
     const pieces = totalTrayPieces % piecesPerPack;
-    const reorder = totalTrayPieces < (1 * piecesPerPack + 20); // below 1 pack + 20 pieces = 120
-    return { packs, pieces, totalTrayPieces, reorder };
+    const reorder = totalTrayPieces < (1 * piecesPerPack + 20); // below 120 trays → reorder
+    return { packs, pieces, totalTrayPieces, reorder, hasTrayData };
   })();
 
   const recent = [...txs].sort((a, b) => (b.ts || 0) - (a.ts || 0)).slice(0, 5);
@@ -130,7 +132,7 @@ export function Dashboard({ txs, people, currency, businessName, onPersonFilter,
   return (
     <div style={{ padding: '16px 16px 120px' }}>
       {/* ── Tray Inventory Notice ── */}
-      {trayInventory.totalTrayPieces > 0 || txs.some(t => t.type === 'tray-stock') ? (
+      {trayInventory.hasTrayData ? (
         <div style={{ marginBottom: 10 }}>
           {trayInventory.reorder && (
             <div style={{

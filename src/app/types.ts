@@ -5,9 +5,7 @@ export type TxType =
   | 'transfer'
   | 'credit'
   | 'owner-fund'
-  | 'fund-return'
-  | 'tray-stock'
-  | 'egg-collection';
+  | 'fund-return';
 
 export type Tab = 'dashboard' | 'ledger' | 'credit' | 'people' | 'report' | 'settings';
 export type AppMode = 'locked' | 'master' | 'view';
@@ -66,9 +64,7 @@ export interface Transaction {
   employeeName?: string;
   salaryPaidBy?: string;
   isPickup?: boolean;
-  // Tray inventory fields
+  // Tray inventory fields (used when expense category === 'Tray Stock')
   trayPacks?: number;
   trayPiecesPerPack?: number;
-  trayPieces?: number;
-  eggTraysUsed?: number;
 }
