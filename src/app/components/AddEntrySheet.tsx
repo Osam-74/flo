@@ -78,8 +78,9 @@ export function AddEntrySheet({ open, onClose, people, currency, onSave, initial
   // Tray stock — used when expense category === 'Tray Stock'
   const [trayPacks, setTrayPacks]           = useState('');
   const [trayPiecesPerPack, setTrayPiecesPerPack] = useState('100');
-  // Egg collection — used when expense category === 'Egg Collection'
+  // Egg collection
   const [eggTraysUsed, setEggTraysUsed]     = useState('');
+  const [brokenEggs, setBrokenEggs]         = useState('');
 
   // ── Swipe gesture state ──────────────────────────────────────────────────
   const swipeStartX = useRef<number | null>(null);
@@ -263,18 +264,19 @@ export function AddEntrySheet({ open, onClose, people, currency, onSave, initial
     }
 
     if (type === 'egg-collection') {
-      const eggs  = parseFloat(eggTraysUsed) || 0;
+      const eggs   = parseFloat(eggTraysUsed) || 0;
+      const broken = parseFloat(brokenEggs) || 0;
       if (!date)     { showToast('Select a date', 'error'); return; }
       if (eggs <= 0) { showToast('Enter total eggs collected', 'error'); return; }
-      // Store raw pieces only — tray deduction is computed cumulatively in the dashboard
-      onSave(stripUndefined({ id, ts, type, amount: 0, date, eggPieces: eggs, desc: `Egg Collection — ${eggs} egg${eggs !== 1 ? 's' : ''} collected` }));
+      const desc = `Egg Collection — ${eggs} eggs collected${broken > 0 ? `, ${broken} broken` : ''}`;
+      onSave(stripUndefined({ id, ts, type, amount: 0, date, eggPieces: eggs, brokenEggs: broken > 0 ? broken : undefined, desc }));
     }
 
     setAmount(''); setNote(''); setBuyer(''); setTfRef('');
     setCrBuyer(''); setCrTotal(''); setCrPaid(''); setCrNote('');
     setOfNote(''); setFrNote('');
     setTrayPacks(''); setTrayPiecesPerPack('100');
-    setEggTraysUsed('');
+    setEggTraysUsed(''); setBrokenEggs('');
 
     const td = today();
     setDate(td); setTfDate(td); setCrDate(td); setOfDate(td); setFrDate(td);
@@ -664,9 +666,21 @@ export function AddEntrySheet({ open, onClose, people, currency, onSave, initial
                     <input style={inp} type="date" value={date} max={today()} onChange={e => setDate(e.target.value)} />
                   </Field>
                 </Row>
+                <Row>
+                  <Field label="Broken Eggs (pieces)">
+                    <input
+                      style={inp}
+                      type="number" placeholder="0 (optional)" min="0" step="1"
+                      value={brokenEggs} onChange={e => setBrokenEggs(e.target.value)}
+                    />
+                  </Field>
+                  <div style={{ flex: 1 }} /> {/* spacer */}
+                </Row>
                 {eggTraysUsed && Number(eggTraysUsed) > 0 && (
                   <div style={{ ...infoBox, color: '#D97706', marginBottom: 4 }}>
-                    🥚 <strong>{Number(eggTraysUsed)} eggs</strong> logged — trays are calculated from your running total
+                    🥚 <strong>{Number(eggTraysUsed)} eggs</strong> collected
+                    {Number(brokenEggs) > 0 ? ` · ${brokenEggs} broken (recorded separately)` : ''}
+                    {' — trays deducted from running total'}
                   </div>
                 )}
               </div>

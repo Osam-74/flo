@@ -81,6 +81,7 @@ export function ReportTab({ businessName, txs, people, currency }: Props) {
     totalExpenses: number; hasSalary: boolean;
     totalSalary: number; totalOtherExpenses: number;
     profit: number; totalCrates: number;
+    totalEggs: number; totalBrokenEggs: number;
   } | null>(null);
 
   function generate() {
@@ -120,6 +121,11 @@ export function ReportTab({ businessName, txs, people, currency }: Props) {
     const totalCrates = f
       .filter(t => ['income', 'credit'].includes(t.type))
       .reduce((s, t) => s + (t.crates || 0), 0);
+
+    // Egg collection totals for the period
+    const eggCollectionTxs = f.filter(t => t.type === 'egg-collection');
+    const totalEggs        = eggCollectionTxs.reduce((s, t) => s + (t.eggPieces || 0), 0);
+    const totalBrokenEggs  = eggCollectionTxs.reduce((s, t) => s + (t.brokenEggs || 0), 0);
 
     const dateLabel = (from && to) ? fmtDate(from) + ' – ' + fmtDate(to) : 'All Dates';
 
@@ -293,6 +299,8 @@ export function ReportTab({ businessName, txs, people, currency }: Props) {
       totalOtherExpenses: totalExpenses - totalSalary,
       profit,
       totalCrates,
+      totalEggs,
+      totalBrokenEggs,
     });
     showToast('Report ready', 'success');
     setTimeout(() => document.getElementById('report-preview')?.scrollIntoView({ behavior: 'smooth' }), 100);
@@ -305,6 +313,7 @@ export function ReportTab({ businessName, txs, people, currency }: Props) {
       totalSales, totalOutstanding,
       totalExpenses, hasSalary, totalSalary, totalOtherExpenses,
       profit, totalCrates,
+      totalEggs, totalBrokenEggs,
     } = reportStats;
 
     // ── Date range label ──────────────────────────────────────────────────
@@ -359,6 +368,13 @@ export function ReportTab({ businessName, txs, people, currency }: Props) {
     // Crates sentence (only if any crates were recorded)
     if (totalCrates > 0) {
       parts.push(`The total number of egg crates sold is ${totalCrates} crate${totalCrates !== 1 ? 's' : ''}.`);
+    }
+    if (totalEggs > 0) {
+      const netEggs = totalEggs - totalBrokenEggs;
+      let eggSentence = `Egg collection for this period totalled ${totalEggs} egg${totalEggs !== 1 ? 's' : ''}`;
+      if (totalBrokenEggs > 0) eggSentence += `, of which ${totalBrokenEggs} were broken, giving a net of ${netEggs} good egg${netEggs !== 1 ? 's' : ''}`;
+      eggSentence += '.';
+      parts.push(eggSentence);
     }
 
     if (parts.length === 0) {
