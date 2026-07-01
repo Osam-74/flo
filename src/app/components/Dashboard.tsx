@@ -82,24 +82,25 @@ export function Dashboard({ txs, people, currency, businessName, onPersonFilter,
   })();
 
   // ── Tray inventory ──────────────────────────────────────────────────────
-  // Restocks come from: expense transactions with category === 'Tray Stock'
-  // There is no separate deduction type — trays are consumed as eggs are sold (not tracked here)
+  // Restocks:  expense cat === 'Tray Stock'    → adds trayPacks × trayPiecesPerPack
+  // Deductions: expense cat === 'Egg Collection' → subtracts eggTraysUsed
   const trayInventory = (() => {
     let totalTrayPieces = 0;
     let hasTrayData = false;
     for (const t of txs) {
       if (t.type === 'expense' && t.cat === 'Tray Stock' && t.trayPacks) {
-        const packs = t.trayPacks || 0;
-        const ppp   = t.trayPiecesPerPack || 100;
-        totalTrayPieces += packs * ppp;
+        totalTrayPieces += (t.trayPacks || 0) * (t.trayPiecesPerPack || 100);
+        hasTrayData = true;
+      } else if (t.type === 'expense' && t.cat === 'Egg Collection' && t.eggTraysUsed) {
+        totalTrayPieces -= (t.eggTraysUsed || 0);
         hasTrayData = true;
       }
     }
     totalTrayPieces = Math.max(0, totalTrayPieces);
-    const piecesPerPack = 100; // standard pack size
-    const packs  = Math.floor(totalTrayPieces / piecesPerPack);
-    const pieces = totalTrayPieces % piecesPerPack;
-    const reorder = totalTrayPieces < (1 * piecesPerPack + 20); // below 120 trays → reorder
+    const piecesPerPack = 100;
+    const packs   = Math.floor(totalTrayPieces / piecesPerPack);
+    const pieces  = totalTrayPieces % piecesPerPack;
+    const reorder = totalTrayPieces < 120; // below 1 pack (100) + 20 loose → reorder
     return { packs, pieces, totalTrayPieces, reorder, hasTrayData };
   })();
 

@@ -64,7 +64,8 @@ export interface Transaction {
   employeeName?: string;
   salaryPaidBy?: string;
   isPickup?: boolean;
-  // Tray inventory fields (used when expense category === 'Tray Stock')
-  trayPacks?: number;
-  trayPiecesPerPack?: number;
+  // Tray inventory fields
+  trayPacks?: number;          // set when expense cat === 'Tray Stock'
+  trayPiecesPerPack?: number;  // set when expense cat === 'Tray Stock'
+  eggTraysUsed?: number;       // set when expense cat === 'Egg Collection'
 }
