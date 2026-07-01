@@ -266,8 +266,8 @@ export function AddEntrySheet({ open, onClose, people, currency, onSave, initial
       const eggs  = parseFloat(eggTraysUsed) || 0;
       if (!date)     { showToast('Select a date', 'error'); return; }
       if (eggs <= 0) { showToast('Enter total eggs collected', 'error'); return; }
-      const trays = Math.ceil(eggs / 30);
-      onSave(stripUndefined({ id, ts, type, amount: 0, date, eggTraysUsed: trays, eggPieces: eggs, desc: `Egg Collection — ${eggs} eggs (${trays} tray${trays !== 1 ? 's' : ''})` }));
+      // Store raw pieces only — tray deduction is computed cumulatively in the dashboard
+      onSave(stripUndefined({ id, ts, type, amount: 0, date, eggPieces: eggs, desc: `Egg Collection — ${eggs} egg${eggs !== 1 ? 's' : ''} collected` }));
     }
 
     setAmount(''); setNote(''); setBuyer(''); setTfRef('');
@@ -359,9 +359,8 @@ export function AddEntrySheet({ open, onClose, people, currency, onSave, initial
             style={{
               overflowY: 'auto',
               flex: 1,
-              padding: '0 16px 40px',
+              padding: '12px 16px 24px',
               WebkitOverflowScrolling: 'touch',
-              paddingBottom: 'max(40px, env(keyboard-inset-height, 0px))',
             }}
           >
 
@@ -665,28 +664,25 @@ export function AddEntrySheet({ open, onClose, people, currency, onSave, initial
                     <input style={inp} type="date" value={date} max={today()} onChange={e => setDate(e.target.value)} />
                   </Field>
                 </Row>
-                {eggTraysUsed && Number(eggTraysUsed) > 0 && (() => {
-                  const eggs  = Number(eggTraysUsed);
-                  const trays = Math.ceil(eggs / 30);
-                  return (
-                    <div style={{ ...infoBox, color: '#D97706', marginBottom: 4 }}>
-                      {eggs} eggs ÷ 30 = <strong>{trays} tray{trays !== 1 ? 's' : ''}</strong> deducted from inventory
-                    </div>
-                  );
-                })()}
+                {eggTraysUsed && Number(eggTraysUsed) > 0 && (
+                  <div style={{ ...infoBox, color: '#D97706', marginBottom: 4 }}>
+                    🥚 <strong>{Number(eggTraysUsed)} eggs</strong> logged — trays are calculated from your running total
+                  </div>
+                )}
               </div>
             )}
 
-            {/* Save button — hidden/disabled in read-only mode */}
+          </div>
+
+          {/* ── Save button — always visible, pinned to drawer bottom ── */}
+          <div style={{ flexShrink: 0, padding: '10px 16px', background: '#fff', borderTop: '1px solid rgba(0,119,182,0.08)', paddingBottom: 'max(10px, env(safe-area-inset-bottom))' }}>
             {isReadOnly ? (
               <div style={{
                 width: '100%', padding: '15px', borderRadius: 14,
                 background: 'rgba(3,4,94,0.08)',
                 color: 'rgba(3,4,94,0.3)', border: 'none',
                 fontSize: '0.82rem', fontWeight: 800, letterSpacing: '0.06em', textTransform: 'uppercase',
-                marginTop: 8, textAlign: 'center',
-                cursor: 'not-allowed',
-                boxShadow: 'none',
+                textAlign: 'center', cursor: 'not-allowed', boxSizing: 'border-box',
               }}>
                 🔒 View Only
               </div>
@@ -699,7 +695,8 @@ export function AddEntrySheet({ open, onClose, people, currency, onSave, initial
                   color: '#fff', border: 'none', cursor: 'pointer',
                   fontSize: '0.82rem', fontWeight: 800, letterSpacing: '0.06em', textTransform: 'uppercase',
                   boxShadow: '0 6px 20px rgba(0,119,182,0.45)',
-                  marginTop: 8, transition: 'opacity 0.15s, transform 0.15s',
+                  transition: 'opacity 0.15s, transform 0.15s',
+                  boxSizing: 'border-box',
                 }}
                 onMouseEnter={e => { e.currentTarget.style.opacity = '0.9'; }}
                 onMouseLeave={e => { e.currentTarget.style.opacity = '1'; }}
@@ -718,15 +715,19 @@ export function AddEntrySheet({ open, onClose, people, currency, onSave, initial
 
 function Field({ label, children }: { label: string; children: React.ReactNode }) {
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 5, flex: 1 }}>
-      <label style={{ fontSize: '0.6rem', fontWeight: 700, letterSpacing: '0.1em', textTransform: 'uppercase', color: '#0077B6' }}>{label}</label>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 5, minWidth: 0 }}>
+      <label style={{ fontSize: '0.6rem', fontWeight: 700, letterSpacing: '0.1em', textTransform: 'uppercase', color: '#0077B6', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{label}</label>
       {children}
     </div>
   );
 }
 
 function Row({ children }: { children: React.ReactNode }) {
-  return <div style={{ display: 'flex', gap: 12, marginBottom: 14, flexWrap: 'wrap' }}>{children}</div>;
+  return (
+    <div style={{ display: 'grid', gridTemplateColumns: `repeat(auto-fit, minmax(0, 1fr))`, gap: 10, marginBottom: 14 }}>
+      {children}
+    </div>
+  );
 }
 
 function Select({ value, onChange, children }: { value: string; onChange: (v: string) => void; children: React.ReactNode }) {
@@ -758,6 +759,7 @@ const inp: React.CSSProperties = {
   border: '1.5px solid rgba(61,107,223,0.18)',
   borderRadius: 10, padding: '10px 13px',
   fontSize: '0.88rem', color: '#03045E',
+  boxSizing: 'border-box' as const,
   width: '100%', fontFamily: "'DM Mono',monospace",
   outline: 'none', transition: 'border-color 0.18s',
 };

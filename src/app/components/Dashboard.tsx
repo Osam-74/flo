@@ -82,26 +82,32 @@ export function Dashboard({ txs, people, currency, businessName, onPersonFilter,
   })();
 
   // ── Tray inventory ──────────────────────────────────────────────────────
-  // Restocks:  expense cat === 'Tray Stock'    → adds trayPacks × trayPiecesPerPack
-  // Deductions: expense cat === 'Egg Collection' → subtracts eggTraysUsed
+  // Restocks:   expense cat === 'Tray Stock' → adds trayPacks × trayPiecesPerPack trays
+  // Deductions: egg-collection entries        → accumulate raw eggPieces; Math.floor(total/30) = trays used
+  // Tray notice fires when remaining trays < 120
   const trayInventory = (() => {
-    let totalTrayPieces = 0;
-    let hasTrayData = false;
+    let trayStockTotal = 0;   // total trays ever restocked
+    let totalEggPieces = 0;   // cumulative eggs collected across all entries
+    let hasTrayData    = false;
+
     for (const t of txs) {
       if (t.type === 'expense' && t.cat === 'Tray Stock' && t.trayPacks) {
-        totalTrayPieces += (t.trayPacks || 0) * (t.trayPiecesPerPack || 100);
+        trayStockTotal += (t.trayPacks || 0) * (t.trayPiecesPerPack || 100);
         hasTrayData = true;
-      } else if (t.type === 'egg-collection' && t.eggTraysUsed) {
-        totalTrayPieces -= (t.eggTraysUsed || 0);
+      } else if (t.type === 'egg-collection' && t.eggPieces) {
+        totalEggPieces += (t.eggPieces || 0);
         hasTrayData = true;
       }
     }
-    totalTrayPieces = Math.max(0, totalTrayPieces);
-    const piecesPerPack = 100;
-    const packs   = Math.floor(totalTrayPieces / piecesPerPack);
-    const pieces  = totalTrayPieces % piecesPerPack;
-    const reorder = totalTrayPieces < 120; // below 1 pack (100) + 20 loose → reorder
-    return { packs, pieces, totalTrayPieces, reorder, hasTrayData };
+
+    // Trays consumed = floor of ALL eggs collected ÷ 30
+    // (40 + 20 = 60 eggs = exactly 2 trays, not 2+1)
+    const traysConsumed = Math.floor(totalEggPieces / 30);
+    const remaining     = Math.max(0, trayStockTotal - traysConsumed);
+    const packs         = Math.floor(remaining / 100);
+    const pieces        = remaining % 100;
+    const reorder       = remaining < 120; // below 120 trays → reorder
+    return { packs, pieces, totalTrays: remaining, reorder, hasTrayData };
   })();
 
   const recent = [...txs].sort((a, b) => (b.ts || 0) - (a.ts || 0)).slice(0, 5);
@@ -166,7 +172,7 @@ export function Dashboard({ txs, people, currency, businessName, onPersonFilter,
               {(trayInventory.packs > 0 && trayInventory.pieces > 0) ? '+ ' : ''}
               {trayInventory.pieces > 0 || trayInventory.packs === 0 ? `${trayInventory.pieces} piece${trayInventory.pieces !== 1 ? 's' : ''}` : ''}
             </span>
-            <span style={{ fontSize: '0.65rem', color: '#7C3AED', marginLeft: 'auto' }}>({trayInventory.totalTrayPieces} total)</span>
+            <span style={{ fontSize: '0.65rem', color: '#7C3AED', marginLeft: 'auto' }}>({trayInventory.totalTrays} total)</span>
           </div>
           <style>{`@keyframes reorder-blink { 0%,100% { opacity:1; } 50% { opacity:0.45; } }`}</style>
         </div>
