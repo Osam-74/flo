@@ -149,9 +149,9 @@ export function Dashboard({
         <>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 6, marginTop: 10 }}>
             {[
-              { lbl: 'Total In',  val: hidden ? '••••' : fmtAmt(totalIn,  ''), col: '#A8C8FF' },
-              { lbl: 'Total Out', val: hidden ? '••••' : fmtAmt(totalOut, ''), col: '#FFB3C0' },
-              { lbl: 'Entries',   val: String(txs.length),                     col: '#CBD5E1' },
+              { lbl: 'Total In',   val: hidden ? '••••' : fmtAmt(totalIn,  ''), col: '#A8C8FF' },
+              { lbl: 'Total Out',  val: hidden ? '••••' : fmtAmt(totalOut, ''), col: '#FFB3C0' },
+              { lbl: 'Feed Stock', val: feedInventory.hasFeedData ? `${feedInventory.totalBags} bag${feedInventory.totalBags !== 1 ? 's' : ''}` : '—', col: '#FDE68A' },
             ].map(s => (
               <div key={s.lbl} style={{ background: 'rgba(255,255,255,0.1)', backdropFilter: 'blur(8px)', borderRadius: 10, padding: '9px 8px', border: '1px solid rgba(255,255,255,0.1)' }}>
                 <div style={{ fontSize: '0.46rem', fontWeight: 800, letterSpacing: '0.13em', textTransform: 'uppercase', color: 'rgba(255,255,255,0.4)', marginBottom: 4 }}>{s.lbl}</div>
@@ -168,7 +168,38 @@ export function Dashboard({
         </>
       ),
     },
-    { label: 'Biz Saving', sub: 'Internal funds held', balance: bizBalance, pal: PALETTE[1], body: () => null },
+    { label: 'Biz Saving', sub: 'Internal funds held', balance: bizBalance, pal: PALETTE[1], body: () => {
+      // Compute biz-specific in/out
+      let bizIn = 0, bizOut = 0;
+      for (const t of txs) {
+        if (t.type === 'transfer') {
+          if (t.transferTo   === 'biz') bizIn  += t.amount;
+          if (t.transferFrom === 'biz') bizOut += t.amount;
+        }
+        if (t.type === 'income'      && (t as any).receiver === 'biz') bizIn  += t.amount;
+        if (t.type === 'salary'      && t.salaryPaidBy      === 'biz') bizOut += t.amount;
+        if (t.type === 'expense'     && t.person            === 'biz') bizOut += t.amount;
+        if (t.type === 'owner-fund'  && t.ownerReceiver     === 'biz') bizIn  += t.amount;
+        if (t.type === 'fund-return' && t.frSender          === 'biz') bizOut += t.amount;
+        if (t.type === 'credit') {
+          if (Array.isArray(t.payments) && t.payments.length > 0) {
+            for (const p of t.payments) if (p.receiver === 'biz') bizIn += p.amount;
+          } else if (t.creditReceiver === 'biz' && (t.creditPaid || 0) > 0) {
+            bizIn += (t.creditPaid || 0);
+          }
+        }
+      }
+      return !hidden ? (
+        <div style={{ display: 'flex', gap: 7, marginTop: 10 }}>
+          {[{ l: 'Total In', v: fmtAmt(bizIn, currency), c: '#A8C8FF' }, { l: 'Total Out', v: fmtAmt(bizOut, currency), c: '#FFB3C0' }].map(s => (
+            <div key={s.l} style={{ background: 'rgba(255,255,255,0.1)', backdropFilter: 'blur(8px)', borderRadius: 10, padding: '9px 12px', flex: 1, border: '1px solid rgba(255,255,255,0.1)' }}>
+              <div style={{ fontSize: '0.46rem', fontWeight: 800, letterSpacing: '0.13em', textTransform: 'uppercase', color: 'rgba(255,255,255,0.4)', marginBottom: 4 }}>{s.l}</div>
+              <div style={{ fontFamily: "'DM Mono',monospace", fontSize: '0.7rem', fontWeight: 700, color: s.c }}>{s.v}</div>
+            </div>
+          ))}
+        </div>
+      ) : null;
+    }},
     ...members.map((p, i) => {
       const { pIn, pOut, pBal } = pStats(p.id, txs);
       return {
