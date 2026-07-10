@@ -71,6 +71,9 @@ export default function App() {
   const [pickupModal, setPickupModal] = useState<{ open: boolean; buyer: string; pickupDate: string }>({ open: false, buyer: '', pickupDate: '' });
   const [clearModal,  setClearModal]  = useState(false);
 
+  /* ── Feed daily prompt ───────────────────────────── */
+  const [feedPrompt, setFeedPrompt] = useState<{ open: boolean; targetDate: string; missedDays: number }>({ open: false, targetDate: '', missedDays: 0 });
+
   /* ── Refs ──────────────────────────────────────── */
   const dbRef    = useRef<any>(null);
   const fsRef    = useRef<any>(null);
@@ -78,6 +81,7 @@ export default function App() {
   const promptRef = useRef<any>(null);
   const bizUnsubRef = useRef<any>(null); // unsubscribe for biz data listener
   const regUnsubRef = useRef<any>(null); // unsubscribe for registry listener
+  const feedCheckedRef = useRef<string>(''); // tracks bizId+date already checked this session
 
   const isReadOnly = appMode === 'view';
 
@@ -525,6 +529,82 @@ export default function App() {
     dbSync(people, txs, c);
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [people, txs, dbSync, isReadOnly]);
+
+  /* ── Cloud pull / push ───────────────────────────── */
+  /* ── Feed daily prompt logic ────────────────────── */
+  const feedPromptKey = (bizId: string, date: string) => `feed_done_${bizId}_${date}`;
+  const todayStr = () => new Date().toISOString().split('T')[0];
+
+  const checkFeedPrompt = (bizId: string, currentTxs: Transaction[]) => {
+    if (!bizId) return;
+    const today = todayStr();
+    if (localStorage.getItem(feedPromptKey(bizId, today)) === 'done') return;
+
+    const feedPurchases = currentTxs.filter(
+      t => t.type === 'expense' && t.cat === 'Feed' && (t.feedBags ?? 0) > 0
+    );
+    if (feedPurchases.length === 0) return; // no feed data yet, don't prompt
+
+    const feedDates = feedPurchases.map(t => t.date).sort().reverse();
+    let missedDays = 0;
+    let targetDate = today;
+
+    const lastDate = feedDates[0];
+    const last = new Date(lastDate + 'T00:00:00');
+    const now  = new Date(today   + 'T00:00:00');
+    const diffDays = Math.floor((now.getTime() - last.getTime()) / (1000 * 60 * 60 * 24));
+    missedDays = Math.max(0, diffDays - 1);
+    if (missedDays > 0) {
+      const missedDate = new Date(last.getTime() + 86400000);
+      targetDate = missedDate.toISOString().split('T')[0];
+    }
+
+    setTimeout(() => {
+      setFeedPrompt({ open: true, targetDate, missedDays });
+    }, 1200);
+  };
+
+  const handleFeedUsageSave = (bags: number, date: string) => {
+    const bizId = selectedBiz?.id ?? '';
+    const today = todayStr();
+    const firstPerson = people.find((p: Person) => !p.role?.toLowerCase().includes('owner'))?.id || 'biz';
+    const tx: any = {
+      id: 'tx_' + Date.now(),
+      ts: Date.now(),
+      type: 'expense',
+      amount: 0,
+      person: firstPerson,
+      date,
+      cat: 'Feed',
+      feedBags: -bags,
+      desc: `Feed usage — ${bags} bag${bags !== 1 ? 's' : ''} used`,
+      note: 'Daily feed usage log',
+    };
+
+    setTxs((prev: Transaction[]) => {
+      const next = [...prev, tx];
+      dbSync(people, next, currency);
+      return next;
+    });
+
+    showToast(`🌾 ${bags} bag${bags !== 1 ? 's' : ''} of feed logged`, 'success');
+    if (bizId) localStorage.setItem(feedPromptKey(bizId, today), 'done');
+    setFeedPrompt({ open: false, targetDate: '', missedDays: 0 });
+
+    // If we just logged a missed day (not today), re-check after a moment
+    if (date !== today) {
+      setTimeout(() => {
+        setTxs((prev: Transaction[]) => {
+          checkFeedPrompt(bizId, prev);
+          return prev;
+        });
+      }, 700);
+    }
+  };
+
+  const handleFeedPromptDismiss = () => {
+    setFeedPrompt({ open: false, targetDate: '', missedDays: 0 });
+  };
 
   /* ── Cloud pull / push ───────────────────────────── */
   const manualPull = async () => {
