@@ -14,6 +14,7 @@ import { PeopleTab }      from './components/PeopleTab';
 import { ReportTab }      from './components/ReportTab';
 import { SettingsTab }    from './components/SettingsTab';
 import { DeleteModal, EditModal, PaymentModal, PickupModal, ClearModal, ToastContainer, showToast } from './components/Modals';
+import { FeedUsageModal } from './components/FeedUsageModal';
 
 import type { Transaction, Person, Tab, AppMode, TxType } from './types';
 import { gs, ss, sha256, sanitizeTxs, stripUndefined } from './utils';
