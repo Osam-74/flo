@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { showToast } from './Modals';
-import { CloudDownload, CloudUpload, Trash2, Building2 } from 'lucide-react';
+import { ShieldCheck, Building2 } from 'lucide-react';
 
 interface Props {
   currency: string;
@@ -10,12 +10,10 @@ interface Props {
   onSaveBusinessName: (name: string) => void; // kept for compat, not used in UI
   onPull: () => void;
   onPush: () => void;
-  onClearAll: () => void;
-  onExport?: () => void;
-  onImport?: (file: File | null) => void;
+  onClearAll?: () => void; // kept for compat — no longer used in UI
 }
 
-export function SettingsTab({ currency, businessName, dbStatus, onSaveCurrency, onPull, onPush, onClearAll, onExport, onImport }: Props) {
+export function SettingsTab({ currency, businessName, dbStatus, onSaveCurrency, onPull, onPush }: Props) {
   const [cur, setCur] = useState(currency);
 
   return (
@@ -83,41 +81,12 @@ export function SettingsTab({ currency, businessName, dbStatus, onSaveCurrency, 
         </div>
       </div>
 
-      {/* Data Management */}
-      <div style={sh}>Data Management</div>
-      <div style={card}>
-        <button
-          onClick={onClearAll}
-          style={{ ...primaryBtn, background: 'linear-gradient(135deg, #c0203a, #e83e5c)', marginBottom: 16, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8 }}
-        >
-          <Trash2 size={14} /> Clear All Data
-        </button>
-
-        <div style={{ background: '#F5F7FF', borderRadius: 12, padding: '14px', border: '1px solid rgba(61,107,223,0.08)' }}>
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 8 }}>
-            <button
-              onClick={() => onExport && onExport()}
-              style={{ ...primaryBtn, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8 }}
-            >
-              <CloudDownload size={14} /> Export
-            </button>
-            <label style={{ width: '100%' }}>
-              <input
-                type="file" accept="application/json" style={{ display: 'none' }}
-                onChange={e => onImport && onImport(e.target.files ? e.target.files[0] : null)}
-              />
-              <button
-                style={{ ...primaryBtn, width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8 }}
-                onClick={e => { (e.currentTarget.previousElementSibling as HTMLInputElement)?.click(); }}
-              >
-                <CloudUpload size={14} /> Import
-              </button>
-            </label>
-          </div>
-          <div style={{ fontSize: '0.7rem', color: '#5A5F7A', lineHeight: 1.8 }}>
-            Export downloads a JSON backup. Import replaces current data.
-          </div>
-        </div>
+      {/* Master Admin notice */}
+      <div style={{ background: 'rgba(61,107,223,0.05)', borderRadius: 14, padding: '13px 16px', border: '1px solid rgba(61,107,223,0.12)', display: 'flex', alignItems: 'center', gap: 10, marginBottom: 20 }}>
+        <ShieldCheck size={17} color="#3D6BDF" style={{ flexShrink: 0 }} />
+        <span style={{ fontSize: '0.72rem', color: '#3D6BDF', fontWeight: 600, lineHeight: 1.5 }}>
+          Data backup, restore, and clearing are only available to the <strong>master admin</strong>.
+        </span>
       </div>
     </div>
   );

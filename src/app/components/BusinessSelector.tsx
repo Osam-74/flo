@@ -239,6 +239,117 @@ function ResetPinModal({ biz, onClose, onSubmit }: { biz: BizRecord; onClose: ()
   );
 }
 
+/* ── Master Data Backup Panel (master admin only) ── */
+function MasterDataBackup({
+  businesses,
+  onExport,
+  onImport,
+  onClearData,
+}: {
+  businesses: BizRecord[];
+  onExport?: (bizId: string) => void;
+  onImport?: (bizId: string, file: File) => void;
+  onClearData?: (bizId: string) => void;
+}) {
+  const [expanded, setExpanded] = React.useState(false);
+  const [selectedId, setSelectedId] = React.useState('');
+  const [confirmClear, setConfirmClear] = React.useState(false);
+  const fileRef = React.useRef<HTMLInputElement>(null);
+
+  const biz = businesses.find(b => b.id === selectedId) ?? null;
+
+  if (!expanded) {
+    return (
+      <div
+        onClick={() => setExpanded(true)}
+        style={{ background: '#fff', borderRadius: 14, padding: '13px 16px', marginBottom: 14, display: 'flex', alignItems: 'center', justifyContent: 'space-between', boxShadow: '0 2px 10px rgba(61,107,223,0.08)', border: '1px solid rgba(61,107,223,0.12)', cursor: 'pointer' }}
+      >
+        <div style={{ display: 'flex', alignItems: 'center', gap: 9 }}>
+          <div style={{ width: 32, height: 32, borderRadius: 9, background: 'linear-gradient(135deg, #B45309, #D97706)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+            <CloudDownload size={15} color="#fff" />
+          </div>
+          <div>
+            <div style={{ fontSize: '0.78rem', fontWeight: 800, color: '#1A1D2E' }}>Data Backup & Restore</div>
+            <div style={{ fontSize: '0.62rem', color: '#9A9FB8', marginTop: 1 }}>Export, import or clear a business</div>
+          </div>
+        </div>
+        <ChevronDown size={16} color="#9A9FB8" />
+      </div>
+    );
+  }
+
+  return (
+    <div style={{ background: '#fff', borderRadius: 14, padding: '16px', marginBottom: 14, boxShadow: '0 2px 10px rgba(61,107,223,0.08)', border: '1px solid rgba(61,107,223,0.12)' }}>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+          <div style={{ width: 30, height: 30, borderRadius: 9, background: 'linear-gradient(135deg, #B45309, #D97706)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            <CloudDownload size={14} color="#fff" />
+          </div>
+          <span style={{ fontSize: '0.78rem', fontWeight: 800, color: '#1A1D2E' }}>Data Backup & Restore</span>
+        </div>
+        <button onClick={() => { setExpanded(false); setSelectedId(''); setConfirmClear(false); }} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#9A9FB8' }}>
+          <X size={16} />
+        </button>
+      </div>
+
+      <div style={{ fontSize: '0.58rem', fontWeight: 800, letterSpacing: '0.12em', textTransform: 'uppercase', color: '#9A9FB8', marginBottom: 6 }}>Select Business</div>
+      <select
+        value={selectedId}
+        onChange={e => { setSelectedId(e.target.value); setConfirmClear(false); }}
+        style={{ width: '100%', padding: '11px 13px', borderRadius: 11, border: '1.5px solid rgba(61,107,223,0.2)', fontSize: '0.85rem', fontWeight: 600, color: '#1A1D2E', background: '#F8F9FF', outline: 'none', marginBottom: 14, fontFamily: 'Plus Jakarta Sans, sans-serif', cursor: 'pointer' }}
+      >
+        <option value="">— Choose a business —</option>
+        {businesses.map(b => (
+          <option key={b.id} value={b.id}>{b.name}</option>
+        ))}
+      </select>
+
+      {!biz ? (
+        <div style={{ fontSize: '0.75rem', color: '#C0C5D8', textAlign: 'center', padding: '8px 0' }}>Select a business above to manage its data</div>
+      ) : (
+        <>
+          <div style={{ fontSize: '0.58rem', fontWeight: 800, letterSpacing: '0.12em', textTransform: 'uppercase', color: '#9A9FB8', marginBottom: 8 }}>Backup / Restore</div>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 14 }}>
+            <button onClick={() => onExport && onExport(biz.id)} style={{ ...backupBtn, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 7 }}>
+              <CloudDownload size={13} /> Export
+            </button>
+            <label style={{ width: '100%' }}>
+              <input ref={fileRef} type="file" accept="application/json" style={{ display: 'none' }}
+                onChange={e => { const f = e.target.files?.[0]; if (f && onImport) { onImport(biz.id, f); if (fileRef.current) fileRef.current.value = ''; } }}
+              />
+              <button style={{ ...backupBtn, width: '100%', background: 'linear-gradient(135deg, #2a4a9a, #3d6bdf)', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 7 }} onClick={() => fileRef.current?.click()}>
+                <CloudUpload size={13} /> Restore
+              </button>
+            </label>
+          </div>
+          <div style={{ fontSize: '0.58rem', fontWeight: 800, letterSpacing: '0.12em', textTransform: 'uppercase', color: '#9A9FB8', marginBottom: 8 }}>Danger Zone</div>
+          {!confirmClear ? (
+            <button onClick={() => setConfirmClear(true)} style={{ ...backupBtn, background: 'linear-gradient(135deg, #c0203a, #e83e5c)', width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8 }}>
+              <Trash2 size={13} /> Clear All Data for {biz.name}
+            </button>
+          ) : (
+            <div style={{ background: 'rgba(232,62,92,0.08)', borderRadius: 13, padding: '13px', border: '1px solid rgba(232,62,92,0.2)' }}>
+              <div style={{ fontSize: '0.75rem', color: '#C0203A', fontWeight: 700, marginBottom: 12, textAlign: 'center', lineHeight: 1.5 }}>
+                ⚠️ Permanently delete ALL data for <strong>{biz.name}</strong>?
+              </div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+                <button onClick={() => setConfirmClear(false)} style={{ padding: '11px', borderRadius: 11, background: '#F5F7FF', border: '1px solid rgba(0,0,0,0.08)', cursor: 'pointer', fontWeight: 700, color: '#5A5F7A', fontSize: '0.78rem' }}>Cancel</button>
+                <button onClick={() => { onClearData && onClearData(biz.id); setConfirmClear(false); setSelectedId(''); }} style={{ padding: '11px', borderRadius: 11, background: 'linear-gradient(135deg, #c0203a, #e83e5c)', border: 'none', cursor: 'pointer', fontWeight: 800, color: '#fff', fontSize: '0.78rem' }}>Yes, Clear</button>
+              </div>
+            </div>
+          )}
+        </>
+      )}
+    </div>
+  );
+}
+
+const backupBtn: React.CSSProperties = {
+  width: '100%', padding: '11px', borderRadius: 11, fontSize: '0.72rem', fontWeight: 700,
+  letterSpacing: '0.04em', background: 'linear-gradient(135deg, #3D6BDF, #5A84FF)',
+  color: '#fff', border: 'none', cursor: 'pointer', boxShadow: '0 3px 12px rgba(61,107,223,0.22)',
+};
+
 /* ── Business Settings Modal (master access) ── */
 function BizSettingsModal({
   biz, onClose, onExport, onImport, onClearData, onPull, onPush
@@ -251,8 +362,6 @@ function BizSettingsModal({
   onPull?: (bizId: string) => void;
   onPush?: (bizId: string) => void;
 }) {
-  const [confirmClear, setConfirmClear] = useState(false);
-
   return (
     <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.55)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 10001, padding: 16 }}>
       <div style={{ background: '#fff', borderRadius: 22, padding: '24px 20px', width: '100%', maxWidth: 340, boxShadow: '0 12px 48px rgba(0,0,0,0.22)', fontFamily: 'Plus Jakarta Sans, sans-serif' }}>
@@ -276,37 +385,13 @@ function BizSettingsModal({
           </button>
         </div>
 
-        {/* Export / Import */}
-        <div style={sectionLabel}>Data Backup</div>
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 18 }}>
-          <button onClick={() => { onExport && onExport(biz.id); onClose(); }} style={{ ...actionBtn, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 7 }}>
-            <CloudDownload size={14} /> Export
-          </button>
-          <label style={{ width: '100%' }}>
-            <input type="file" accept="application/json" style={{ display: 'none' }} onChange={e => { const f = e.target.files?.[0]; if (f && onImport) { onImport(biz.id, f); onClose(); } }} />
-            <button style={{ ...actionBtn, width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 7 }} onClick={e => (e.currentTarget.previousElementSibling as HTMLInputElement)?.click()}>
-              <CloudUpload size={14} /> Import
-            </button>
-          </label>
+        {/* Backup notice */}
+        <div style={{ background: 'rgba(61,107,223,0.05)', borderRadius: 12, padding: '12px 14px', border: '1px solid rgba(61,107,223,0.12)', display: 'flex', alignItems: 'center', gap: 10 }}>
+          <ShieldCheck size={16} color="#3D6BDF" style={{ flexShrink: 0 }} />
+          <span style={{ fontSize: '0.7rem', color: '#3D6BDF', fontWeight: 600, lineHeight: 1.5 }}>
+            Data backup, restore, and clearing are managed by the <strong>master admin</strong>.
+          </span>
         </div>
-
-        {/* Danger zone */}
-        <div style={sectionLabel}>Danger Zone</div>
-        {!confirmClear ? (
-          <button onClick={() => setConfirmClear(true)} style={{ ...actionBtn, background: 'linear-gradient(135deg, #c0203a, #e83e5c)', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, width: '100%' }}>
-            <Trash2 size={14} /> Clear All Data
-          </button>
-        ) : (
-          <div style={{ background: 'rgba(232,62,92,0.08)', borderRadius: 14, padding: '14px', border: '1px solid rgba(232,62,92,0.2)' }}>
-            <div style={{ fontSize: '0.78rem', color: '#C0203A', fontWeight: 700, marginBottom: 12, textAlign: 'center' }}>
-              ⚠️ This will permanently delete ALL transactions and people for {biz.name}.
-            </div>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
-              <button onClick={() => setConfirmClear(false)} style={{ padding: '11px', borderRadius: 12, background: '#F5F7FF', border: '1px solid rgba(0,0,0,0.08)', cursor: 'pointer', fontWeight: 700, color: '#5A5F7A', fontSize: '0.78rem' }}>Cancel</button>
-              <button onClick={() => { onClearData && onClearData(biz.id); onClose(); }} style={{ padding: '11px', borderRadius: 12, background: 'linear-gradient(135deg, #c0203a, #e83e5c)', border: 'none', cursor: 'pointer', fontWeight: 800, color: '#fff', fontSize: '0.78rem' }}>Yes, Clear</button>
-            </div>
-          </div>
-        )}
       </div>
     </div>
   );
@@ -436,6 +521,14 @@ export function BusinessSelector({
               </div>
             ))}
           </div>
+
+          {/* Data Backup — master admin only */}
+          <MasterDataBackup
+            businesses={businesses}
+            onExport={onExport}
+            onImport={onImport}
+            onClearData={onClearData}
+          />
 
           {/* Business list */}
           <div style={{ background: '#fff', borderRadius: 18, overflow: 'hidden', boxShadow: '0 2px 16px rgba(0,0,0,0.07)', marginBottom: 16 }}>
