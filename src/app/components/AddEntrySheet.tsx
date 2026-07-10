@@ -36,7 +36,7 @@ const TYPE_OPTS: { id: TxType; emoji: string; label: string; color: string }[] =
   { id: 'fund-return', emoji: '●', label: 'Fund Return',    color: '#03045E' },
 ];
 
-const CATS = ['', 'Feed & Supplies', 'Transport', 'Utilities', 'Equipment', 'Medical / Vet', 'Labour', 'Sales Revenue', 'Loan / Advance', 'Salary', 'Tray Stock', 'Other'];
+const CATS = ['', 'Feed', 'Feed & Supplies', 'Transport', 'Utilities', 'Equipment', 'Medical / Vet', 'Labour', 'Sales Revenue', 'Loan / Advance', 'Salary', 'Tray Stock', 'Other'];
 
 export function AddEntrySheet({ open, onClose, people, currency, onSave, initialType = 'income', isReadOnly = false }: Props) {
   const [type, setType] = useState<TxType>(initialType);
@@ -81,6 +81,9 @@ export function AddEntrySheet({ open, onClose, people, currency, onSave, initial
   // Egg collection
   const [eggTraysUsed, setEggTraysUsed]     = useState('');
   const [brokenEggs, setBrokenEggs]         = useState('');
+  // Feed inventory — used when expense category === 'Feed'
+  const [feedTons, setFeedTons]   = useState('');
+  const [feedBags, setFeedBags]   = useState('');
 
   // ── Swipe gesture state ──────────────────────────────────────────────────
   const swipeStartX = useRef<number | null>(null);
@@ -201,12 +204,20 @@ export function AddEntrySheet({ open, onClose, people, currency, onSave, initial
           const packs = parseFloat(trayPacks) || 0;
           if (packs <= 0) { showToast('Enter number of tray packs', 'error'); return; }
         }
+        // Feed — validate bags field
+        if (cat === 'Feed') {
+          const bags = parseFloat(feedBags) || 0;
+          if (bags <= 0) { showToast('Enter number of feed bags', 'error'); return; }
+        }
         const packs    = cat === 'Tray Stock' ? (parseFloat(trayPacks) || 0)        : undefined;
         const ppp      = cat === 'Tray Stock' ? (parseFloat(trayPiecesPerPack) || 100) : undefined;
+        const fTons    = cat === 'Feed' ? (parseFloat(feedTons) || 0) || undefined : undefined;
+        const fBags    = cat === 'Feed' ? (parseFloat(feedBags) || 0) || undefined : undefined;
         const pn       = people.find(p => p.id === person)?.name || '';
         const trayInfo = packs ? ` — ${packs} pack${packs !== 1 ? 's' : ''} × ${ppp} trays` : '';
-        const desc     = `Expense${pn ? ' by ' + pn : ''}${cat ? ' — ' + cat : ''}${trayInfo}`;
-        onSave(stripUndefined({ id, ts, type, amount: amt, person, date, cat, note, source, buyer: buyer || undefined, receiver: receiver || undefined, trayPacks: packs, trayPiecesPerPack: ppp, desc }));
+        const feedInfo = fBags ? ` — ${fTons ? fTons + 't ' : ''}${fBags} bag${fBags !== 1 ? 's' : ''}` : '';
+        const desc     = `Expense${pn ? ' by ' + pn : ''}${cat ? ' — ' + cat : ''}${trayInfo}${feedInfo}`;
+        onSave(stripUndefined({ id, ts, type, amount: amt, person, date, cat, note, source, buyer: buyer || undefined, receiver: receiver || undefined, trayPacks: packs, trayPiecesPerPack: ppp, feedTons: fTons, feedBags: fBags, desc }));
       }
     }
     if (type === 'salary') {
@@ -287,6 +298,7 @@ export function AddEntrySheet({ open, onClose, people, currency, onSave, initial
   const ow = owners(people);
   const isStandard       = ['income', 'expense', 'salary'].includes(type);
   const isTrayExpense    = type === 'expense' && cat === 'Tray Stock';
+  const isFeedExpense    = type === 'expense' && cat === 'Feed';
   const isEggCollection  = type === 'egg-collection';
   const crPaidAmt  = parseFloat(crPaid)  || 0;
   const crTotalAmt = parseFloat(crTotal) || 0;
@@ -438,6 +450,32 @@ export function AddEntrySheet({ open, onClose, people, currency, onSave, initial
                     {trayPacks && Number(trayPacks) > 0 && (
                       <div style={{ ...infoBox, color: '#7C3AED', marginBottom: 10 }}>
                         📦 {Number(trayPacks)} pack{Number(trayPacks) !== 1 ? 's' : ''} × {Number(trayPiecesPerPack) || 100} = <strong>{Number(trayPacks) * (Number(trayPiecesPerPack) || 100)} trays</strong> incoming
+                      </div>
+                    )}
+                  </>
+                )}
+                {/* ── Feed extra fields (shown when category = Feed on an Expense) ── */}
+                {isFeedExpense && (
+                  <>
+                    <Row>
+                      <Field label="How Many Tons? *">
+                        <input
+                          style={{ ...inp, fontSize: '1.2rem', fontFamily: "'DM Mono',monospace" }}
+                          type="number" placeholder="e.g. 2" min="0" step="0.5"
+                          value={feedTons} onChange={e => setFeedTons(e.target.value)}
+                        />
+                      </Field>
+                      <Field label="How Many Bags? *">
+                        <input
+                          style={{ ...inp, fontSize: '1.2rem', fontFamily: "'DM Mono',monospace" }}
+                          type="number" placeholder="e.g. 40" min="1" step="1"
+                          value={feedBags} onChange={e => setFeedBags(e.target.value)}
+                        />
+                      </Field>
+                    </Row>
+                    {feedBags && Number(feedBags) > 0 && (
+                      <div style={{ ...infoBox, color: '#B45309', marginBottom: 10 }}>
+                        🌾 {Number(feedTons) > 0 ? `${Number(feedTons)}t — ` : ''}<strong>{Number(feedBags)} bag{Number(feedBags) !== 1 ? 's' : ''}</strong> of feed incoming
                       </div>
                     )}
                   </>

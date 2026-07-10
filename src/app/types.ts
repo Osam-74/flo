@@ -70,4 +70,7 @@ export interface Transaction {
   trayPiecesPerPack?: number;  // set when expense cat === 'Tray Stock'
   eggPieces?: number;          // raw eggs collected in pieces (tray math is cumulative in dashboard)
   brokenEggs?: number;         // broken eggs logged separately (excluded from tray count, kept in report)
+  // Feed inventory fields
+  feedTons?: number;           // set when expense cat === 'Feed'
+  feedBags?: number;           // set when expense cat === 'Feed'
 }

@@ -110,12 +110,32 @@ export function Dashboard({
     return { packs: Math.floor(remaining / 100), pieces: remaining % 100, totalTrays: remaining, reorder: remaining < 120, hasTrayData };
   })();
 
+  const feedInventory = (() => {
+    let totalBags = 0, hasFeedData = false;
+    for (const t of txs) {
+      if (t.type === 'expense' && t.cat === 'Feed' && t.feedBags) {
+        totalBags += (t.feedBags || 0);
+        hasFeedData = true;
+      }
+    }
+    return { totalBags, reorder: totalBags < 10, hasFeedData };
+  })();
+
+  const [feedVisible, setFeedVisible] = useState(true);
+
   useEffect(() => {
     if (!trayInventory.hasTrayData || trayInventory.reorder) { setTrayVisible(true); return; }
     setTrayVisible(true);
     const t = setTimeout(() => setTrayVisible(false), 4000);
     return () => clearTimeout(t);
   }, [trayInventory.hasTrayData, trayInventory.reorder]);
+
+  useEffect(() => {
+    if (!feedInventory.hasFeedData || feedInventory.reorder) { setFeedVisible(true); return; }
+    setFeedVisible(true);
+    const t = setTimeout(() => setFeedVisible(false), 4000);
+    return () => clearTimeout(t);
+  }, [feedInventory.hasFeedData, feedInventory.reorder]);
 
   // ── Card definitions ──────────────────────────────────────────────────────
   const cards = [
@@ -243,6 +263,26 @@ export function Dashboard({
                 {trayInventory.packs > 0 ? `${trayInventory.packs}pk` : ''}{trayInventory.packs > 0 && trayInventory.pieces > 0 ? ' + ' : ''}{(trayInventory.pieces > 0 || trayInventory.packs === 0) ? `${trayInventory.pieces}pcs` : ''}
               </span>
               <span style={{ fontSize: '0.58rem', color: '#7C3AED', marginLeft: 'auto' }}>{trayInventory.totalTrays} total</span>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* ── Feed notice ── */}
+      {feedInventory.hasFeedData && (
+        <div style={{ marginBottom: 14, transition: 'opacity 0.9s ease, max-height 0.9s ease', opacity: feedVisible ? 1 : 0, maxHeight: feedVisible ? 80 : 0, overflow: 'hidden', pointerEvents: feedVisible ? 'auto' : 'none' }}>
+          {feedInventory.reorder ? (
+            <div style={{ background: 'rgba(180,83,9,0.10)', border: '1.5px solid #B45309', borderRadius: 12, padding: '9px 14px', display: 'flex', alignItems: 'center', gap: 8, animation: 'reorder-blink 1.2s ease-in-out infinite' }}>
+              <span style={{ fontSize: '0.7rem', fontWeight: 800, color: '#B45309', letterSpacing: '0.07em', textTransform: 'uppercase' }}>LOW FEED STOCK</span>
+              <span style={{ fontSize: '0.65rem', color: '#92400E', marginLeft: 'auto' }}>{feedInventory.totalBags} bag{feedInventory.totalBags !== 1 ? 's' : ''} left</span>
+            </div>
+          ) : (
+            <div style={{ background: 'rgba(180,83,9,0.07)', border: '1px solid rgba(180,83,9,0.18)', borderRadius: 12, padding: '9px 14px', display: 'flex', alignItems: 'center', gap: 8 }}>
+              <span style={{ fontSize: '0.68rem', fontWeight: 700, color: '#92400E' }}>Feed Stock</span>
+              <span style={{ fontFamily: "'DM Mono',monospace", fontSize: '0.72rem', fontWeight: 700, color: '#B45309' }}>
+                {feedInventory.totalBags} bag{feedInventory.totalBags !== 1 ? 's' : ''}
+              </span>
+              <span style={{ fontSize: '0.58rem', color: '#B45309', marginLeft: 'auto' }}>in stock</span>
             </div>
           )}
         </div>
