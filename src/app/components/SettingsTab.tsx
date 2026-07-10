@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { showToast } from './Modals';
-import { Building2 } from 'lucide-react';
+import { CloudDownload, CloudUpload, Building2 } from 'lucide-react';
 
 interface Props {
   currency: string;
