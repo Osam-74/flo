@@ -858,6 +858,14 @@ export default function App() {
           onConfirm={() => { executeFullClear(); setClearModal(false); }}
           onClose={() => setClearModal(false)}
         />
+
+        <FeedUsageModal
+          open={feedPrompt.open}
+          targetDate={feedPrompt.targetDate}
+          missedDays={feedPrompt.missedDays}
+          onSave={handleFeedUsageSave}
+          onDismiss={handleFeedPromptDismiss}
+        />
       </div>
     </div>
   );

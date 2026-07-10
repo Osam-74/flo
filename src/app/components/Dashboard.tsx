@@ -113,12 +113,13 @@ export function Dashboard({
   const feedInventory = (() => {
     let totalBags = 0, hasFeedData = false;
     for (const t of txs) {
-      if (t.type === 'expense' && t.cat === 'Feed' && t.feedBags) {
+      if (t.type === 'expense' && t.cat === 'Feed' && t.feedBags !== undefined) {
         totalBags += (t.feedBags || 0);
-        hasFeedData = true;
+        if ((t.feedBags || 0) > 0) hasFeedData = true; // only positive (purchase) entries activate the widget
       }
     }
-    return { totalBags, reorder: totalBags < 10, hasFeedData };
+    const remaining = Math.max(0, totalBags);
+    return { totalBags: remaining, reorder: remaining < 10, hasFeedData };
   })();
 
   const [feedVisible, setFeedVisible] = useState(true);
