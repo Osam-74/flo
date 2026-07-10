@@ -199,7 +199,7 @@ export default function App() {
   }, [bizLoading]);
 
   /* ── Apply remote data ───────────────────────────── */
-  const applyRemote = useCallback((r: any, _bizId: string) => {
+  const applyRemote = useCallback((r: any, bizId: string) => {
     const p = r.people ?? [];
     const ppl = Array.isArray(p) ? p : [];
     const withBiz = ppl.find((x: any) => x?.id === BIZ_ACCOUNT.id) ? ppl : [...ppl, BIZ_ACCOUNT];
@@ -208,6 +208,14 @@ export default function App() {
     const c = r.currency ?? 'GHS';
     setPeople(withBiz); setTxs(t); setCurrency(c);
     setDbStatus('✅ Live sync active. Last update: ' + new Date().toLocaleTimeString());
+
+    // Trigger feed usage prompt — once per biz+day per session
+    const checkKey = bizId + '_' + new Date().toISOString().split('T')[0];
+    if (feedCheckedRef.current !== checkKey) {
+      feedCheckedRef.current = checkKey;
+      checkFeedPrompt(bizId, t);
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   /* ── Subscribe to business data ──────────────────── */
