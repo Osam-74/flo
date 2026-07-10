@@ -385,13 +385,7 @@ function BizSettingsModal({
           </button>
         </div>
 
-        {/* Backup notice */}
-        <div style={{ background: 'rgba(61,107,223,0.05)', borderRadius: 12, padding: '12px 14px', border: '1px solid rgba(61,107,223,0.12)', display: 'flex', alignItems: 'center', gap: 10 }}>
-          <ShieldCheck size={16} color="#3D6BDF" style={{ flexShrink: 0 }} />
-          <span style={{ fontSize: '0.7rem', color: '#3D6BDF', fontWeight: 600, lineHeight: 1.5 }}>
-            Data backup, restore, and clearing are managed by the <strong>master admin</strong>.
-          </span>
-        </div>
+
       </div>
     </div>
   );

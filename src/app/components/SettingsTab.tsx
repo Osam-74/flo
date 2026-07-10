@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { showToast } from './Modals';
-import { ShieldCheck, Building2 } from 'lucide-react';
+import { Building2 } from 'lucide-react';
 
 interface Props {
   currency: string;
@@ -81,13 +81,7 @@ export function SettingsTab({ currency, businessName, dbStatus, onSaveCurrency, 
         </div>
       </div>
 
-      {/* Master Admin notice */}
-      <div style={{ background: 'rgba(61,107,223,0.05)', borderRadius: 14, padding: '13px 16px', border: '1px solid rgba(61,107,223,0.12)', display: 'flex', alignItems: 'center', gap: 10, marginBottom: 20 }}>
-        <ShieldCheck size={17} color="#3D6BDF" style={{ flexShrink: 0 }} />
-        <span style={{ fontSize: '0.72rem', color: '#3D6BDF', fontWeight: 600, lineHeight: 1.5 }}>
-          Data backup, restore, and clearing are only available to the <strong>master admin</strong>.
-        </span>
-      </div>
+
     </div>
   );
 }
