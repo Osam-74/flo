@@ -22,6 +22,8 @@ const TX_CIRCLE: Record<string, React.ReactNode> = {
   credit:        <svg viewBox="0 0 20 20" width="18" height="18"><circle cx="10" cy="10" r="9" fill="none" stroke="currentColor" strokeWidth="2"/><circle cx="10" cy="10" r="6.5" fill="currentColor" opacity="0.6"/></svg>,
   'owner-fund':  <svg viewBox="0 0 20 20" width="18" height="18"><circle cx="10" cy="10" r="9" fill="currentColor" opacity="0.5"/><circle cx="10" cy="10" r="5" fill="currentColor"/></svg>,
   'fund-return': <svg viewBox="0 0 20 20" width="18" height="18"><circle cx="10" cy="10" r="9" fill="none" stroke="currentColor" strokeWidth="2.5"/></svg>,
+  'egg-collection': <svg viewBox="0 0 20 20" width="18" height="18"><circle cx="10" cy="10" r="9" fill="currentColor" opacity="0.85"/><circle cx="10" cy="10" r="5.5" fill="white" opacity="0.4"/></svg>,
+  'feed-usage':    <svg viewBox="0 0 20 20" width="18" height="18"><circle cx="10" cy="10" r="9" fill="currentColor" opacity="0.6"/><circle cx="10" cy="10" r="4" fill="currentColor" opacity="0.4"/></svg>,
 };
 
 export function TxItem({ tx, people, currency, showActions, onEdit, onDelete, onClick }: Props) {
@@ -60,6 +62,25 @@ export function TxItem({ tx, people, currency, showActions, onEdit, onDelete, on
     amountEl = (
       <div style={{ fontFamily: "'DM Mono',monospace", fontSize: '0.88rem', fontWeight: 600, color: '#5A84FF', flexShrink: 0 }}>
         ⇄ {currency} {amt.toFixed(2)}
+      </div>
+    );
+  } else if (tx.type === 'egg-collection') {
+    amountEl = (
+      <div className="text-right flex-shrink-0">
+        <div style={{ fontFamily: "'DM Mono',monospace", fontSize: '0.84rem', fontWeight: 600, color: '#D97706' }}>
+          {tx.eggPieces || 0} 🥚
+        </div>
+        {tx.brokenEggs ? <div style={{ fontSize: '0.58rem', color: '#E83E5C' }}>{tx.brokenEggs} broken</div> : null}
+      </div>
+    );
+  } else if (tx.type === 'feed-usage') {
+    const bagsUsed = Math.abs(tx.feedBags || 0);
+    amountEl = (
+      <div className="text-right flex-shrink-0">
+        <div style={{ fontFamily: "'DM Mono',monospace", fontSize: '0.84rem', fontWeight: 600, color: '#B45309' }}>
+          {bagsUsed} 🌾
+        </div>
+        <div style={{ fontSize: '0.58rem', color: '#9A9FB8' }}>bags used</div>
       </div>
     );
   } else {

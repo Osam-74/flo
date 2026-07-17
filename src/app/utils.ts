@@ -3,7 +3,7 @@ import type { Person, Transaction, ColorDef } from './types';
 /**
  * Coerce every numeric field on each transaction to a real number.
  * This prevents "can't access property 'toFixed', a is undefined" crashes
- * that occur when Firestore, localStorage, or imported JSON contains
+ * that occur when Firestore or imported JSON contains
  * string/null/undefined values in fields we call .toFixed() on.
  */
 export function sanitizeTxs(raw: any[]): Transaction[] {
@@ -39,6 +39,8 @@ export const TX_COLORS: Record<string, string> = {
   credit:        '#2A50B8',   // mid blue
   'owner-fund':  '#6B8FFF',   // soft blue
   'fund-return': '#C0392B',   // dark red (outflow)
+  'egg-collection': '#D97706',  // amber (eggs)
+  'feed-usage':     '#B45309',  // brown (feed)
 };
 
 export const TX_BG: Record<string, string> = {
@@ -49,6 +51,8 @@ export const TX_BG: Record<string, string> = {
   credit:        'rgba(42,80,184,0.13)',
   'owner-fund':  'rgba(107,143,255,0.13)',
   'fund-return': 'rgba(192,57,43,0.12)',
+  'egg-collection': 'rgba(217,119,6,0.13)',
+  'feed-usage':     'rgba(180,83,9,0.12)',
 };
 
 export const TX_EMOJI: Record<string, string> = {
@@ -59,6 +63,8 @@ export const TX_EMOJI: Record<string, string> = {
   credit:       '🟣',
   'owner-fund': '🟠',
   'fund-return':'🔵',
+  'egg-collection': '🥚',
+  'feed-usage':     '🌾',
 };
 
 export function pColor(p?: Pick<Person, 'color'>): ColorDef {
@@ -123,11 +129,15 @@ export function pStats(pid: string, txs: Transaction[]) {
   return { pIn, pOut, pBal: pIn - pOut };
 }
 
+// localStorage helpers — kept for UI prefs only; all transaction data
+// is synced exclusively via Firebase Firestore (no local fallback).
 export const gs = <T>(k: string, d: T): T => {
+  // Only used for non-critical UI prefs (e.g. theme). Data lives in Firestore.
   try { const v = localStorage.getItem(k); return v ? JSON.parse(v) : d; } catch { return d; }
 };
 
 export const ss = <T>(k: string, v: T): void => {
+  // Only used for non-critical UI prefs. Never stores transaction data.
   try { localStorage.setItem(k, JSON.stringify(v)); } catch (e) { console.warn('LS write failed', e); }
 };
 

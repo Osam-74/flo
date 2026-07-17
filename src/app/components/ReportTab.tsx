@@ -82,6 +82,8 @@ export function ReportTab({ businessName, txs, people, currency }: Props) {
     totalSalary: number; totalOtherExpenses: number;
     profit: number; totalCrates: number;
     totalEggs: number; totalBrokenEggs: number;
+    balanceBroughtForward: number;
+    weekStartDate: string;
   } | null>(null);
 
   function generate() {
@@ -128,6 +130,37 @@ export function ReportTab({ businessName, txs, people, currency }: Props) {
     const totalBrokenEggs  = eggCollectionTxs.reduce((s, t) => s + (t.brokenEggs || 0), 0);
 
     const dateLabel = (from && to) ? fmtDate(from) + ' – ' + fmtDate(to) : 'All Dates';
+
+    // ── Balance brought forward (into the start of the week containing 'from') ──
+    function getWeekStart(dateStr: string): string {
+      const d = new Date(dateStr + 'T00:00:00');
+      const day = d.getDay(); // 0 = Sunday
+      d.setDate(d.getDate() - day); // walk back to Sunday
+      return d.toISOString().split('T')[0];
+    }
+    const weekStartDate = from ? getWeekStart(from) : getWeekStart(today);
+
+    // Compute net balance from ALL transactions before weekStartDate
+    let balanceBroughtForward = 0;
+    for (const t of txs) {
+      if (!t.date || t.date >= weekStartDate) continue;
+      if (t.type === 'income')         balanceBroughtForward += (t.amount || 0);
+      if (t.type === 'expense')        balanceBroughtForward -= (t.amount || 0);
+      if (t.type === 'salary')         balanceBroughtForward -= (t.amount || 0);
+      if (t.type === 'feed-usage')     balanceBroughtForward -= 0; // no cash impact
+      if (t.type === 'transfer')       balanceBroughtForward += 0;
+      if (t.type === 'owner-fund')     balanceBroughtForward += (t.amount || 0);
+      if (t.type === 'fund-return')   balanceBroughtForward -= (t.amount || 0);
+      if (t.type === 'credit') {
+        if (Array.isArray(t.payments) && t.payments.length > 0) {
+          for (const p of t.payments) {
+            if (p.date < weekStartDate) balanceBroughtForward += (p.amount || 0);
+          }
+        } else if ((t.creditPaid || 0) > 0 && (t.date || '') < weekStartDate) {
+          balanceBroughtForward += (t.creditPaid || 0);
+        }
+      }
+    }
 
     // ── Build balance breakdown by person ─────────────────────────────────
     // We use the FULL txs (all time) to compute current balances, then show them
@@ -303,6 +336,8 @@ export function ReportTab({ businessName, txs, people, currency }: Props) {
       totalCrates,
       totalEggs,
       totalBrokenEggs,
+      balanceBroughtForward,
+      weekStartDate,
     });
     showToast('Report ready', 'success');
     setTimeout(() => document.getElementById('report-preview')?.scrollIntoView({ behavior: 'smooth' }), 100);
@@ -316,6 +351,7 @@ export function ReportTab({ businessName, txs, people, currency }: Props) {
       totalExpenses, hasSalary, totalSalary, totalOtherExpenses,
       profit, totalCrates,
       totalEggs, totalBrokenEggs,
+      balanceBroughtForward, weekStartDate,
     } = reportStats;
 
     // ── Date range label ──────────────────────────────────────────────────
@@ -336,6 +372,14 @@ export function ReportTab({ businessName, txs, people, currency }: Props) {
 
     // ── Build smart sentences ─────────────────────────────────────────────
     const parts: string[] = [];
+
+    // Balance brought forward sentence
+    if (balanceBroughtForward !== 0 || totalSales > 0 || totalExpenses > 0) {
+      const weekDate = new Date(weekStartDate + 'T00:00:00');
+      const weekLabel = weekDate.toLocaleDateString('en-GB', { weekday: 'long', day: '2-digit', month: 'short' });
+      const balSign = balanceBroughtForward >= 0 ? '' : '–';
+      parts.push(`Balance brought into ${weekLabel} (start of the week) was ${currency} ${balSign}${fmtN(Math.abs(balanceBroughtForward))}.`);
+    }
 
     // Sales sentence (only if there were sales)
     if (totalSales > 0) {

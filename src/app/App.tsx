@@ -17,7 +17,7 @@ import { DeleteModal, EditModal, PaymentModal, PickupModal, ClearModal, ToastCon
 import { FeedUsageModal } from './components/FeedUsageModal';
 
 import type { Transaction, Person, Tab, AppMode, TxType } from './types';
-import { gs, ss, sha256, sanitizeTxs, stripUndefined } from './utils';
+import { sha256, sanitizeTxs, stripUndefined } from './utils';
 
 /* ── Firebase config ───────────────────────────────── */
 const FB = {
@@ -217,7 +217,7 @@ export default function App() {
     const checkKey = bizId + '_' + new Date().toISOString().split('T')[0];
     if (feedCheckedRef.current !== checkKey) {
       feedCheckedRef.current = checkKey;
-      checkFeedPrompt(bizId, t);
+      // checkFeedPrompt disabled — feed usage is now logged manually via AddEntry → Feed Usage
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -591,15 +591,7 @@ export default function App() {
     if (bizId) localStorage.setItem(feedPromptKey(bizId, today), 'done');
     setFeedPrompt({ open: false, targetDate: '', missedDays: 0 });
 
-    // If we just logged a missed day (not today), re-check after a moment
-    if (date !== today) {
-      setTimeout(() => {
-        setTxs((prev: Transaction[]) => {
-          checkFeedPrompt(bizId, prev);
-          return prev;
-        });
-      }, 700);
-    }
+    // Auto-feed-prompt disabled — users log feed usage manually now
   };
 
   const handleFeedPromptDismiss = () => {
@@ -634,11 +626,7 @@ export default function App() {
     const emptyTxs: Transaction[] = [];
     const peopleWithBiz: Person[] = [BIZ_ACCOUNT as any];
     setPeople(peopleWithBiz); setTxs(emptyTxs); setCurrency('GHS');
-    if (selectedBiz) {
-      ss(`cb_people_${selectedBiz.id}`, peopleWithBiz);
-      ss(`cb_txs_${selectedBiz.id}`, emptyTxs);
-      ss(`cb_currency_${selectedBiz.id}`, 'GHS');
-    }
+    // Firebase-only: no localStorage writes
     dbSync(peopleWithBiz, emptyTxs, 'GHS');
     showToast('All data cleared', 'success');
   }, [dbSync]);
@@ -678,11 +666,7 @@ export default function App() {
           const withBiz = ppl.find((x: any) => x?.id === BIZ_ACCOUNT.id) ? ppl : [...ppl, BIZ_ACCOUNT];
           const cleanTxs = sanitizeTxs(obj.txs);
           setPeople(withBiz); setTxs(cleanTxs); setCurrency(obj.currency || 'GHS');
-          if (selectedBiz) {
-            ss(`cb_people_${selectedBiz.id}`, withBiz);
-            ss(`cb_txs_${selectedBiz.id}`, cleanTxs);
-            ss(`cb_currency_${selectedBiz.id}`, obj.currency || 'GHS');
-          }
+          // Firebase-only: no localStorage writes
           dbSync(withBiz, cleanTxs, obj.currency || 'GHS');
           showToast('Imported data', 'success');
         } else showToast('Invalid import file', 'error');
@@ -879,9 +863,6 @@ export default function App() {
               onSaveBusinessName={() => {}} // name is managed via master admin
               onPull={manualPull}
               onPush={manualPush}
-              onClearAll={() => { if (!guardWrite()) return; setClearModal(true); }}
-              onExport={exportData}
-              onImport={(file) => { if (!guardWrite()) return; importData(file); }}
             />
           )}
         </div>

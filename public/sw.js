@@ -1,4 +1,4 @@
-const CACHE_NAME = 'flohq-v13';
+const CACHE_NAME = 'flohq-v14';
 
 const swPath = self.location.pathname;
 const BASE = swPath.replace(/\/sw\.js$/, '');

@@ -23,6 +23,8 @@ const TYPE_FILTERS: { id: FilterType; label: string }[] = [
   { id: 'salary',      label: 'Salary' },
   { id: 'transfer',    label: 'Transfer' },
   { id: 'credit',      label: 'Credit' },
+  { id: 'egg-collection', label: 'Eggs' },
+  { id: 'feed-usage',     label: 'Feed' },
   { id: 'owner-fund',  label: 'Fund Injection' },
   { id: 'fund-return', label: 'Fund Return' },
 ];

@@ -113,7 +113,7 @@ export function Dashboard({
   const feedInventory = (() => {
     let totalBags = 0, hasFeedData = false;
     for (const t of txs) {
-      if (t.type === 'expense' && t.cat === 'Feed' && t.feedBags !== undefined) {
+      if ((t.type === 'expense' && t.cat === 'Feed' && t.feedBags !== undefined) || t.type === 'feed-usage') {
         totalBags += (t.feedBags || 0);
         if ((t.feedBags || 0) > 0) hasFeedData = true; // only positive (purchase) entries activate the widget
       }

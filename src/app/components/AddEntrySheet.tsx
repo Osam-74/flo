@@ -31,7 +31,8 @@ const TYPE_OPTS: { id: TxType; emoji: string; label: string; color: string }[] =
   { id: 'salary',      emoji: '●', label: 'Salary',         color: '#03045E' },
   { id: 'transfer',    emoji: '●', label: 'Transfer',       color: '#00B4D8' },
   { id: 'credit',      emoji: '●', label: 'Credit Sale',    color: '#0077B6' },
-  { id: 'egg-collection', emoji: '●', label: 'Egg Collection', color: '#D97706' },
+  { id: 'egg-collection', emoji: '🥚', label: 'Egg Collection', color: '#D97706' },
+  { id: 'feed-usage',     emoji: '🌾', label: 'Feed Usage',     color: '#B45309' },
   { id: 'owner-fund',     emoji: '●', label: 'Fund Injection', color: '#00B4D8' },
   { id: 'fund-return', emoji: '●', label: 'Fund Return',    color: '#03045E' },
 ];
@@ -84,22 +85,36 @@ export function AddEntrySheet({ open, onClose, people, currency, onSave, initial
   // Feed inventory — used when expense category === 'Feed'
   const [feedTons, setFeedTons]   = useState('');
   const [feedBags, setFeedBags]   = useState('');
+  // Feed usage (standalone type)
+  const [fuBags, setFuBags]       = useState('');
+  const [fuDate, setFuDate]       = useState(today());
 
   // ── Swipe gesture state ──────────────────────────────────────────────────
   const swipeStartX = useRef<number | null>(null);
-  const TYPES_ORDER: TxType[] = ['income', 'expense', 'salary', 'transfer', 'credit', 'egg-collection', 'owner-fund', 'fund-return'];
+  const swipeStartY = useRef<number | null>(null);
+  const TYPES_ORDER: TxType[] = ['income', 'expense', 'salary', 'transfer', 'credit', 'egg-collection', 'feed-usage', 'owner-fund', 'fund-return'];
 
   const handleSwipeStart = (e: React.TouchEvent) => {
     swipeStartX.current = e.touches[0].clientX;
+    swipeStartY.current = e.touches[0].clientY;
   };
   const handleSwipeEnd = (e: React.TouchEvent) => {
     if (swipeStartX.current === null) return;
+    const diffX = swipeStartX.current - e.changedTouches[0].clientX;
+    const diffY = (swipeStartY.current || 0) - e.changedTouches[0].clientY;
+    // Only trigger horizontal swipe if X movement is dominant and exceeds threshold
+    if (Math.abs(diffX) < 50 || Math.abs(diffX) < Math.abs(diffY)) {
+      swipeStartX.current = null;
+      swipeStartY.current = null;
+      return;
+    }
     const diff = swipeStartX.current - e.changedTouches[0].clientX;
     if (Math.abs(diff) < 50) { swipeStartX.current = null; return; }
     const idx = TYPES_ORDER.indexOf(type);
-    if (diff > 0 && idx < TYPES_ORDER.length - 1) changeType(TYPES_ORDER[idx + 1]); // swipe left → next
-    if (diff < 0 && idx > 0) changeType(TYPES_ORDER[idx - 1]); // swipe right → prev
+    if (diffX > 0 && idx < TYPES_ORDER.length - 1) changeType(TYPES_ORDER[idx + 1]); // swipe left → next
+    if (diffX < 0 && idx > 0) changeType(TYPES_ORDER[idx - 1]); // swipe right → prev
     swipeStartX.current = null;
+    swipeStartY.current = null;
   };
 
   // ── Keyboard / viewport repositioning fix ──────────────────────────────
@@ -283,11 +298,22 @@ export function AddEntrySheet({ open, onClose, people, currency, onSave, initial
       onSave(stripUndefined({ id, ts, type, amount: 0, date, eggPieces: eggs, brokenEggs: broken > 0 ? broken : undefined, desc }));
     }
 
+    if (type === 'feed-usage') {
+      const bags = parseInt(fuBags, 10) || 0;
+      const logDate = fuDate || today();
+      if (!logDate)   { showToast('Select a date', 'error'); return; }
+      if (bags <= 0)  { showToast('Enter number of bags used', 'error'); return; }
+      const firstPerson = people.find(p => !p.role?.toLowerCase().includes('owner'))?.id || 'biz';
+      const desc = `Feed Usage — ${bags} bag${bags !== 1 ? 's' : ''} used on ${logDate}`;
+      onSave(stripUndefined({ id, ts, type, amount: 0, date: logDate, person: firstPerson, cat: 'Feed', feedBags: -bags, desc, note: 'Daily feed usage log' }));
+    }
+
     setAmount(''); setNote(''); setBuyer(''); setTfRef('');
     setCrBuyer(''); setCrTotal(''); setCrPaid(''); setCrNote('');
     setOfNote(''); setFrNote('');
     setTrayPacks(''); setTrayPiecesPerPack('100');
     setEggTraysUsed(''); setBrokenEggs('');
+    setFuBags(''); setFuDate(today());
 
     const td = today();
     setDate(td); setTfDate(td); setCrDate(td); setOfDate(td); setFrDate(td);
@@ -300,6 +326,7 @@ export function AddEntrySheet({ open, onClose, people, currency, onSave, initial
   const isTrayExpense    = type === 'expense' && cat === 'Tray Stock';
   const isFeedExpense    = type === 'expense' && cat === 'Feed';
   const isEggCollection  = type === 'egg-collection';
+  const isFeedUsage      = type === 'feed-usage';
   const crPaidAmt  = parseFloat(crPaid)  || 0;
   const crTotalAmt = parseFloat(crTotal) || 0;
   const crOutstanding = crTotalAmt - crPaidAmt;
@@ -375,6 +402,7 @@ export function AddEntrySheet({ open, onClose, people, currency, onSave, initial
               flex: 1,
               padding: '12px 16px 24px',
               WebkitOverflowScrolling: 'touch',
+              touchAction: 'pan-y',
             }}
           >
 
@@ -702,6 +730,42 @@ export function AddEntrySheet({ open, onClose, people, currency, onSave, initial
                     {' — trays deducted from running total'}
                   </div>
                 )}
+              </div>
+            )}
+
+            {/* ── FEED USAGE ── */}
+            {isFeedUsage && (
+              <div style={card}>
+                <div style={{ marginBottom: 14 }}>
+                  <Field label="Date *">
+                    <input
+                      style={{ ...inp, fontSize: '0.95rem' }}
+                      type="date"
+                      value={fuDate}
+                      max={today()}
+                      onChange={e => setFuDate(e.target.value)}
+                    />
+                  </Field>
+                </div>
+                <div style={{ marginBottom: 14 }}>
+                  <Field label="Bags of Feed Used *">
+                    <input
+                      style={{ ...inp, fontSize: '1.5rem', fontFamily: "'DM Mono',monospace" }}
+                      type="number"
+                      placeholder="0"
+                      min="1"
+                      step="1"
+                      value={fuBags}
+                      onChange={e => setFuBags(e.target.value)}
+                      autoFocus
+                    />
+                  </Field>
+                  {fuBags && parseInt(fuBags, 10) > 0 && (
+                    <div style={{ fontSize: '0.72rem', color: '#B45309', fontWeight: 600, marginTop: 6 }}>
+                      🌾 {parseInt(fuBags, 10)} bag{parseInt(fuBags, 10) !== 1 ? 's' : ''} will be deducted from feed stock
+                    </div>
+                  )}
+                </div>
               </div>
             )}
 
