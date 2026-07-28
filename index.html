@@ -70,11 +70,18 @@
     </script>
 
 
-    <!-- One-time master admin PIN reset trigger -->
+    <!-- One-time master admin PIN reset trigger (only fires once — until a hash is set) -->
     <script>
       (function() {
         try {
-          localStorage.setItem('cb_admin_force_reset', 'true');
+          // Only set the force-reset flag if NO admin hash has been stored yet.
+          // Once the user resets their PIN, cb_admin_hash is set and this never fires again.
+          if (!localStorage.getItem('cb_admin_hash')) {
+            localStorage.setItem('cb_admin_force_reset', 'true');
+          } else {
+            // Already has a hash — make sure the flag is cleared
+            localStorage.removeItem('cb_admin_force_reset');
+          }
         } catch(e) {}
       })();
     </script>
