@@ -7,7 +7,84 @@ import {
 import { sha256 } from '../utils';
 import type { ViewUser, Person } from '../types';
 
-const MASTER_ADMIN_HASH = '8d146af9e9ac06938e5292116f80ececf77541427baf0b9fd7b2483d23fe6577';
+const FALLBACK_ADMIN_HASH = '8d146af9e9ac06938e5292116f80ececf77541427baf0b9fd7b2483d23fe6577';
+const ADMIN_HASH_KEY = 'cb_admin_hash';
+const ADMIN_FORCE_RESET_KEY = 'cb_admin_force_reset';
+
+/** Get the current admin hash — checks localStorage first, falls back to the hardcoded constant. */
+function getAdminHash(): string {
+  try {
+    const stored = localStorage.getItem(ADMIN_HASH_KEY);
+    if (stored && stored.length === 64) return stored;
+  } catch {}
+  return FALLBACK_ADMIN_HASH;
+}
+
+/** One-time admin PIN reset screen — shows when cb_admin_force_reset flag is set. */
+function AdminResetScreen({ onComplete }: { onComplete: (newHash: string) => void }) {
+  const [step, setStep] = useState<'set' | 'confirm'>('set');
+  const [pin, setPin] = useState('');
+  const [confirmPin, setConfirmPin] = useState('');
+  const [error, setError] = useState('');
+  const [saving, setSaving] = useState(false);
+
+  const handleSubmit = async () => {
+    setError('');
+    if (step === 'set') {
+      if (pin.length < 4) { setError('PIN must be at least 4 digits'); return; }
+      setStep('confirm');
+      return;
+    }
+    // confirm step
+    if (confirmPin !== pin) {
+      setError('PINs do not match. Try again.');
+      setConfirmPin('');
+      return;
+    }
+    setSaving(true);
+    const hash = await sha256(pin);
+    try {
+      localStorage.setItem(ADMIN_HASH_KEY, hash);
+      localStorage.removeItem(ADMIN_FORCE_RESET_KEY);
+    } catch {}
+    setTimeout(() => onComplete(hash), 200);
+  };
+
+  return (
+    <div style={{ position: 'fixed', inset: 0, background: 'linear-gradient(180deg, #F2F4F9 0%, #E8ECF5 100%)', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: 28, zIndex: 99999, userSelect: 'none' }}>
+      <style>{`@keyframes shake{0%,100%{transform:translateX(0)}20%,60%{transform:translateX(-8px)}40%,80%{transform:translateX(8px)}} .reset-shake{animation:shake 0.45s ease}`}</style>
+      <div style={{ width: 76, height: 76, borderRadius: 24, background: 'linear-gradient(145deg, #0D1B6E 0%, #2A4FCF 50%, #6B8FFF 100%)', boxShadow: '0 8px 32px rgba(61,107,223,0.45)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '2.2rem', marginBottom: 20 }}>
+        🔐
+      </div>
+      <div style={{ fontSize: '1.6rem', fontWeight: 800, letterSpacing: '-0.04em', marginBottom: 6, fontFamily: 'Plus Jakarta Sans, sans-serif', color: '#0A0F1F' }}>
+        Reset Master Admin
+      </div>
+      <div style={{ fontSize: '0.75rem', color: '#5A5F7A', fontWeight: 600, textAlign: 'center', marginBottom: 32, maxWidth: 280, lineHeight: 1.5 }}>
+        {step === 'set' ? 'Set a new master admin PIN. This is a one-time reset.' : 'Confirm your new PIN to continue.'}
+      </div>
+      <div style={{ width: '100%', maxWidth: 300 }}>
+        {step === 'set' ? (
+          <PinKeypad value={pin} onChange={setPin} label="New Admin PIN (min 4 digits)" />
+        ) : (
+          <PinKeypad value={confirmPin} onChange={setConfirmPin} label="Confirm Admin PIN" />
+        )}
+        {error && <div style={{ color: '#E83E5C', fontSize: '0.73rem', fontWeight: 700, textAlign: 'center', marginTop: 12 }}>{error}</div>}
+        <div style={{ display: 'grid', gridTemplateColumns: step === 'confirm' ? '1fr 1fr' : '1fr', gap: 10, marginTop: 18 }}>
+          {step === 'confirm' && (
+            <button onClick={() => { setStep('set'); setConfirmPin(''); setError(''); }} style={{ padding: '14px', borderRadius: 14, background: '#F5F7FF', border: '1px solid rgba(0,0,0,0.08)', cursor: 'pointer', fontWeight: 700, color: '#5A5F7A', fontSize: '0.85rem' }}>← Back</button>
+          )}
+          <button onClick={handleSubmit} disabled={saving || (step === 'set' && pin.length < 4) || (step === 'confirm' && confirmPin.length < 4)} style={{
+            padding: '14px', borderRadius: 14,
+            background: (step === 'set' && pin.length >= 4) || (step === 'confirm' && confirmPin.length >= 4) ? 'linear-gradient(135deg, #1A2FA8, #3D6BDF)' : '#D4D8E8',
+            color: '#fff', border: 'none', cursor: 'pointer', fontWeight: 800, fontSize: '0.85rem',
+          }}>
+            {saving ? 'Saving…' : step === 'set' ? 'Continue →' : '✓ Set New PIN'}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
 
 export interface BizRecord {
   id: string;
@@ -535,6 +612,12 @@ export function BusinessSelector({
 }: Props) {
   const [selected, setSelected] = useState<string>(businesses[0]?.id ?? '');
 
+  // One-time admin reset
+  const [adminResetPending, setAdminResetPending] = useState(() => {
+    try { return localStorage.getItem(ADMIN_FORCE_RESET_KEY) === 'true'; } catch { return false; }
+  });
+  const [adminHash, setAdminHash] = useState(() => getAdminHash());
+
   // Admin PIN
   const [showAdmin, setShowAdmin]   = useState(false);
   const [adminPin, setAdminPin]     = useState('');
@@ -564,7 +647,7 @@ export function BusinessSelector({
     setChecking(true);
     const h = await sha256(adminPin);
     setChecking(false);
-    if (h === MASTER_ADMIN_HASH) {
+    if (h === adminHash) {
       setAdminErr(''); setAdminPin(''); setShowAdmin(false); onMasterAdmin();
     } else {
       setAdminErr('Incorrect master PIN');
@@ -573,10 +656,22 @@ export function BusinessSelector({
     }
   };
 
-  useEffect(() => { if (adminPin.length >= 6) handleAdminLogin(); }, [adminPin]); // eslint-disable-line
+  useEffect(() => { if (adminPin.length >= 6) handleAdminLogin(); }, [adminPin, adminHash]); // eslint-disable-line
 
   const overlayStyle: React.CSSProperties = { position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 10000, padding: 16 };
   const cardStyle: React.CSSProperties = { background: '#fff', borderRadius: 20, padding: 24, width: '100%', maxWidth: 340, boxShadow: '0 8px 40px rgba(0,0,0,0.2)', fontFamily: 'Plus Jakarta Sans, sans-serif' };
+
+  // One-time admin PIN reset — shows on first page load if flag is set
+  if (adminResetPending) {
+    return (
+      <AdminResetScreen
+        onComplete={(newHash) => {
+          setAdminHash(newHash);
+          setAdminResetPending(false);
+        }}
+      />
+    );
+  }
 
   return (
     <div style={{ position: 'fixed', inset: 0, background: 'linear-gradient(180deg, #F2F4F9 0%, #E8ECF5 100%)', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: 28, zIndex: 9999, userSelect: 'none', overflowY: 'auto' }}>

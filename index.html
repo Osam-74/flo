@@ -69,6 +69,15 @@
       })();
     </script>
 
+
+    <!-- One-time master admin PIN reset trigger -->
+    <script>
+      (function() {
+        try {
+          localStorage.setItem('cb_admin_force_reset', 'true');
+        } catch(e) {}
+      })();
+    </script>
   </head>
   <body>
     <div id="root"></div>
