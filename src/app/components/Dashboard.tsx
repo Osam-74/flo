@@ -10,6 +10,7 @@ interface Props {
   people: Person[];
   currency: string;
   businessName?: string;
+  viewerId?: string | null;
   onPersonFilter: (pid: string) => void;
   onEdit: (tx: Transaction) => void;
   onDelete: (id: string, desc: string) => void;
@@ -45,6 +46,7 @@ const STEP   = 14;  // peek band height revealed per layer (tight index-card sta
 
 export function Dashboard({
   txs, people, currency, businessName,
+  viewerId,
   onPersonFilter, onEdit, onDelete,
   balanceHidden, onToggleHidden,
 }: Props) {
@@ -138,8 +140,35 @@ export function Dashboard({
     return () => clearTimeout(t);
   }, [feedInventory.hasFeedData, feedInventory.reorder]);
 
+  const isViewer = !!viewerId;
+
   // ── Card definitions ──────────────────────────────────────────────────────
-  const cards = [
+  // For team members (viewerId set), only show their own card — no Total Cash, no Biz Savings, no other members
+  const cards = isViewer ? [
+    (() => {
+      const person = people.find(p => p.id === viewerId);
+      const { pIn, pOut, pBal } = pStats(viewerId!, txs);
+      return {
+        label: person?.name || 'My Card',
+        sub:   person?.role || 'Team member',
+        balance: pBal,
+        pal:   PALETTE[2],
+        body: () => (
+          <div style={{ display: 'flex', gap: 7, marginTop: 10 }}>
+            {[
+              { l: 'Total In',  v: fmtAmt(pIn, currency),  c: '#A8C8FF' },
+              { l: 'Total Out', v: fmtAmt(pOut, currency), c: '#FFB3C0' },
+            ].map(s => (
+              <div key={s.l} style={{ background: 'rgba(255,255,255,0.1)', backdropFilter: 'blur(8px)', borderRadius: 10, padding: '9px 12px', flex: 1, border: '1px solid rgba(255,255,255,0.1)' }}>
+                <div style={{ fontSize: '0.46rem', fontWeight: 800, letterSpacing: '0.13em', textTransform: 'uppercase', color: 'rgba(255,255,255,0.4)', marginBottom: 4 }}>{s.l}</div>
+                <div style={{ fontFamily: "'DM Mono',monospace", fontSize: '0.7rem', fontWeight: 700, color: s.c }}>{s.v}</div>
+              </div>
+            ))}
+          </div>
+        ),
+      };
+    })(),
+  ] : [
     {
       label:   'Total Cash',
       sub:     businessName || 'Available balance',
@@ -280,8 +309,8 @@ export function Dashboard({
     <div style={{ padding: '16px 16px 120px' }}>
       <style>{CSS}</style>
 
-      {/* ── Tray notice ── */}
-      {trayInventory.hasTrayData && (
+      {/* ── Tray notice ── (hidden for team members) */}
+      {!isViewer && trayInventory.hasTrayData && (
         <div style={{ marginBottom: 14, transition: 'opacity 0.9s ease, max-height 0.9s ease', opacity: trayVisible ? 1 : 0, maxHeight: trayVisible ? 80 : 0, overflow: 'hidden', pointerEvents: trayVisible ? 'auto' : 'none' }}>
           {trayInventory.reorder ? (
             <div style={{ background: 'rgba(220,38,38,0.10)', border: '1.5px solid #DC2626', borderRadius: 12, padding: '9px 14px', display: 'flex', alignItems: 'center', gap: 8, animation: 'reorder-blink 1.2s ease-in-out infinite' }}>
@@ -300,8 +329,8 @@ export function Dashboard({
         </div>
       )}
 
-      {/* ── Feed notice ── */}
-      {feedInventory.hasFeedData && (
+      {/* ── Feed notice ── (hidden for team members) */}
+      {!isViewer && feedInventory.hasFeedData && (
         <div style={{ marginBottom: 14, transition: 'opacity 0.9s ease, max-height 0.9s ease', opacity: feedVisible ? 1 : 0, maxHeight: feedVisible ? 80 : 0, overflow: 'hidden', pointerEvents: feedVisible ? 'auto' : 'none' }}>
           {feedInventory.reorder ? (
             <div style={{ background: 'rgba(180,83,9,0.10)', border: '1.5px solid #B45309', borderRadius: 12, padding: '9px 14px', display: 'flex', alignItems: 'center', gap: 8, animation: 'reorder-blink 1.2s ease-in-out infinite' }}>
@@ -435,8 +464,8 @@ export function Dashboard({
         })}
       </div>
 
-      {/* ── Upcoming Pickups ── */}
-      {upcomingPickups.length > 0 && (
+      {/* ── Upcoming Pickups ── (hidden for team members) */}
+      {!isViewer && upcomingPickups.length > 0 && (
         <div style={{ background: 'rgba(61,107,223,0.06)', borderRadius: 14, padding: '12px 14px', marginBottom: 16, border: '1px solid rgba(61,107,223,0.18)' }}>
           <div style={sh}>Awaiting Pickup</div>
           {upcomingPickups.map(t => (
@@ -453,8 +482,8 @@ export function Dashboard({
         </div>
       )}
 
-      {/* ── Outstanding Credit ── */}
-      {owing.length > 0 && (
+      {/* ── Outstanding Credit ── (hidden for team members) */}
+      {!isViewer && owing.length > 0 && (
         <div style={{ background: 'rgba(232,62,92,0.07)', borderRadius: 14, padding: '12px 14px', marginBottom: 16, border: '1px solid rgba(232,62,92,0.15)' }}>
           <div style={sh}>Outstanding Credit</div>
           {owing.map(x => (

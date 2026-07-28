@@ -7,6 +7,7 @@ interface Props {
   appMode: AppMode;
   onTab: (tab: Tab) => void;
   onAdd: () => void;
+  viewerId?: string;
 }
 
 interface NavItem {
@@ -30,11 +31,15 @@ interface NavProps extends Props {
   fabActive?: boolean;
 }
 
-export function BottomNav({ activeTab, appMode, onTab, onAdd, fabActive }: NavProps & { fabActive?: boolean }) {
+export function BottomNav({ activeTab, appMode, onTab, onAdd, fabActive, viewerId }: NavProps) {
   const [pressedId, setPressedId] = useState<string | null>(null);
 
   // The "effective" active: if fab is active, no nav item is expanded
   const effectiveActive: ActiveId = fabActive ? 'fab' : activeTab;
+
+  const visibleItems = viewerId
+    ? NAV_ITEMS.filter(item => item.id === 'dashboard' || item.id === 'ledger')
+    : NAV_ITEMS;
 
   return (
     <div style={{
@@ -55,12 +60,12 @@ export function BottomNav({ activeTab, appMode, onTab, onAdd, fabActive }: NavPr
       gap: 0,
       height: 60,
     }}>
-      {NAV_ITEMS.map((item, idx) => {
+      {visibleItems.map((item, idx) => {
         const isActive = effectiveActive === item.id;
         const isPressed = pressedId === item.id;
 
-        // Insert FAB between ledger (idx=1) and credit (idx=2)
-        const fab = idx === 2 ? (
+        // Insert FAB between ledger (idx=1) and credit (idx=2) only when not a viewer
+        const fab = (!viewerId && idx === 2) ? (
           <button
             key="fab"
             onClick={onAdd}

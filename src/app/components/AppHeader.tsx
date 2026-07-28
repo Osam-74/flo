@@ -9,9 +9,10 @@ interface Props {
   onLock: () => void;
   onInstall: () => void;
   onTab: (tab: Tab) => void;
+  viewerId?: string;
 }
 
-export function AppHeader({ appMode, installReady, onLock, onInstall, onTab }: Props) {
+export function AppHeader({ appMode, installReady, onLock, onInstall, onTab, viewerId }: Props) {
   const isReadOnly = appMode === 'view';
   const isStandalone = !!(window.__pwaIsStandalone);
   const [showHelp, setShowHelp] = useState(false);
@@ -49,33 +50,37 @@ export function AppHeader({ appMode, installReady, onLock, onInstall, onTab }: P
           </button>
         )}
 
-        {/* Report — always visible; disabled (no pointer) in view-only mode */}
-        <button
-          onClick={isReadOnly ? undefined : () => onTab('report')}
-          title="Report"
-          style={{
-            ...iconBtn,
-            cursor: isReadOnly ? 'default' : 'pointer',
-            opacity: isReadOnly ? 0.45 : 1,
-            pointerEvents: isReadOnly ? 'none' : 'auto',
-          }}
-        >
-          <Printer size={18} strokeWidth={2} color="#C8CDE8" />
-        </button>
+        {/* Report — always visible; disabled (no pointer) in view-only mode. Hidden completely when viewerId is set */}
+        {!viewerId && (
+          <button
+            onClick={isReadOnly ? undefined : () => onTab('report')}
+            title="Report"
+            style={{
+              ...iconBtn,
+              cursor: isReadOnly ? 'default' : 'pointer',
+              opacity: isReadOnly ? 0.45 : 1,
+              pointerEvents: isReadOnly ? 'none' : 'auto',
+            }}
+          >
+            <Printer size={18} strokeWidth={2} color="#C8CDE8" />
+          </button>
+        )}
 
-        {/* Settings — always visible; disabled in view-only mode */}
-        <button
-          onClick={isReadOnly ? undefined : () => onTab('settings')}
-          title="Settings"
-          style={{
-            ...iconBtn,
-            cursor: isReadOnly ? 'default' : 'pointer',
-            opacity: isReadOnly ? 0.45 : 1,
-            pointerEvents: isReadOnly ? 'none' : 'auto',
-          }}
-        >
-          <Settings size={18} strokeWidth={2} color="#C8CDE8" />
-        </button>
+        {/* Settings — always visible; disabled in view-only mode. Hidden completely when viewerId is set */}
+        {!viewerId && (
+          <button
+            onClick={isReadOnly ? undefined : () => onTab('settings')}
+            title="Settings"
+            style={{
+              ...iconBtn,
+              cursor: isReadOnly ? 'default' : 'pointer',
+              opacity: isReadOnly ? 0.45 : 1,
+              pointerEvents: isReadOnly ? 'none' : 'auto',
+            }}
+          >
+            <Settings size={18} strokeWidth={2} color="#C8CDE8" />
+          </button>
+        )}
 
         <button onClick={onLock} title="Lock" style={iconBtn}>
           <Lock size={18} strokeWidth={2} color="#C8CDE8" />

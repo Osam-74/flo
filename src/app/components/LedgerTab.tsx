@@ -10,6 +10,7 @@ interface Props {
   currency: string;
   initialPersonFilter?: string;
   isReadOnly: boolean;
+  viewerId?: string | null;
   onEdit: (tx: Transaction) => void;
   onDelete: (id: string, desc: string) => void;
 }
@@ -29,7 +30,7 @@ const TYPE_FILTERS: { id: FilterType; label: string }[] = [
   { id: 'fund-return', label: 'Fund Return' },
 ];
 
-export function LedgerTab({ txs, people, currency, initialPersonFilter = 'all', isReadOnly, onEdit, onDelete }: Props) {
+export function LedgerTab({ txs, people, currency, initialPersonFilter = 'all', isReadOnly, viewerId, onEdit, onDelete }: Props) {
   const [typeFilter, setTypeFilter]     = useState<FilterType>('all');
   const [personFilter, setPersonFilter] = useState(initialPersonFilter);
   const [detailTx, setDetailTx] = useState<import('../types').Transaction | null>(null);
@@ -81,7 +82,8 @@ export function LedgerTab({ txs, people, currency, initialPersonFilter = 'all', 
         ))}
       </div>
 
-      {/* Person filter chips */}
+      {/* Person filter chips — hidden for team members (locked to their own) */}
+      {!viewerId && (
       <div style={{ display: 'flex', gap: 7, overflowX: 'auto', paddingBottom: 10, scrollbarWidth: 'none' as any }}>
         <button
           onClick={() => setPersonFilter('all')}
@@ -119,6 +121,7 @@ export function LedgerTab({ txs, people, currency, initialPersonFilter = 'all', 
           );
         })}
       </div>
+      )}
 
       {filtered.length === 0 ? (
         <div style={{ textAlign: 'center', padding: '48px 20px', fontSize: '0.78rem', color: '#9A9FB8', lineHeight: 1.8 }}>

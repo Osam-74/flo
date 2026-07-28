@@ -2,6 +2,7 @@ import React, { useState, useCallback, useEffect } from 'react';
 import { Delete, ArrowLeft, Download } from 'lucide-react';
 import { showToast } from './Modals';
 import { sha256 } from '../utils';
+import { ViewUser } from '../types';
 
 interface Props {
   onUnlock: (mode: 'master' | 'view') => void;
@@ -10,9 +11,11 @@ interface Props {
   businessName: string;
   masterHash: string;
   viewHash?: string;
+  viewUsers?: ViewUser[];
+  onUnlockView: (personId: string, personName: string) => void;
 }
 
-export function PinScreen({ onUnlock, onBack, businessName, masterHash, viewHash }: Props) {
+export function PinScreen({ onUnlock, onBack, businessName, masterHash, viewHash, viewUsers, onUnlockView }: Props) {
   const [entry, setEntry] = useState('');
   const [dotState, setDotState] = useState<'idle' | 'error'>('idle');
   const [shaking, setShaking] = useState(false);
@@ -20,6 +23,7 @@ export function PinScreen({ onUnlock, onBack, businessName, masterHash, viewHash
   const [lastPress, setLastPress] = useState(0);
   const [installReady, setInstallReady] = useState(!!(window.__pwaInstallReady && window.__pwaInstallPrompt));
   const [showInstallHelp, setShowInstallHelp] = useState(false);
+  const [welcomeInfo, setWelcomeInfo] = useState<{ name: string } | null>(null);
   const isStandalone = !!(window.__pwaIsStandalone);
 
   /* ── Listen for install prompt ── */
@@ -66,7 +70,25 @@ export function PinScreen({ onUnlock, onBack, businessName, masterHash, viewHash
     } else if (viewHash && h === viewHash) {
       sessionStorage.setItem('cb_s', 'view');
       onUnlock('view');
+    } else if (viewUsers && viewUsers.length > 0) {
+      const matched = viewUsers.find(vu => vu.pinHash === h);
+      if (matched) {
+        sessionStorage.setItem('cb_s', 'view');
+        sessionStorage.setItem('cb_viewer_id', matched.personId);
+        sessionStorage.setItem('cb_viewer_name', matched.personName);
+        setWelcomeInfo({ name: matched.personName });
+        setTimeout(() => {
+          onUnlockView(matched.personId, matched.personName);
+        }, 3000);
+        return;
+      } else {
+        triggerError();
+      }
     } else {
+      triggerError();
+    }
+
+    function triggerError() {
       setDotState('error');
       setShaking(true);
       setErrMsg('Incorrect PIN');
@@ -77,7 +99,7 @@ export function PinScreen({ onUnlock, onBack, businessName, masterHash, viewHash
         setErrMsg('');
       }, 900);
     }
-  }, [onUnlock, masterHash, viewHash]);
+  }, [onUnlock, onUnlockView, masterHash, viewHash, viewUsers]);
 
   const press = useCallback((d: string) => {
     const now = Date.now();
@@ -120,7 +142,88 @@ export function PinScreen({ onUnlock, onBack, businessName, masterHash, viewHash
           40%,80%{transform:translateX(8px)}
         }
         .pin-shake { animation: shake 0.45s ease; }
+        @keyframes welcomeFade {
+          0% { opacity: 0; }
+          10% { opacity: 1; }
+          90% { opacity: 1; }
+          100% { opacity: 0; }
+        }
+        @keyframes spin {
+          0% { transform: rotate(0deg); }
+          100% { transform: rotate(360deg); }
+        }
       `}</style>
+
+      {/* Welcome Screen Overlay */}
+      {welcomeInfo && (
+        <div style={{
+          position: 'fixed',
+          inset: 0,
+          background: 'linear-gradient(180deg, #F2F4F9 0%, #E8ECF5 100%)',
+          display: 'flex',
+          flexDirection: 'column',
+          alignItems: 'center',
+          justifyContent: 'center',
+          zIndex: 10005,
+          fontFamily: 'Plus Jakarta Sans, sans-serif',
+          animation: 'welcomeFade 3s forwards',
+          userSelect: 'none',
+        }}>
+          {/* Logo */}
+          <div style={{
+            width: 80,
+            height: 80,
+            borderRadius: 26,
+            background: 'linear-gradient(145deg, #0D1B6E 0%, #2A4FCF 50%, #6B8FFF 100%)',
+            boxShadow: '0 10px 40px rgba(13,27,110,0.4), 0 0 0 1px rgba(255,255,255,0.1)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            fontSize: '2.4rem',
+            marginBottom: 24,
+          }}>💰</div>
+
+          <div style={{
+            fontSize: '2.1rem',
+            fontWeight: 800,
+            letterSpacing: '-0.04em',
+            marginBottom: 16,
+            color: '#0A0F1F'
+          }}>
+            Flo<span style={{ color: '#00B4D8' }}>HQ</span>
+          </div>
+
+          <div style={{
+            fontSize: '1rem',
+            color: '#5A5F7A',
+            fontWeight: 500,
+            marginBottom: 4,
+          }}>
+            Welcome back,
+          </div>
+
+          <div style={{
+            fontSize: '1.8rem',
+            fontWeight: 800,
+            color: '#1A2FA8',
+            marginBottom: 32,
+            textAlign: 'center',
+            padding: '0 24px',
+          }}>
+            {welcomeInfo.name}
+          </div>
+
+          {/* Spinner */}
+          <div style={{
+            width: 32,
+            height: 32,
+            borderRadius: '50%',
+            border: '3px solid rgba(61,107,223,0.1)',
+            borderTopColor: '#3D6BDF',
+            animation: 'spin 0.8s linear infinite',
+          }} />
+        </div>
+      )}
 
       {/* Back button */}
       {onBack && (

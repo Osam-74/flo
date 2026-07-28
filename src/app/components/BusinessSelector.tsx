@@ -2,9 +2,10 @@ import React, { useState, useEffect, useCallback } from 'react';
 import {
   ChevronDown, Plus, Trash2, LogIn, ShieldCheck, X, Delete,
   Lock, Building2, Clock, KeyRound, CloudDownload, CloudUpload,
-  Settings2, RefreshCw, Pencil, Check
+  Settings2, RefreshCw, Pencil, Check, Users
 } from 'lucide-react';
 import { sha256 } from '../utils';
+import type { ViewUser, Person } from '../types';
 
 const MASTER_ADMIN_HASH = '8d146af9e9ac06938e5292116f80ececf77541427baf0b9fd7b2483d23fe6577';
 
@@ -13,6 +14,7 @@ export interface BizRecord {
   name: string;
   masterHash: string;
   viewHash?: string;
+  viewUsers?: ViewUser[];
   fsDoc: string;
   hasViewAccess?: boolean;
   createdAt?: number;
@@ -32,6 +34,8 @@ interface Props {
   onClearData?: (bizId: string) => void;
   onPull?: (bizId: string) => void;
   onPush?: (bizId: string) => void;
+  onFetchPeople?: (bizId: string) => Promise<Person[]>;
+  onSaveViewUsers?: (bizId: string, viewUsers: ViewUser[]) => Promise<void>;
   isMasterAdmin: boolean;
 }
 
@@ -161,6 +165,106 @@ function CreateBusinessWizard({ onClose, onSubmit }: { onClose: () => void; onSu
               <button onClick={handleFinish} disabled={creating || (!skipView && viewPin.length > 0 && viewPin.length < 4)} style={{ padding: '12px', borderRadius: 12, background: creating ? '#D4D8E8' : 'linear-gradient(135deg, #1A2FA8, #3D6BDF)', color: '#fff', border: 'none', cursor: creating ? 'wait' : 'pointer', fontWeight: 800, fontSize: '0.8rem' }}>{creating ? 'Creating…' : '✓ Create'}</button>
             </div>
           </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+/* ── Team Member PIN Setup Modal ── */
+function TeamMemberPinsModal({
+  biz, onClose, onFetchPeople, onSaveViewUsers,
+}: {
+  biz: BizRecord;
+  onClose: () => void;
+  onFetchPeople?: (bizId: string) => Promise<Person[]>;
+  onSaveViewUsers?: (bizId: string, viewUsers: ViewUser[]) => Promise<void>;
+}) {
+  const [people, setPeople] = useState<Person[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [viewUsers, setViewUsers] = useState<ViewUser[]>(biz.viewUsers ?? []);
+  const [selectedPerson, setSelectedPerson] = useState<string>('');
+  const [pinEntry, setPinEntry] = useState('');
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState('');
+
+  useEffect(() => {
+    if (!onFetchPeople) { setLoading(false); return; }
+    onFetchPeople(biz.id).then(p => { setPeople(p); setLoading(false); }).catch(() => setLoading(false));
+  }, [biz.id]); // eslint-disable-line
+
+  const handleAssign = async () => {
+    if (!selectedPerson || pinEntry.length < 4) return;
+    const person = people.find(p => p.id === selectedPerson);
+    if (!person) return;
+    setSaving(true);
+    try {
+      const pinHash = await sha256(pinEntry);
+      const updated = viewUsers.filter(vu => vu.personId !== person.id);
+      updated.push({ personId: person.id, personName: person.name, pinHash });
+      setViewUsers(updated);
+      setSelectedPerson(''); setPinEntry('');
+    } catch { setError('Failed to hash PIN'); }
+    setSaving(false);
+  };
+
+  const handleRemove = (personId: string) => {
+    setViewUsers(prev => prev.filter(vu => vu.personId !== personId));
+  };
+
+  const handleSave = async () => {
+    if (!onSaveViewUsers) return;
+    setSaving(true);
+    try { await onSaveViewUsers(biz.id, viewUsers); onClose(); }
+    catch { setError('Failed to save'); setSaving(false); }
+  };
+
+  return (
+    <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.55)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 10001, padding: 16 }}>
+      <div style={{ background: '#fff', borderRadius: 22, padding: '24px 20px', width: '100%', maxWidth: 340, boxShadow: '0 12px 48px rgba(0,0,0,0.22)', fontFamily: 'Plus Jakarta Sans, sans-serif' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <Users size={18} color="#3D6BDF" />
+            <span style={{ fontWeight: 800, fontSize: '0.95rem', color: '#1A1D2E' }}>Team Member Access</span>
+          </div>
+          <button onClick={onClose} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#9A9FB8' }}><X size={18} /></button>
+        </div>
+        <div style={{ fontSize: '0.75rem', color: '#9A9FB8', marginBottom: 18 }}>{biz.name} — assign PINs so team members can view their own transactions</div>
+        {loading ? (
+          <div style={{ textAlign: 'center', padding: '20px 0', color: '#9A9FB8', fontSize: '0.82rem' }}>Loading team members…</div>
+        ) : people.length === 0 ? (
+          <div style={{ textAlign: 'center', padding: '20px 0', color: '#9A9FB8', fontSize: '0.82rem', lineHeight: 1.6 }}>No team members found for this business.<br />Add people first, then assign their PINs here.</div>
+        ) : (
+          <>
+            {viewUsers.length > 0 && (
+              <div style={{ marginBottom: 16 }}>
+                <div style={{ fontSize: '0.58rem', fontWeight: 800, letterSpacing: '0.12em', textTransform: 'uppercase', color: '#9A9FB8', marginBottom: 8 }}>Active Access</div>
+                {viewUsers.map(vu => (
+                  <div key={vu.personId} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '8px 12px', background: 'rgba(61,107,223,0.06)', borderRadius: 10, marginBottom: 6, border: '1px solid rgba(61,107,223,0.12)' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                      <div style={{ width: 28, height: 28, borderRadius: 8, background: 'rgba(61,107,223,0.1)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '0.6rem', fontWeight: 800, color: '#3D6BDF' }}>{vu.personName.slice(0,2).toUpperCase()}</div>
+                      <span style={{ fontSize: '0.82rem', fontWeight: 700, color: '#1A1D2E' }}>{vu.personName}</span>
+                    </div>
+                    <button onClick={() => handleRemove(vu.personId)} style={{ background: 'rgba(232,62,92,0.1)', color: '#E83E5C', border: 'none', borderRadius: 8, padding: '4px 10px', cursor: 'pointer', fontSize: '0.68rem', fontWeight: 700, display: 'flex', alignItems: 'center', gap: 4 }}><X size={12} /> Remove</button>
+                  </div>
+                ))}
+              </div>
+            )}
+            <div style={{ background: '#F5F7FF', borderRadius: 14, padding: '14px', border: '1px solid rgba(61,107,223,0.1)' }}>
+              <div style={{ fontSize: '0.58rem', fontWeight: 800, letterSpacing: '0.12em', textTransform: 'uppercase', color: '#9A9FB8', marginBottom: 8 }}>Assign New PIN</div>
+              <div style={{ position: 'relative', marginBottom: 10 }}>
+                <select value={selectedPerson} onChange={e => setSelectedPerson(e.target.value)} style={{ width: '100%', padding: '11px 36px 11px 14px', background: '#fff', border: '1.5px solid rgba(61,107,223,0.2)', borderRadius: 12, fontSize: '0.85rem', fontWeight: 600, color: '#1A1D2E', appearance: 'none', cursor: 'pointer', outline: 'none', fontFamily: 'Plus Jakarta Sans, sans-serif' }}>
+                  <option value="">— Select team member —</option>
+                  {people.filter(p => !viewUsers.some(vu => vu.personId === p.id)).map(p => (<option key={p.id} value={p.id}>{p.name} ({p.role})</option>))}
+                </select>
+                <ChevronDown size={16} color="#3D6BDF" style={{ position: 'absolute', right: 12, top: '50%', transform: 'translateY(-50%)', pointerEvents: 'none' }} />
+              </div>
+              <PinKeypad value={pinEntry} onChange={setPinEntry} label="PIN (min 4 digits)" maxLen={6} />
+              <button onClick={handleAssign} disabled={!selectedPerson || pinEntry.length < 4 || saving} style={{ width: '100%', padding: '11px', borderRadius: 12, marginTop: 12, background: selectedPerson && pinEntry.length >= 4 ? 'linear-gradient(135deg, #1A2FA8, #3D6BDF)' : '#D4D8E8', color: '#fff', border: 'none', cursor: selectedPerson && pinEntry.length >= 4 ? 'pointer' : 'not-allowed', fontSize: '0.8rem', fontWeight: 800 }}>+ Assign PIN</button>
+            </div>
+            {error && <div style={{ color: '#E83E5C', fontSize: '0.73rem', fontWeight: 700, textAlign: 'center', marginTop: 10 }}>{error}</div>}
+            <button onClick={handleSave} disabled={saving} style={{ width: '100%', padding: '13px', borderRadius: 12, marginTop: 16, background: saving ? '#D4D8E8' : 'linear-gradient(135deg, #E8A000, #F5C800)', color: '#fff', border: 'none', cursor: saving ? 'wait' : 'pointer', fontWeight: 800, fontSize: '0.85rem' }}>{saving ? 'Saving…' : '✓ Save Team Access'}</button>
+          </>
         )}
       </div>
     </div>
@@ -426,6 +530,7 @@ export function BusinessSelector({
   onSelectBusiness, onMasterAdmin, onLogoutMasterAdmin,
   businesses, onCreateBusiness, onDeleteBusiness, onResetPin, onRenameBusiness,
   onExport, onImport, onClearData, onPull, onPush,
+  onFetchPeople, onSaveViewUsers,
   isMasterAdmin,
 }: Props) {
   const [selected, setSelected] = useState<string>(businesses[0]?.id ?? '');
@@ -446,6 +551,7 @@ export function BusinessSelector({
   const [renameName, setRenameName]           = useState('');
   const [renaming, setRenaming]               = useState(false);
   const [showContact, setShowContact]         = useState(false);
+  const [teamMemberPinsBiz, setTeamMemberPinsBiz] = useState<BizRecord | null>(null);
 
   useEffect(() => {
     if (businesses.length > 0 && !selected) setSelected(businesses[0].id);
@@ -604,6 +710,9 @@ export function BusinessSelector({
                   <button onClick={() => setResetPinBiz(biz)} style={{ flex: 1, padding: '8px', borderRadius: 10, background: 'rgba(61,107,223,0.07)', border: '1px solid rgba(61,107,223,0.15)', cursor: 'pointer', fontSize: '0.68rem', fontWeight: 700, color: '#3D6BDF', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 5 }}>
                     <KeyRound size={12} /> Reset PIN
                   </button>
+                  <button onClick={() => setTeamMemberPinsBiz(biz)} style={{ flex: 1, padding: '8px', borderRadius: 10, background: 'rgba(61,107,223,0.07)', border: '1px solid rgba(61,107,223,0.15)', cursor: 'pointer', fontSize: '0.68rem', fontWeight: 700, color: '#3D6BDF', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 5 }}>
+                    <Users size={12} /> Team PINs
+                  </button>
                   <button onClick={() => setSettingsBiz(biz)} style={{ flex: 1, padding: '8px', borderRadius: 10, background: 'rgba(61,107,223,0.07)', border: '1px solid rgba(61,107,223,0.15)', cursor: 'pointer', fontSize: '0.68rem', fontWeight: 700, color: '#3D6BDF', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 5 }}>
                     <Settings2 size={12} /> Settings
                   </button>
@@ -694,6 +803,16 @@ export function BusinessSelector({
             </div>
           </div>
         </div>
+      )}
+
+      {/* ══ TEAM MEMBER PINS MODAL ══ */}
+      {teamMemberPinsBiz && (
+        <TeamMemberPinsModal
+          biz={teamMemberPinsBiz}
+          onClose={() => setTeamMemberPinsBiz(null)}
+          onFetchPeople={onFetchPeople}
+          onSaveViewUsers={onSaveViewUsers}
+        />
       )}
 
       {/* ══ CONTACT ADMIN ══ */}

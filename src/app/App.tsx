@@ -16,7 +16,7 @@ import { SettingsTab }    from './components/SettingsTab';
 import { DeleteModal, EditModal, PaymentModal, PickupModal, ClearModal, ToastContainer, showToast } from './components/Modals';
 import { FeedUsageModal } from './components/FeedUsageModal';
 
-import type { Transaction, Person, Tab, AppMode, TxType } from './types';
+import type { Transaction, Person, Tab, AppMode, TxType, ViewUser } from './types';
 import { sha256, sanitizeTxs, stripUndefined } from './utils';
 
 /* ── Firebase config ───────────────────────────────── */
@@ -42,6 +42,8 @@ export default function App() {
   const [screen, setScreen] = useState<Screen>('selector');
   const [appMode, setAppMode] = useState<AppMode>('locked');
   const [isMasterAdmin, setIsMasterAdmin] = useState(false);
+  const [viewerId, setViewerId] = useState<string | null>(null);
+  const [viewerName, setViewerName] = useState<string | null>(null);
 
   /* ── Business registry (loaded from Firestore) ── */
   const [businesses, setBusinesses] = useState<BizRecord[]>([]);
@@ -84,6 +86,23 @@ export default function App() {
   const feedCheckedRef = useRef<string>(''); // tracks bizId+date already checked this session
 
   const isReadOnly = appMode === 'view';
+
+  /* ── Filter data for team member (viewer) mode ─── */
+  const isViewer = isReadOnly && !!viewerId;
+  const viewerTxs = isViewer
+    ? txs.filter(t =>
+        t.person === viewerId ||
+        t.transferFrom === viewerId || t.transferTo === viewerId ||
+        t.creditReceiver === viewerId || t.creditSeller === viewerId ||
+        t.ownerSender === viewerId || t.ownerReceiver === viewerId ||
+        t.frSender === viewerId || t.frReceiver === viewerId ||
+        t.employee === viewerId ||
+        (t.payments?.some(p => p.receiver === viewerId))
+      )
+    : txs;
+  const viewerPeople = isViewer
+    ? people.filter(p => p.id === viewerId)
+    : people;
 
   /* ── PWA install ─────────────────────────────────────────────────────
      The beforeinstallprompt event is captured in main.tsx BEFORE React
@@ -281,19 +300,28 @@ export default function App() {
   }, [selectedBiz]);
 
   /* ── Unlock a business ───────────────────────────── */
-  const unlockBiz = useCallback((biz: BizRecord, mode: 'master' | 'view') => {
+  const unlockBiz = useCallback((biz: BizRecord, mode: 'master' | 'view', vId?: string, vName?: string) => {
     setAppMode(mode);
     setScreen('app');
+    if (vId) { setViewerId(vId); setViewerName(vName ?? null); }
+    else { setViewerId(null); setViewerName(null); }
     subscribeToBiz(biz);
     sessionStorage.setItem('cb_s',   mode);
     sessionStorage.setItem('cb_biz', biz.id);
+    if (vId) { sessionStorage.setItem('cb_viewer_id', vId); sessionStorage.setItem('cb_viewer_name', vName ?? ''); }
+    else { sessionStorage.removeItem('cb_viewer_id'); sessionStorage.removeItem('cb_viewer_name'); }
   }, [subscribeToBiz]);
+
+  const unlockBizView = useCallback((biz: BizRecord, personId: string, personName: string) => {
+    unlockBiz(biz, 'view', personId, personName);
+  }, [unlockBiz]);
 
   const lock = useCallback(() => {
     sessionStorage.clear();
     setScreen('selector');
     setAppMode('locked');
     setIsMasterAdmin(false);
+    setViewerId(null); setViewerName(null);
     setSelectedBiz(null);
     setPeople([]); setTxs([]); setCurrency('GHS');
     if (bizUnsubRef.current) bizUnsubRef.current();
@@ -701,6 +729,40 @@ export default function App() {
     showToast('Open that business first to push data.', 'info');
   }, [selectedBiz, manualPush]);
 
+  /* ── Fetch people for a business (admin only, for team PIN setup) ── */
+  const onFetchPeople = useCallback(async (bizId: string): Promise<Person[]> => {
+    if (!dbRef.current || !fsRef.current) return [];
+    const biz = businesses.find(b => b.id === bizId);
+    if (!biz) return [];
+    try {
+      const [col, doc] = biz.fsDoc.split('/');
+      const s = await fsRef.current.getDoc(fsRef.current.doc(dbRef.current, col, doc));
+      if (s.exists()) {
+        const data = s.data();
+        const ppl = Array.isArray(data.people) ? data.people : [];
+        return ppl.filter((p: Person) => {
+          const r = (p.role || '').toLowerCase();
+          return !r.includes('owner') && p.id !== 'biz';
+        });
+      }
+    } catch (e) { console.warn('[FetchPeople]', e); }
+    return [];
+  }, [businesses]);
+
+  /* ── Save view users (team member PINs) to registry ── */
+  const onSaveViewUsers = useCallback(async (bizId: string, viewUsers: ViewUser[]) => {
+    const updated = businesses.map(b => b.id === bizId ? { ...b, viewUsers: viewUsers.length > 0 ? viewUsers : undefined } : b);
+    // Also strip viewUsers if empty
+    const clean = updated.map(b => {
+      const obj: any = { ...b };
+      if (!obj.viewUsers) delete obj.viewUsers;
+      Object.keys(obj).forEach(k => { if (obj[k] === undefined) delete obj[k]; });
+      return obj;
+    });
+    await saveRegistry(clean);
+    showToast('Team member access updated', 'success');
+  }, [businesses, saveRegistry]);
+
   /* ════════════════════════════════════════════════
      RENDER
   ════════════════════════════════════════════════ */
@@ -756,6 +818,8 @@ export default function App() {
           onClearData={masterClearData}
           onPull={masterPull}
           onPush={masterPush}
+          onFetchPeople={onFetchPeople}
+          onSaveViewUsers={onSaveViewUsers}
         />
         <ToastContainer />
       </>
@@ -771,7 +835,9 @@ export default function App() {
           businessName={selectedBiz.name}
           masterHash={selectedBiz.masterHash}
           viewHash={selectedBiz.viewHash}
+          viewUsers={selectedBiz.viewUsers}
           onUnlock={(mode) => unlockBiz(selectedBiz, mode)}
+          onUnlockView={(personId, personName) => unlockBizView(selectedBiz, personId, personName)}
           onBack={() => setScreen('selector')}
         />
         <ToastContainer />
@@ -794,6 +860,7 @@ export default function App() {
           appMode={appMode}
           installReady={installReady}
           activeTab={activeTab}
+          viewerId={viewerId ?? undefined}
           onLock={lock}
           onInstall={async () => {
             const p = promptRef.current;
@@ -817,8 +884,11 @@ export default function App() {
         <div style={{ flex: 1, overflowY: 'auto', WebkitOverflowScrolling: 'touch' as any }}>
           {activeTab === 'dashboard' && (
             <Dashboard
-              txs={txs} people={people} currency={currency}
+              txs={isViewer ? viewerTxs : txs}
+              people={isViewer ? viewerPeople : people}
+              currency={currency}
               businessName={selectedBiz?.name}
+              viewerId={viewerId ?? undefined}
               onPersonFilter={handlePersonFilter}
               onEdit={tx => { if (!guardWrite()) return; setEditModal({ open: true, tx }); }}
               onDelete={(id, desc) => { if (!guardWrite()) return; setDeleteModal({ open: true, id, desc }); }}
@@ -828,9 +898,12 @@ export default function App() {
           )}
           {activeTab === 'ledger' && (
             <LedgerTab
-              txs={txs} people={people} currency={currency}
-              initialPersonFilter={personFilterForLedger}
+              txs={isViewer ? viewerTxs : txs}
+              people={isViewer ? viewerPeople : people}
+              currency={currency}
+              initialPersonFilter={isViewer ? (viewerId ?? 'all') : personFilterForLedger}
               isReadOnly={isReadOnly}
+              viewerId={viewerId ?? undefined}
               onEdit={tx => { if (!guardWrite()) return; setEditModal({ open: true, tx }); }}
               onDelete={(id, desc) => { if (!guardWrite()) return; setDeleteModal({ open: true, id, desc }); }}
             />
@@ -870,6 +943,7 @@ export default function App() {
         <BottomNav
           activeTab={activeTab}
           appMode={appMode}
+          viewerId={viewerId ?? undefined}
           onTab={handleTab}
           onAdd={openAdd}
           fabActive={isAddOpen}

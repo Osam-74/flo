@@ -32,6 +32,12 @@ export interface Person {
   color: string;
 }
 
+export interface ViewUser {
+  personId: string;
+  personName: string;
+  pinHash: string;
+}
+
 export interface Transaction {
   id: string;
   type: TxType;
