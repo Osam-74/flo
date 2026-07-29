@@ -301,6 +301,14 @@ export function EditModal({ open, tx, people, currency, onClose, onSave }: EditM
   const [frSender,   setFrSender]   = useState('');
   const [frReceiver, setFrReceiver] = useState('');
 
+  // Egg collection
+  const [eggPieces,  setEggPieces]  = useState('');
+  const [brokenEggs, setBrokenEggs] = useState('');
+  const [eggDate,    setEggDate]    = useState('');
+  // Feed usage
+  const [fuBags, setFuBags] = useState('');
+  const [fuDate, setFuDate] = useState('');
+
   useEffect(() => {
     if (!tx) return;
     const t = tx;
@@ -342,6 +350,13 @@ export function EditModal({ open, tx, people, currency, onClose, onSave }: EditM
     setFrNote(t.note || '');
     setFrSender(t.frSender || t.person || '');
     setFrReceiver(t.frReceiver || '');
+    // egg-collection
+    setEggPieces(String(t.eggPieces || 0));
+    setBrokenEggs(String(t.brokenEggs || 0));
+    setEggDate(t.date || today());
+    // feed-usage
+    setFuBags(String(Math.abs(t.feedBags || 0)));
+    setFuDate(t.date || today());
   }, [tx]);
 
   if (!tx) return null;
@@ -418,6 +433,21 @@ export function EditModal({ open, tx, people, currency, onClose, onSave }: EditM
       const rn = people.find(p => p.id === frReceiver)?.name || 'Owner';
       onSave(tx.id, { amount: amt, date: frDate, note: frNote, frSender, frReceiver, person: frSender, desc: `Fund return: ${sn} → ${rn}` });
     }
+    else if (type === 'egg-collection') {
+      const eggs = parseFloat(eggPieces) || 0;
+      const broken = parseFloat(brokenEggs) || 0;
+      if (!eggDate) { showToast('Select a date', 'error'); return; }
+      if (eggs <= 0) { showToast('Enter total eggs collected', 'error'); return; }
+      const desc = `Egg Collection — ${eggs} eggs collected${broken > 0 ? `, ${broken} broken` : ''}`;
+      onSave(tx.id, { date: eggDate, eggPieces: eggs, brokenEggs: broken > 0 ? broken : undefined, desc });
+    }
+    else if (type === 'feed-usage') {
+      const bags = parseInt(fuBags, 10) || 0;
+      if (!fuDate) { showToast('Select a date', 'error'); return; }
+      if (bags <= 0) { showToast('Enter number of bags used', 'error'); return; }
+      const desc = `Feed Usage — ${bags} bag${bags !== 1 ? 's' : ''} used on ${fuDate}`;
+      onSave(tx.id, { date: fuDate, feedBags: -bags, desc, note: 'Daily feed usage log' });
+    }
 
     onClose();
   };
@@ -425,6 +455,7 @@ export function EditModal({ open, tx, people, currency, onClose, onSave }: EditM
   const typeLabel: Record<string, string> = {
     income: 'Sales', expense: 'Expense', salary: 'Salary',
     transfer: 'Transfer', credit: 'Credit Sale', 'owner-fund': 'Fund Injection', 'fund-return': 'Fund Return',
+    'egg-collection': 'Egg Collection', 'feed-usage': 'Feed Usage',
   };
 
   return (
@@ -764,6 +795,47 @@ export function EditModal({ open, tx, people, currency, onClose, onSave }: EditM
               </Sel>
             </Field>
           </Row>
+        </div>
+      )}
+
+      {/* ════════════════════════════════════════════════
+          EGG COLLECTION — edit eggs collected and broken eggs
+      ════════════════════════════════════════════════ */}
+      {tx.type === 'egg-collection' && (
+        <div style={card}>
+          <Row>
+            <Field label="Date *">
+              <input style={inp} type="date" value={eggDate} max={today()} onChange={e => setEggDate(e.target.value)} />
+            </Field>
+          </Row>
+          <Field label="Total Eggs Collected *">
+            <input style={{ ...inp, fontSize: '1.5rem', fontFamily: "'DM Mono',monospace" }}
+              type="number" placeholder="0" min="0" step="1"
+              value={eggPieces} onChange={e => setEggPieces(e.target.value)} />
+          </Field>
+          <div style={{ height: 10 }} />
+          <Field label="Broken Eggs (optional)">
+            <input style={inp} type="number" placeholder="0" min="0" step="1"
+              value={brokenEggs} onChange={e => setBrokenEggs(e.target.value)} />
+          </Field>
+        </div>
+      )}
+
+      {/* ════════════════════════════════════════════════
+          FEED USAGE — edit bags used and date
+      ════════════════════════════════════════════════ */}
+      {tx.type === 'feed-usage' && (
+        <div style={card}>
+          <Row>
+            <Field label="Date *">
+              <input style={inp} type="date" value={fuDate} max={today()} onChange={e => setFuDate(e.target.value)} />
+            </Field>
+          </Row>
+          <Field label="Bags Used *">
+            <input style={{ ...inp, fontSize: '1.5rem', fontFamily: "'DM Mono',monospace" }}
+              type="number" placeholder="0" min="0" step="1"
+              value={fuBags} onChange={e => setFuBags(e.target.value)} />
+          </Field>
         </div>
       )}
 

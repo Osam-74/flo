@@ -305,9 +305,73 @@ export function Dashboard({
   const owing = Object.entries(byBuyer).map(([n, d]) => ({ n, o: d.total - d.paid })).filter(x => x.o > 0.005);
   const upcomingPickups = txs.filter(t => t.type === 'credit' && t.isPickup && t.date > todayStr).sort((a, b) => (a.date || '').localeCompare(b.date || ''));
 
+  // ── Missed days notices ──────────────────────────────────────────
+  // Only count from the "refresh date" (stored in localStorage on each page load).
+  // This prevents stale historical misses from piling up. When the page
+  // is refreshed, the start date resets to today — so at most it checks
+  // from the last time the user opened the app.
+  const refreshDateKey = 'cb_refresh_date';
+  let refreshDate = todayStr;
+  try {
+    const stored = localStorage.getItem(refreshDateKey);
+    if (stored && stored <= todayStr) {
+      refreshDate = stored;
+    } else {
+      localStorage.setItem(refreshDateKey, todayStr);
+    }
+  } catch {}
+
+  // Count missed egg-collection days from refresh date to today
+  const eggMissedDays = (() => {
+    const eggDates = new Set(txs.filter(t => t.type === 'egg-collection').map(t => t.date));
+    let missed = 0;
+    let d = new Date(refreshDate + 'T00:00:00');
+    const end = new Date(todayStr + 'T00:00:00');
+    while (d <= end) {
+      const ds = d.toISOString().split('T')[0];
+      if (!eggDates.has(ds)) missed++;
+      d.setDate(d.getDate() + 1);
+    }
+    return missed;
+  })();
+
+  // Count missed feed-usage days from refresh date to today
+  const feedMissedDays = (() => {
+    const feedDates = new Set(txs.filter(t => t.type === 'feed-usage').map(t => t.date));
+    let missed = 0;
+    let d = new Date(refreshDate + 'T00:00:00');
+    const end = new Date(todayStr + 'T00:00:00');
+    while (d <= end) {
+      const ds = d.toISOString().split('T')[0];
+      if (!feedDates.has(ds)) missed++;
+      d.setDate(d.getDate() + 1);
+    }
+    return missed;
+  })();
+
   return (
     <div style={{ padding: '16px 16px 120px' }}>
       <style>{CSS}</style>
+
+      {/* ── Missed days notices ── (hidden for team members) */}
+      {!isViewer && eggMissedDays > 0 && (
+        <div style={{ marginBottom: 10, background: 'rgba(217,119,6,0.10)', border: '1.5px solid #D97706', borderRadius: 12, padding: '10px 14px', display: 'flex', alignItems: 'center', gap: 8 }}>
+          <span style={{ fontSize: '1rem' }}>🥚</span>
+          <div style={{ flex: 1 }}>
+            <span style={{ fontSize: '0.72rem', fontWeight: 800, color: '#92400E', display: 'block' }}>Egg Collection Missing</span>
+            <span style={{ fontSize: '0.62rem', color: '#B45309' }}>{eggMissedDays} day{eggMissedDays !== 1 ? 's' : ''} since last refresh — log today's collection</span>
+          </div>
+        </div>
+      )}
+      {!isViewer && feedMissedDays > 0 && (
+        <div style={{ marginBottom: 10, background: 'rgba(180,83,9,0.10)', border: '1.5px solid #B45309', borderRadius: 12, padding: '10px 14px', display: 'flex', alignItems: 'center', gap: 8 }}>
+          <span style={{ fontSize: '1rem' }}>🌾</span>
+          <div style={{ flex: 1 }}>
+            <span style={{ fontSize: '0.72rem', fontWeight: 800, color: '#92400E', display: 'block' }}>Feed Usage Missing</span>
+            <span style={{ fontSize: '0.62rem', color: '#B45309' }}>{feedMissedDays} day{feedMissedDays !== 1 ? 's' : ''} since last refresh — log today's feed usage</span>
+          </div>
+        </div>
+      )}
 
       {/* ── Tray notice ── (hidden for team members) */}
       {!isViewer && trayInventory.hasTrayData && (
