@@ -894,6 +894,7 @@ export default function App() {
               onDelete={(id, desc) => { if (!guardWrite()) return; setDeleteModal({ open: true, id, desc }); }}
               balanceHidden={balanceHidden}
               onToggleHidden={() => setBalanceHidden(h => !h)}
+              onQuickAdd={(type) => { if (!guardWrite()) return; setAddInitType(type); setIsAddOpen(true); }}
             />
           )}
           {activeTab === 'ledger' && (

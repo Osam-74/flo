@@ -16,6 +16,7 @@ interface Props {
   onDelete: (id: string, desc: string) => void;
   balanceHidden: boolean;
   onToggleHidden: () => void;
+  onQuickAdd?: (type: 'egg-collection' | 'feed-usage') => void;
 }
 
 function haptic() {
@@ -49,6 +50,7 @@ export function Dashboard({
   viewerId,
   onPersonFilter, onEdit, onDelete,
   balanceHidden, onToggleHidden,
+  onQuickAdd,
 }: Props) {
   const hidden = balanceHidden;
   const [detailTx,  setDetailTx]  = useState<Transaction | null>(null);
@@ -355,21 +357,33 @@ export function Dashboard({
 
       {/* ── Missed days notices ── (hidden for team members) */}
       {!isViewer && eggMissedDays > 0 && (
-        <div style={{ marginBottom: 10, background: 'rgba(217,119,6,0.10)', border: '1.5px solid #D97706', borderRadius: 12, padding: '10px 14px', display: 'flex', alignItems: 'center', gap: 8 }}>
+        <div
+          onClick={() => onQuickAdd?.('egg-collection')}
+          style={{ marginBottom: 10, background: 'rgba(217,119,6,0.10)', border: '1.5px solid #D97706', borderRadius: 12, padding: '10px 14px', display: 'flex', alignItems: 'center', gap: 8, cursor: onQuickAdd ? 'pointer' : 'default', transition: 'background 0.15s ease' }}
+        >
           <span style={{ fontSize: '1rem' }}>🥚</span>
           <div style={{ flex: 1 }}>
             <span style={{ fontSize: '0.72rem', fontWeight: 800, color: '#92400E', display: 'block' }}>Egg Collection Missing</span>
             <span style={{ fontSize: '0.62rem', color: '#B45309' }}>{eggMissedDays} day{eggMissedDays !== 1 ? 's' : ''} since last refresh — log today's collection</span>
           </div>
+          {onQuickAdd && (
+            <span style={{ background: 'linear-gradient(135deg, #D97706, #F59E0B)', color: '#fff', fontSize: '0.62rem', fontWeight: 800, padding: '5px 11px', borderRadius: 8, whiteSpace: 'nowrap', letterSpacing: '0.02em' }}>Log Now →</span>
+          )}
         </div>
       )}
       {!isViewer && feedMissedDays > 0 && (
-        <div style={{ marginBottom: 10, background: 'rgba(180,83,9,0.10)', border: '1.5px solid #B45309', borderRadius: 12, padding: '10px 14px', display: 'flex', alignItems: 'center', gap: 8 }}>
+        <div
+          onClick={() => onQuickAdd?.('feed-usage')}
+          style={{ marginBottom: 10, background: 'rgba(180,83,9,0.10)', border: '1.5px solid #B45309', borderRadius: 12, padding: '10px 14px', display: 'flex', alignItems: 'center', gap: 8, cursor: onQuickAdd ? 'pointer' : 'default', transition: 'background 0.15s ease' }}
+        >
           <span style={{ fontSize: '1rem' }}>🌾</span>
           <div style={{ flex: 1 }}>
             <span style={{ fontSize: '0.72rem', fontWeight: 800, color: '#92400E', display: 'block' }}>Feed Usage Missing</span>
             <span style={{ fontSize: '0.62rem', color: '#B45309' }}>{feedMissedDays} day{feedMissedDays !== 1 ? 's' : ''} since last refresh — log today's feed usage</span>
           </div>
+          {onQuickAdd && (
+            <span style={{ background: 'linear-gradient(135deg, #B45309, #D97706)', color: '#fff', fontSize: '0.62rem', fontWeight: 800, padding: '5px 11px', borderRadius: 8, whiteSpace: 'nowrap', letterSpacing: '0.02em' }}>Log Now →</span>
+          )}
         </div>
       )}
 
