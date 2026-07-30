@@ -421,7 +421,7 @@ export function ReportTab({ businessName, txs, people, currency }: Props) {
         { label: 'Currency', value: CUR },
         { label: 'Filter', value: `${personLabel} · ${TYPE_LABELS[rType] || 'All types'}` },
         {
-          label: 'Generated',
+          label: 'Prepared at',
           value: now.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })
             + ', ' + now.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' }),
         },
