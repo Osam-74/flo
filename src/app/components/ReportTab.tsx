@@ -92,11 +92,17 @@ export function ReportTab({ businessName, txs, people, currency }: Props) {
 
   function generate() {
     let f = [...txs];
-    // Always exclude feed-usage and egg-collection logs from the report tables
-    f = f.filter(t => !['feed-usage', 'egg-collection'].includes(t.type));
     if (from)          f = f.filter(t => t.date >= from);
     if (to)            f = f.filter(t => t.date <= to);
     if (pId !== 'all') f = f.filter(t => t.person === pId);
+
+    // Compute egg collection totals BEFORE excluding them from the table
+    const eggCollectionTxs = f.filter(t => t.type === 'egg-collection');
+    const totalEggs        = eggCollectionTxs.reduce((s, t) => s + (t.eggPieces || 0), 0);
+    const totalBrokenEggs  = eggCollectionTxs.reduce((s, t) => s + (t.brokenEggs || 0), 0);
+
+    // Now exclude feed-usage and egg-collection logs from the report tables
+    f = f.filter(t => !['feed-usage', 'egg-collection'].includes(t.type));
     if (rType !== 'all') f = f.filter(t => t.type === rType);
     f.sort((a, b) => a.date < b.date ? -1 : 1);
 
@@ -129,11 +135,6 @@ export function ReportTab({ businessName, txs, people, currency }: Props) {
     const totalCrates = f
       .filter(t => ['income', 'credit'].includes(t.type))
       .reduce((s, t) => s + (t.crates || 0), 0);
-
-    // Egg collection totals for the period
-    const eggCollectionTxs = f.filter(t => t.type === 'egg-collection');
-    const totalEggs        = eggCollectionTxs.reduce((s, t) => s + (t.eggPieces || 0), 0);
-    const totalBrokenEggs  = eggCollectionTxs.reduce((s, t) => s + (t.brokenEggs || 0), 0);
 
     const dateLabel = (from && to) ? fmtDate(from) + ' – ' + fmtDate(to) : 'All Dates';
 
@@ -596,7 +597,6 @@ export function ReportTab({ businessName, txs, people, currency }: Props) {
           borderRadius: 16,
           padding: '16px 18px',
           marginBottom: 14,
-          position: 'relative',
         }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
             <Sun size={16} color="#ca8a04" />
@@ -604,21 +604,20 @@ export function ReportTab({ businessName, txs, people, currency }: Props) {
             <span style={{ fontSize: '0.72rem', fontWeight: 800, letterSpacing: '0.1em', textTransform: 'uppercase', color: '#16a34a' }}>Report Summary</span>
             <button
               onClick={() => { navigator.clipboard?.writeText(summaryText).then(() => showToast('Summary copied to clipboard', 'success')).catch(() => showToast('Copy failed', 'error')); }}
-              style={{ marginLeft: 'auto', background: 'rgba(22,163,74,0.1)', border: '1px solid rgba(22,163,74,0.3)', borderRadius: 8, cursor: 'pointer', padding: '5px 8px', display: 'flex', alignItems: 'center', gap: 4, color: '#16a34a', fontSize: '0.62rem', fontWeight: 700, letterSpacing: '0.04em' }}
+              style={{ marginLeft: 'auto', background: 'rgba(22,163,74,0.1)', border: '1px solid rgba(22,163,74,0.3)', borderRadius: 7, cursor: 'pointer', padding: 5, display: 'flex', alignItems: 'center', color: '#16a34a' }}
               aria-label="Copy summary"
             >
-              <Copy size={13} />
-              <span>COPY</span>
+              <Copy size={14} />
             </button>
+            <button
+              onClick={() => setShowSummary(false)}
+              style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#16a34a', fontSize: '1rem', lineHeight: 1, padding: '4px 2px', display: 'flex', alignItems: 'center' }}
+              aria-label="Dismiss"
+            >✕</button>
           </div>
           <div style={{ fontSize: '0.88rem', lineHeight: 1.65, color: '#14532d', margin: 0, fontFamily: "'Plus Jakarta Sans', sans-serif", whiteSpace: 'pre-line' }}>
             {summaryText}
           </div>
-          <button
-            onClick={() => setShowSummary(false)}
-            style={{ position: 'absolute', top: 12, right: 12, background: 'none', border: 'none', cursor: 'pointer', color: '#16a34a', fontSize: '1rem', lineHeight: 1, padding: 2 }}
-            aria-label="Dismiss"
-          >✕</button>
         </div>
       )}
 
