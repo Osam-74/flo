@@ -140,30 +140,47 @@ export function ReportTab({ businessName, txs, people, currency }: Props) {
     // ── Balance brought forward (into the start date of the report) ──
     // If 'from' is the 1st of a month → "balance brought into the month"
     // Otherwise → "balance brought into the week"
+    // The balance is the TOTAL BALANCE AVAILABLE as of the day before the
+    // start date — i.e. sum of all positive account/person balances, same
+    // logic as the dashboard.
     const periodStartDate = from || today;
     const fromDateObj = new Date(periodStartDate + 'T00:00:00');
     const periodLabel: 'month' | 'week' = fromDateObj.getDate() === 1 ? 'month' : 'week';
 
-    // Compute net balance from ALL transactions before periodStartDate
-    let balanceBroughtForward = 0;
-    for (const t of txs) {
-      if (!t.date || t.date >= periodStartDate) continue;
-      if (t.type === 'income')         balanceBroughtForward += (t.amount || 0);
-      if (t.type === 'expense')        balanceBroughtForward -= (t.amount || 0);
-      if (t.type === 'salary')         balanceBroughtForward -= (t.amount || 0);
-      if (t.type === 'feed-usage')     balanceBroughtForward -= 0; // no cash impact
-      if (t.type === 'transfer')       balanceBroughtForward += 0;
-      if (t.type === 'owner-fund')     balanceBroughtForward += (t.amount || 0);
-      if (t.type === 'fund-return')   balanceBroughtForward -= (t.amount || 0);
+    // All transactions BEFORE the period start date
+    const prePeriodTxs = txs.filter(t => t.date && t.date < periodStartDate);
+
+    // Compute biz balance from pre-period txs
+    let preBizBalance = 0;
+    for (const t of prePeriodTxs) {
+      if (t.type === 'transfer') {
+        if (t.transferTo   === 'biz') preBizBalance += t.amount;
+        if (t.transferFrom === 'biz') preBizBalance -= t.amount;
+      }
+      if (t.type === 'income' && (t as any).receiver === 'biz') preBizBalance += t.amount;
+      if (t.type === 'salary' && t.salaryPaidBy === 'biz') preBizBalance -= t.amount;
+      if (t.type === 'expense' && t.person === 'biz') preBizBalance -= t.amount;
+      if (t.type === 'owner-fund' && t.ownerReceiver === 'biz') preBizBalance += t.amount;
+      if (t.type === 'fund-return' && t.frSender === 'biz') preBizBalance -= t.amount;
       if (t.type === 'credit') {
         if (Array.isArray(t.payments) && t.payments.length > 0) {
           for (const p of t.payments) {
-            if (p.date < periodStartDate) balanceBroughtForward += (p.amount || 0);
+            if (p.receiver === 'biz') preBizBalance += p.amount;
           }
-        } else if ((t.creditPaid || 0) > 0 && (t.date || '') < periodStartDate) {
-          balanceBroughtForward += (t.creditPaid || 0);
+        } else if (t.creditReceiver === 'biz' && (t.creditPaid || 0) > 0) {
+          preBizBalance += (t.creditPaid || 0);
         }
       }
+    }
+
+    // Total balance available = max(0, bizBalance) + sum of positive member balances
+    let balanceBroughtForward = Math.max(0, preBizBalance);
+    for (const p of people) {
+      if (p.id === 'biz') continue;
+      const role = (p.role || '').toLowerCase();
+      if (role.includes('owner')) continue;
+      const { pBal } = pStats(p.id, prePeriodTxs);
+      if (pBal > 0.005) balanceBroughtForward += pBal;
     }
 
     // ── Team member debts (negative balance = we owe them) ──
