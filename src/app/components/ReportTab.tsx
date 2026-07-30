@@ -101,12 +101,20 @@ export function ReportTab({ businessName, txs, people, currency }: Props) {
     const totalEggs        = eggCollectionTxs.reduce((s, t) => s + (t.eggPieces || 0), 0);
     const totalBrokenEggs  = eggCollectionTxs.reduce((s, t) => s + (t.brokenEggs || 0), 0);
 
-    // Now exclude feed-usage and egg-collection logs from the report tables
-    f = f.filter(t => !['feed-usage', 'egg-collection'].includes(t.type));
+    // Helper: detect feed-usage entries regardless of how they were saved
+    // Old entries: type='expense', note='Daily feed usage log'
+    // New entries: type='feed-usage'
+    const isFeedUsageEntry = (t: Transaction) =>
+      t.type === 'feed-usage' ||
+      (t.note === 'Daily feed usage log') ||
+      (typeof t.desc === 'string' && /^feed usage/i.test(t.desc));
+
+    // Exclude feed-usage (both formats) and egg-collection from report tables
+    f = f.filter(t => !isFeedUsageEntry(t) && t.type !== 'egg-collection');
     if (rType !== 'all') f = f.filter(t => t.type === rType);
     f.sort((a, b) => a.date < b.date ? -1 : 1);
 
-    const expenseTxs  = f.filter(t => ['expense', 'salary', 'fund-return'].includes(t.type));
+    const expenseTxs  = f.filter(t => ['expense', 'salary', 'fund-return'].includes(t.type) && !isFeedUsageEntry(t));
     const salaryTxs   = f.filter(t => t.type === 'salary');
     const salesTxs    = f.filter(t => ['income', 'credit'].includes(t.type));
     const ownerFunds  = f.filter(t => t.type === 'owner-fund');
