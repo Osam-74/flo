@@ -389,7 +389,7 @@ export function Dashboard({
 
       {/* ── Tray notice ── (hidden for team members) */}
       {!isViewer && trayInventory.hasTrayData && (
-        <div style={{ marginBottom: 14, transition: 'opacity 0.9s ease, max-height 0.9s ease', opacity: trayVisible ? 1 : 0, maxHeight: trayVisible ? 80 : 0, overflow: 'hidden', pointerEvents: trayVisible ? 'auto' : 'none' }}>
+        <div style={{ marginBottom: trayVisible ? 14 : 0, transition: 'opacity 0.9s ease, max-height 0.9s ease, margin 0.9s ease', opacity: trayVisible ? 1 : 0, maxHeight: trayVisible ? 80 : 0, overflow: 'hidden', pointerEvents: trayVisible ? 'auto' : 'none' }}>
           {trayInventory.reorder ? (
             <div style={{ background: 'rgba(220,38,38,0.10)', border: '1.5px solid #DC2626', borderRadius: 12, padding: '9px 14px', display: 'flex', alignItems: 'center', gap: 8, animation: 'reorder-blink 1.2s ease-in-out infinite' }}>
               <span style={{ fontSize: '0.7rem', fontWeight: 800, color: '#DC2626', letterSpacing: '0.07em', textTransform: 'uppercase' }}>REORDER TRAY</span>
@@ -409,7 +409,7 @@ export function Dashboard({
 
       {/* ── Feed notice ── (hidden for team members) */}
       {!isViewer && feedInventory.hasFeedData && (
-        <div style={{ marginBottom: 14, transition: 'opacity 0.9s ease, max-height 0.9s ease', opacity: feedVisible ? 1 : 0, maxHeight: feedVisible ? 80 : 0, overflow: 'hidden', pointerEvents: feedVisible ? 'auto' : 'none' }}>
+        <div style={{ marginBottom: feedVisible ? 14 : 0, transition: 'opacity 0.9s ease, max-height 0.9s ease, margin 0.9s ease', opacity: feedVisible ? 1 : 0, maxHeight: feedVisible ? 80 : 0, overflow: 'hidden', pointerEvents: feedVisible ? 'auto' : 'none' }}>
           {feedInventory.reorder ? (
             <div style={{ background: 'rgba(180,83,9,0.10)', border: '1.5px solid #B45309', borderRadius: 12, padding: '9px 14px', display: 'flex', alignItems: 'center', gap: 8, animation: 'reorder-blink 1.2s ease-in-out infinite' }}>
               <span style={{ fontSize: '0.7rem', fontWeight: 800, color: '#B45309', letterSpacing: '0.07em', textTransform: 'uppercase' }}>LOW FEED STOCK</span>

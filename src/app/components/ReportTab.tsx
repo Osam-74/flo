@@ -86,6 +86,8 @@ export function ReportTab({ businessName, txs, people, currency }: Props) {
     periodStartDate: string;
     periodLabel: 'month' | 'week';
     teamDebts: { name: string; amount: number }[];
+    totalCashAvail: number;
+    memberBalances: { name: string; balance: number }[];
   } | null>(null);
 
   function generate() {
@@ -174,18 +176,13 @@ export function ReportTab({ businessName, txs, people, currency }: Props) {
       }
     }
 
-    // ── Build balance breakdown by person ─────────────────────────────────
-    // We use the FULL txs (all time) to compute current balances, then show them
-    const allPeopleWithBiz = [
-      // Biz account
-      { id: 'biz', name: 'Biz Saving', isBiz: true },
-      // Real people from the people list
-      ...people.map(p => ({ id: p.id, name: p.name, isBiz: false })),
-    ];
+    // ── Build balance breakdown by person (selected period only) ─────────
+    // Use filtered txs (f) — only transactions within the selected date range
+    const periodTxs = f;
 
-    // Compute biz balance using full txs
+    // Compute biz balance using period txs only
     let bizBalance = 0;
-    for (const t of txs) {
+    for (const t of periodTxs) {
       if (t.type === 'transfer') {
         if (t.transferTo   === 'biz') bizBalance += t.amount;
         if (t.transferFrom === 'biz') bizBalance -= t.amount;
@@ -210,27 +207,36 @@ export function ReportTab({ businessName, txs, people, currency }: Props) {
     interface BalRow { name: string; balance: number; isBiz: boolean; }
     const balRows: BalRow[] = [];
 
-    // Bees (biz) account
+    // Biz account
     balRows.push({ name: 'Biz Saving', balance: bizBalance, isBiz: true });
 
-    // Each person
+    // Each person — using period txs only
     for (const p of people) {
       if (p.id === 'biz') continue;
-      const { pBal } = pStats(p.id, txs);
+      const { pBal } = pStats(p.id, periodTxs);
       balRows.push({ name: p.name, balance: pBal, isBiz: false });
     }
 
     // Remove entries with zero balance (they don't add info)
     const nonZeroBalRows = balRows.filter(r => Math.abs(r.balance) > 0.005);
 
+    // ── Total cash available (like dashboard: ignore negative member balances) ──
+    const totalCashAvail = Math.max(0, bizBalance) + balRows
+      .filter(r => !r.isBiz && r.balance > 0.005)
+      .reduce((s, r) => s + r.balance, 0);
+
+    // Member balances for summary (non-zero only, min 1)
+    const memberBalances: { name: string; balance: number }[] = balRows
+      .filter(r => !r.isBiz && Math.abs(r.balance) >= 1)
+      .map(r => ({ name: r.name, balance: r.balance }));
+
     // ── Balance breakdown HTML table ─────────────────────────────────────
     function makeBalanceTable(): string {
       const rows = nonZeroBalRows.length > 0 ? nonZeroBalRows : balRows;
-      const totalBalance = rows.reduce((s, r) => s + r.balance, 0);
 
       return `<div class="pdf-section">
         <div class="pdf-section-title">Balance Breakdown by Account / Person</div>
-        <div class="pdf-section-sub">Current balances as of ${esc(fmtDate(new Date().toISOString().split('T')[0]))}</div>
+        <div class="pdf-section-sub">For the period ${esc(dateLabel)}</div>
         <table class="pdf-table"><thead><tr>
           <th>Account / Person</th>
           <th style="width:22%">Balance (${esc(currency)})</th>
@@ -240,7 +246,7 @@ export function ReportTab({ businessName, txs, people, currency }: Props) {
           <td>${r.balance < 0 ? '–' : ''}${fmtN(Math.abs(r.balance))}</td>
         </tr>`).join('')}
         </tbody><tfoot>
-          <tr class="pdf-total"><td>TOTAL BALANCE</td><td>${totalBalance < 0 ? '–' : ''}${fmtN(Math.abs(totalBalance))}</td></tr>
+          <tr class="pdf-total"><td>TOTAL CASH AVAILABLE</td><td>${fmtN(totalCashAvail)}</td></tr>
         </tfoot></table>
       </div>`;
     }
@@ -312,13 +318,11 @@ export function ReportTab({ businessName, txs, people, currency }: Props) {
       const rows: { label: string; amount: number; isTotal?: boolean; prefix?: string; isNeg?: boolean }[] = [];
       if (totalShopSales > 0) rows.push({ label: 'Shop Sales', amount: totalShopSales });
       if (totalFarmSales > 0) rows.push({ label: 'Farm Dispatch', amount: totalFarmSales });
-      if (totalOutstanding > 0) rows.push({ label: 'Outstanding – Credit Sales', amount: totalOutstanding });
+      if (totalOutstanding > 0) rows.push({ label: 'Outstanding – Credit Sales', amount: totalOutstanding, isNeg: true });
       rows.push({ label: 'Total Sales / Dispatch', amount: totalSales, isTotal: true });
       if (totalExpenses > 0) rows.push({ label: 'Total Expenses', amount: totalExpenses });
       if (cashInjection > 0) rows.push({ label: 'Cash Injection', amount: cashInjection, prefix: '+ ' });
       if (totalCrates > 0) rows.push({ label: 'Total Crates Sold', amount: totalCrates });
-      if (totalEggs > 0) rows.push({ label: 'Total Eggs Collected', amount: totalEggs });
-      if (totalBrokenEggs > 0) rows.push({ label: 'Broken Eggs', amount: totalBrokenEggs, isNeg: true });
       html += makeSummaryTable(rows);
     }
     if (rType === 'owner-fund' && ownerFunds.length) html += makeExpenseTable(ownerFunds, 'Cash Injections', dateLabel);
@@ -352,6 +356,8 @@ export function ReportTab({ businessName, txs, people, currency }: Props) {
       periodStartDate,
       periodLabel,
       teamDebts,
+      totalCashAvail,
+      memberBalances,
     });
     showToast('Report ready', 'success');
     setTimeout(() => document.getElementById('report-preview')?.scrollIntoView({ behavior: 'smooth' }), 100);
@@ -366,6 +372,7 @@ export function ReportTab({ businessName, txs, people, currency }: Props) {
       profit, totalCrates,
       totalEggs, totalBrokenEggs,
       balanceBroughtForward, periodStartDate, periodLabel, teamDebts,
+      totalCashAvail, memberBalances,
     } = reportStats;
 
     // ── Date range label ──────────────────────────────────────────────────
@@ -418,6 +425,9 @@ export function ReportTab({ businessName, txs, people, currency }: Props) {
       bullets.push(`• No recorded expenses — full ${currency} ${fmtN(totalSales)} is available income`);
     }
 
+    // Total cash available
+    bullets.push(`• Total balance available: ${currency} ${fmtN(totalCashAvail)}`);
+
     if (totalCrates > 0) {
       bullets.push(`• Egg crates sold: ${totalCrates} crate${totalCrates !== 1 ? 's' : ''}`);
     }
@@ -425,17 +435,30 @@ export function ReportTab({ businessName, txs, people, currency }: Props) {
     if (totalEggs > 0) {
       const netEggs = totalEggs - totalBrokenEggs;
       let eggBullet = `• Eggs collected: ${totalEggs} (${netEggs} good`;
-      if (totalBrokenEggs > 0) eggBullet += `, ${totalBrokenEggs} broken`;
+      if (totalBrokenEggs > 0) eggBullet += `, ${totalBrokenEggs} reported broken`;
       eggBullet += ')';
       bullets.push(eggBullet);
     }
 
-    // ── Team member debts ─────────────────────────────────────────────────
-    if (teamDebts.length > 0) {
-      bullets.push('');
-      bullets.push(`⚠ Team members owed money:`);
-      for (const d of teamDebts) {
-        bullets.push(`  → ${d.name}: ${currency} ${fmtN(d.amount)}`);
+    // ── Team member balances (non-zero only, min 1) ──────────────────────
+    if (memberBalances.length > 0) {
+      const owed = memberBalances.filter(m => m.balance < 0);
+      const positive = memberBalances.filter(m => m.balance > 0);
+
+      if (positive.length > 0) {
+        bullets.push('');
+        bullets.push(`Team member balances:`);
+        for (const m of positive) {
+          bullets.push(`  → ${m.name}: ${currency} ${fmtN(m.balance)}`);
+        }
+      }
+
+      if (owed.length > 0) {
+        bullets.push('');
+        bullets.push(`⚠ Team members owed money:`);
+        for (const m of owed) {
+          bullets.push(`  → ${m.name}: ${currency} ${fmtN(Math.abs(m.balance))}`);
+        }
       }
     }
 
