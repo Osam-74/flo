@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { FileText, Download, Sparkles, Sun } from 'lucide-react';
+import { FileText, Download, Sparkles, Sun, Copy } from 'lucide-react';
 import { showToast } from './Modals';
 import type { Transaction, Person } from '../types';
 import { fmtDate, fmtN, pStats } from '../utils';
@@ -602,6 +602,14 @@ export function ReportTab({ businessName, txs, people, currency }: Props) {
             <Sun size={16} color="#ca8a04" />
             <Sparkles size={16} color="#16a34a" />
             <span style={{ fontSize: '0.72rem', fontWeight: 800, letterSpacing: '0.1em', textTransform: 'uppercase', color: '#16a34a' }}>Report Summary</span>
+            <button
+              onClick={() => { navigator.clipboard?.writeText(summaryText).then(() => showToast('Summary copied to clipboard', 'success')).catch(() => showToast('Copy failed', 'error')); }}
+              style={{ marginLeft: 'auto', background: 'rgba(22,163,74,0.1)', border: '1px solid rgba(22,163,74,0.3)', borderRadius: 8, cursor: 'pointer', padding: '5px 8px', display: 'flex', alignItems: 'center', gap: 4, color: '#16a34a', fontSize: '0.62rem', fontWeight: 700, letterSpacing: '0.04em' }}
+              aria-label="Copy summary"
+            >
+              <Copy size={13} />
+              <span>COPY</span>
+            </button>
           </div>
           <div style={{ fontSize: '0.88rem', lineHeight: 1.65, color: '#14532d', margin: 0, fontFamily: "'Plus Jakarta Sans', sans-serif", whiteSpace: 'pre-line' }}>
             {summaryText}
