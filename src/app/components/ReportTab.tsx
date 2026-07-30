@@ -3,6 +3,9 @@ import { FileText, Download, Sparkles, Sun, Copy } from 'lucide-react';
 import { showToast } from './Modals';
 import type { Transaction, Person } from '../types';
 import { fmtDate, fmtN, pStats } from '../utils';
+import type { PdfRow, PdfSection, PdfTableSection, ReportDocument } from '../pdf/reportModel';
+import { reportToHtml, reportPreviewStyles } from '../pdf/reportToHtml';
+import { downloadReportPdf, safeCurrency } from '../pdf/renderReportPdf';
 
 interface Props {
   businessName: string;
@@ -33,32 +36,8 @@ function dayOf(dateStr: string): string {
 
 // ── report styles ─────────────────────────────────────────────────────────────
 
-const printStyles = `
-.pdf-section { margin-bottom: 28px; }
-.pdf-header { font-size: 1.6rem; font-weight: 800; color: #1a2fa8; margin-bottom: 20px; letter-spacing: -0.01em; }
-.pdf-section-title { font-size: 1rem; font-weight: 800; color: #1a1a2e; margin-bottom: 2px; letter-spacing: -0.01em; }
-.pdf-section-sub { font-size: 0.7rem; color: #9a9fb8; margin-bottom: 10px; font-weight: 500; }
-.pdf-divider { border: none; border-top: 2px solid #1a1a2e; margin: 28px 0; }
-.pdf-table { width: 100%; border-collapse: collapse; font-size: 0.8rem; }
-.pdf-table th { background: #1a1a2e; color: #fff; font-size: 0.68rem; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; padding: 8px; text-align: left; }
-.pdf-table th:last-child { text-align: right; }
-.pdf-table td { padding: 7px 8px; border: 0.5px solid #ccc; vertical-align: middle; color: #1a1a2e; }
-.pdf-table td:last-child { text-align: right; font-family: 'DM Mono', monospace; font-size: 0.78rem; }
-.pdf-table tr:nth-child(even) td { background: #f5f5f5; }
-.pdf-table tr:nth-child(odd) td { background: #fff; }
-.pdf-table tr.pdf-total td { background: #e8f4e8 !important; font-weight: 700; border-top: 1.5px solid #1a1a2e; }
-.pdf-table tr.pdf-outstanding td { background: #fff8f0 !important; color: #cc5500; }
-.pdf-table tr.pdf-negative td { background: #fff0f0 !important; color: #cc2222; }
-.pdf-summary-table { width: 100%; border-collapse: collapse; font-size: 0.8rem; }
-.pdf-summary-table th { background: #1a1a2e; color: #fff; font-size: 0.68rem; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; padding: 8px; text-align: left; }
-.pdf-summary-table th:last-child { text-align: right; }
-.pdf-summary-table td { padding: 7px 8px; border: 0.5px solid #ccc; color: #1a1a2e; }
-.pdf-summary-table td:last-child { text-align: right; font-family: 'DM Mono', monospace; }
-.pdf-summary-table tr:nth-child(even) td { background: #f5f5f5; }
-.pdf-summary-table tr:nth-child(odd) td { background: #fff; }
-.pdf-summary-table tr.pdf-total td { background: #e8f4e8 !important; font-weight: 700; border-top: 1.5px solid #1a1a2e; }
-.pdf-summary-table tr.pdf-negative td { color: #cc2222 !important; }
-`;
+// Preview styles live alongside the PDF renderer so the two stay in step.
+const printStyles = reportPreviewStyles;
 
 // ── ReportTab component ───────────────────────────────────────────────────────
 
@@ -69,6 +48,7 @@ export function ReportTab({ businessName, txs, people, currency }: Props) {
   const [pId, setPId]         = useState('all');
   const [rType, setRType]     = useState('all');
   const [reportHtml, setReportHtml] = useState('');
+  const [reportDoc, setReportDoc]   = useState<ReportDocument | null>(null);
   const [generated, setGenerated]   = useState(false);
   const [downloading, setDownloading] = useState(false);
   const [summaryText, setSummaryText] = useState('');
@@ -258,49 +238,72 @@ export function ReportTab({ businessName, txs, people, currency }: Props) {
       .filter(r => Math.abs(r.balance) >= 1)
       .map(r => ({ name: r.name, balance: r.balance }));
 
-    // ── Balance breakdown HTML table ─────────────────────────────────────
-    function makeBalanceTable(): string {
-      const rows = nonZeroBalRows.length > 0 ? nonZeroBalRows : balRows;
+    // ── Section builders ─────────────────────────────────────────────────
+    // These now emit *structured sections* rather than HTML strings. The same
+    // sections feed both the on-screen preview and the PDF, so the two can
+    // never drift apart. None of the arithmetic above has changed.
+    const CUR = safeCurrency(currency);
 
-      return `<div class="pdf-section">
-        <div class="pdf-section-title">Balance Breakdown by Account / Person</div>
-        <div class="pdf-section-sub">Final balances as of ${esc(fmtDate(to || new Date().toISOString().split('T')[0]))}</div>
-        <table class="pdf-table"><thead><tr>
-          <th>Account / Person</th>
-          <th style="width:22%">Balance (${esc(currency)})</th>
-        </tr></thead><tbody>
-        ${rows.map(r => `<tr class="${r.balance < 0 ? 'pdf-negative' : ''}">
-          <td>${esc(r.name)}${r.isBiz ? ' <span style="font-size:0.68rem;background:#e8f0fe;color:#1a2fa8;border-radius:4px;padding:1px 6px;margin-left:4px;font-weight:700;">BIZ</span>' : ''}</td>
-          <td>${r.balance < 0 ? '–' : ''}${fmtN(Math.abs(r.balance))}</td>
-        </tr>`).join('')}
-        </tbody><tfoot>
-          <tr class="pdf-total"><td>TOTAL BALANCE AVAILABLE</td><td>${fmtN(totalCashAvail)}</td></tr>
-        </tfoot></table>
-      </div>`;
+    function makeBalanceTable(): PdfTableSection {
+      const rows = nonZeroBalRows.length > 0 ? nonZeroBalRows : balRows;
+      return {
+        kind: 'table',
+        title: 'Balance Breakdown by Account / Person',
+        subtitle: `Final balances as of ${fmtDate(to || today)}`,
+        columns: [
+          { header: 'Account / Person', width: 0.72 },
+          { header: `Balance (${CUR})`, width: 0.28, align: 'right', numeric: true },
+        ],
+        rows: rows.map((r): PdfRow => ({
+          variant: r.balance < 0 ? 'negative' : 'default',
+          cells: [
+            { text: r.name, tag: r.isBiz ? 'BIZ' : undefined },
+            { text: (r.balance < 0 ? '-' : '') + fmtN(Math.abs(r.balance)) },
+          ],
+        })),
+        footer: [{
+          variant: 'total',
+          cells: [{ text: 'TOTAL BALANCE AVAILABLE' }, { text: fmtN(totalCashAvail) }],
+        }],
+      };
     }
 
-    // ── Section builders (unchanged logic, same as before) ───────────────
-    function makeExpenseTable(rows: Transaction[], title: string, subtitle: string) {
-      if (!rows.length) return '';
+    function makeExpenseTable(rows: Transaction[], title: string, subtitle: string): PdfTableSection | null {
+      if (!rows.length) return null;
       const total = rows.reduce((s, t) => s + (t.amount || 0), 0);
-      return `<div class="pdf-section">
-        <div class="pdf-section-title">${esc(title)}</div>
-        <div class="pdf-section-sub">${esc(subtitle)}</div>
-        <table class="pdf-table"><thead><tr>
-          <th style="width:18%">Date</th><th>Description</th><th style="width:22%">Amount (${esc(currency)})</th>
-        </tr></thead><tbody>
-        ${rows.map(t => {
+      return {
+        kind: 'table',
+        title,
+        subtitle,
+        columns: [
+          { header: 'Date', width: 0.17 },
+          { header: 'Description', width: 0.57 },
+          { header: `Amount (${CUR})`, width: 0.26, align: 'right', numeric: true },
+        ],
+        rows: rows.map((t): PdfRow => {
           // Strip "Expense by X" prefix — show only the category/description
           let displayDesc = t.desc || '';
-          displayDesc = displayDesc.replace(/^Expense\s+by\s+[^—\-]+\s*—\s*/i, '').replace(/^Expense\s+by\s+[^—\-]+\s*-\s*/i, '').replace(/^Expense\s+by\s+/i, '');
-          return `<tr><td>${esc(fmtDate(t.date))}</td><td>${esc(displayDesc)}${t.note ? '<br><span style="font-size:0.7em;color:#9a9fb8;">' + esc(t.note) + '</span>' : ''}</td><td>${fmtN(t.amount || 0)}</td></tr>`;
-        }).join('')}
-        </tbody><tfoot><tr class="pdf-total"><td></td><td>TOTAL</td><td>${fmtN(total)}</td></tr></tfoot></table>
-      </div>`;
+          displayDesc = displayDesc
+            .replace(/^Expense\s+by\s+[^—\-]+\s*—\s*/i, '')
+            .replace(/^Expense\s+by\s+[^—\-]+\s*-\s*/i, '')
+            .replace(/^Expense\s+by\s+/i, '');
+          return {
+            cells: [
+              { text: fmtDate(t.date) },
+              { text: displayDesc, note: t.note || undefined },
+              { text: fmtN(t.amount || 0) },
+            ],
+          };
+        }),
+        footer: [{
+          variant: 'total',
+          cells: [{ text: '' }, { text: 'TOTAL' }, { text: fmtN(total) }],
+        }],
+      };
     }
 
-    function makeSalesTable(rows: Transaction[], title: string, subtitle: string, showOutstanding: boolean) {
-      if (!rows.length) return '';
+    function makeSalesTable(rows: Transaction[], title: string, subtitle: string, showOutstanding: boolean): PdfTableSection | null {
+      if (!rows.length) return null;
       let shopTotal = 0, farmTotal = 0, outstanding = 0, crates = 0;
       rows.forEach(t => {
         const src = t.source || (t.type === 'income' ? 'shop' : 'farm');
@@ -315,60 +318,119 @@ export function ReportTab({ businessName, txs, people, currency }: Props) {
         crates += (t.crates || 0);
       });
       const grandTotal = shopTotal + farmTotal;
-      return `<div class="pdf-section">
-        <div class="pdf-section-title">${esc(title)}</div>
-        <div class="pdf-section-sub">${esc(subtitle)}</div>
-        <table class="pdf-table"><thead><tr>
-          <th>Source</th><th style="width:30%">Amount (${esc(currency)})</th>
-        </tr></thead><tbody>
-        ${shopTotal > 0 ? `<tr><td>Shop Sales</td><td>${fmtN(shopTotal)}</td></tr>` : ''}
-        ${farmTotal > 0 ? `<tr><td>Farm Dispatch</td><td>${fmtN(farmTotal)}</td></tr>` : ''}
-        ${crates > 0 ? `<tr><td>Total Crates</td><td>${crates} crates</td></tr>` : ''}
-        </tbody><tfoot>
-          <tr class="pdf-total"><td>TOTAL COLLECTED</td><td>${fmtN(grandTotal)}</td></tr>
-          ${showOutstanding && outstanding > 0.005 ? `<tr class="pdf-outstanding"><td>Outstanding – Credit Sales</td><td>${fmtN(outstanding)}</td></tr>` : ''}
-        </tfoot></table>
-      </div>`;
+
+      const bodyRows: PdfRow[] = [];
+      if (shopTotal > 0) bodyRows.push({ cells: [{ text: 'Shop Sales' }, { text: fmtN(shopTotal) }] });
+      if (farmTotal > 0) bodyRows.push({ cells: [{ text: 'Farm Dispatch' }, { text: fmtN(farmTotal) }] });
+      if (crates > 0) bodyRows.push({ cells: [{ text: 'Total Crates' }, { text: `${crates} crates` }] });
+
+      const footRows: PdfRow[] = [{
+        variant: 'total',
+        cells: [{ text: 'TOTAL COLLECTED' }, { text: fmtN(grandTotal) }],
+      }];
+      if (showOutstanding && outstanding > 0.005) {
+        footRows.push({
+          variant: 'outstanding',
+          cells: [{ text: 'Outstanding - Credit Sales' }, { text: fmtN(outstanding) }],
+        });
+      }
+
+      return {
+        kind: 'table',
+        title,
+        subtitle,
+        columns: [
+          { header: 'Source', width: 0.7 },
+          { header: `Amount (${CUR})`, width: 0.3, align: 'right', numeric: true },
+        ],
+        rows: bodyRows,
+        footer: footRows,
+      };
     }
 
-    function makeSummaryTable(sections: { label: string; amount: number; isTotal?: boolean; prefix?: string; isNeg?: boolean }[]) {
-      return `<div class="pdf-section">
-        <div class="pdf-section-title">Summary</div>
-        <div class="pdf-section-sub">${esc(dateLabel)}</div>
-        <table class="pdf-summary-table"><thead><tr><th></th><th style="width:30%">Amount (${esc(currency)})</th></tr></thead>
-        <tbody>${sections.map(s => `<tr${s.isTotal ? ' class="pdf-total"' : s.isNeg ? ' class="pdf-negative"' : ''}><td>${esc(s.label)}</td><td>${s.prefix || ''}${fmtN(s.amount)}</td></tr>`).join('')}
-        </tbody></table>
-      </div>`;
+    function makeSummaryTable(entries: { label: string; value: string; isTotal?: boolean; isNeg?: boolean }[]): PdfTableSection {
+      return {
+        kind: 'table',
+        title: 'Summary',
+        subtitle: dateLabel,
+        columns: [
+          { header: 'Item', width: 0.7 },
+          { header: `Amount (${CUR})`, width: 0.3, align: 'right', numeric: true },
+        ],
+        rows: entries.map((s): PdfRow => ({
+          variant: s.isTotal ? 'total' : s.isNeg ? 'negative' : 'default',
+          cells: [{ text: s.label }, { text: s.value }],
+        })),
+      };
     }
 
-    // ── Assemble HTML ─────────────────────────────────────────────────────
-    let html = '';
-    if (businessName) html += `<div class="pdf-header">${esc(businessName)}</div>`;
-    if (rType === 'all' || rType === 'expense' || rType === 'salary') html += makeExpenseTable(expenseTxs, 'Expenses', dateLabel);
-    if (rType === 'all' || rType === 'income'  || rType === 'credit') html += makeSalesTable(salesTxs, 'Sales / Dispatch', dateLabel, true);
+    // ── Assemble the document ─────────────────────────────────────────────
+    const sections: PdfSection[] = [];
+    const add = (s: PdfTableSection | null) => { if (s) sections.push(s); };
+
+    if (rType === 'all' || rType === 'expense' || rType === 'salary') {
+      add(makeExpenseTable(expenseTxs, 'Expenses', dateLabel));
+    }
+    if (rType === 'all' || rType === 'income' || rType === 'credit') {
+      add(makeSalesTable(salesTxs, 'Sales / Dispatch', dateLabel, true));
+    }
     if (rType === 'all' && (expenseTxs.length || salesTxs.length || eggCollectionTxs.length)) {
-      html += `<hr class="pdf-divider">`;
-      const rows: { label: string; amount: number; isTotal?: boolean; prefix?: string; isNeg?: boolean }[] = [];
-      if (totalShopSales > 0) rows.push({ label: 'Shop Sales', amount: totalShopSales });
-      if (totalFarmSales > 0) rows.push({ label: 'Farm Dispatch', amount: totalFarmSales });
-      if (totalOutstanding > 0) rows.push({ label: 'Outstanding – Credit Sales', amount: totalOutstanding, isNeg: true });
-      rows.push({ label: 'Total Sales / Dispatch', amount: totalSales, isTotal: true });
-      if (totalExpenses > 0) rows.push({ label: 'Total Expenses', amount: totalExpenses });
-      if (cashInjection > 0) rows.push({ label: 'Cash Injection', amount: cashInjection, prefix: '+ ' });
-      if (totalCrates > 0) rows.push({ label: 'Total Crates Sold', amount: totalCrates });
-      html += makeSummaryTable(rows);
+      sections.push({ kind: 'rule' });
+      const entries: { label: string; value: string; isTotal?: boolean; isNeg?: boolean }[] = [];
+      if (totalShopSales > 0)   entries.push({ label: 'Shop Sales', value: fmtN(totalShopSales) });
+      if (totalFarmSales > 0)   entries.push({ label: 'Farm Dispatch', value: fmtN(totalFarmSales) });
+      if (totalOutstanding > 0) entries.push({ label: 'Outstanding - Credit Sales', value: fmtN(totalOutstanding), isNeg: true });
+      entries.push({ label: 'Total Sales / Dispatch', value: fmtN(totalSales), isTotal: true });
+      if (totalExpenses > 0)    entries.push({ label: 'Total Expenses', value: fmtN(totalExpenses) });
+      if (cashInjection > 0)    entries.push({ label: 'Cash Injection', value: '+ ' + fmtN(cashInjection) });
+      // Crates are a count, not money — render as a whole number.
+      if (totalCrates > 0)      entries.push({ label: 'Total Crates Sold', value: `${totalCrates} crates` });
+      add(makeSummaryTable(entries));
     }
-    if (rType === 'owner-fund' && ownerFunds.length) html += makeExpenseTable(ownerFunds, 'Cash Injections', dateLabel);
-
-    // ── Balance breakdown — appended to all-type reports ─────────────────
+    if (rType === 'owner-fund' && ownerFunds.length) {
+      add(makeExpenseTable(ownerFunds, 'Cash Injections', dateLabel));
+    }
     if (rType === 'all') {
-      html += `<hr class="pdf-divider">`;
-      html += makeBalanceTable();
+      sections.push({ kind: 'rule' });
+      add(makeBalanceTable());
     }
 
-    if (!html) html = `<div style="text-align:center;padding:40px;font-size:0.82rem;color:#9a9fb8;">No transactions found for the selected filters.</div>`;
+    const hasContent = sections.some(s => s.kind === 'table');
+    const finalSections: PdfSection[] = hasContent
+      ? sections
+      : [{ kind: 'note', text: 'No transactions found for the selected filters.' }];
 
-    setReportHtml(html);
+    const TYPE_LABELS: Record<string, string> = {
+      all: 'All types', income: 'Sales', expense: 'Expenses', salary: 'Salary',
+      transfer: 'Transfers', credit: 'Credit sales', 'owner-fund': 'Fund injection',
+      'fund-return': 'Fund returns',
+    };
+    const personLabel = pId === 'all'
+      ? 'All people'
+      : (people.find(p => p.id === pId)?.name || 'All people');
+    const now = new Date();
+
+    const model: ReportDocument = {
+      businessName: businessName || 'Report',
+      documentTitle: 'Financial Report',
+      periodLabel: dateLabel,
+      currency: CUR,
+      generatedAt: now,
+      meta: [
+        { label: 'Period', value: dateLabel },
+        { label: 'Currency', value: CUR },
+        { label: 'Filter', value: `${personLabel} · ${TYPE_LABELS[rType] || 'All types'}` },
+        {
+          label: 'Generated',
+          value: now.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })
+            + ', ' + now.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' }),
+        },
+      ],
+      sections: finalSections,
+    };
+
+    setReportDoc(model);
+    setReportHtml(reportToHtml(model));
     setGenerated(true);
     setSummaryText('');
     setShowSummary(false);
@@ -506,38 +568,16 @@ export function ReportTab({ businessName, txs, people, currency }: Props) {
   }
 
   async function downloadPDF() {
-    const el = document.getElementById('pdf-download-target');
-    if (!el) return;
+    if (!reportDoc) return;
     setDownloading(true);
     try {
-      const { default: html2canvas } = await import('html2canvas');
-      const { jsPDF } = await import('jspdf');
-      const PAGE_W_MM = 210, PAGE_H_MM = 297, MARGIN_MM = 14;
-      const CONTENT_W_MM = PAGE_W_MM - MARGIN_MM * 2;
-      const canvas = await html2canvas(el, { scale: 2, useCORS: true, backgroundColor: '#ffffff', logging: false });
-      const imgW = canvas.width, imgH = canvas.height;
-      const pxPerMm = imgW / (CONTENT_W_MM * 2);
-      const pdf = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
-      let yOffset = 0, pageIndex = 0;
-      const pageHpx = (PAGE_H_MM - MARGIN_MM * 2) * pxPerMm * 2;
-      while (yOffset < imgH) {
-        if (pageIndex > 0) pdf.addPage();
-        const sliceH = Math.min(pageHpx, imgH - yOffset);
-        const pageCanvas = document.createElement('canvas');
-        pageCanvas.width = imgW; pageCanvas.height = sliceH;
-        const ctx = pageCanvas.getContext('2d')!;
-        ctx.drawImage(canvas, 0, yOffset, imgW, sliceH, 0, 0, imgW, sliceH);
-        const imgData = pageCanvas.toDataURL('image/png');
-        const sliceHmm = sliceH / pxPerMm / 2;
-        pdf.addImage(imgData, 'PNG', MARGIN_MM, MARGIN_MM, CONTENT_W_MM, sliceHmm);
-        yOffset += sliceH; pageIndex++;
-      }
       const safeName = (businessName || 'report').replace(/[^a-z0-9]/gi, '_').toLowerCase();
-      pdf.save(`${safeName}_report.pdf`);
+      const stamp = (to || new Date().toISOString().split('T')[0]).replace(/-/g, '');
+      await downloadReportPdf(reportDoc, `${safeName}_report_${stamp}.pdf`);
       showToast('PDF downloaded', 'success');
     } catch (err) {
       console.error('PDF generation failed', err);
-      showToast('Download failed — try again', 'error');
+      showToast('Download failed - try again', 'error');
     } finally {
       setDownloading(false);
     }
@@ -633,7 +673,7 @@ export function ReportTab({ businessName, txs, people, currency }: Props) {
       {generated && (
         <div id="report-preview" className="report-preview">
           <div
-            id="pdf-download-target" className="pdf-doc"
+            className="rp-doc"
             style={{ background: '#fff', borderRadius: 12, padding: '24px 22px 32px', boxShadow: '0 4px 24px rgba(0,0,0,0.1)', fontFamily: 'Plus Jakarta Sans, sans-serif', color: '#1a1a2e' }}
             dangerouslySetInnerHTML={{ __html: reportHtml }}
           />
