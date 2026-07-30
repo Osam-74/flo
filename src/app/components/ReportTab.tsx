@@ -92,6 +92,8 @@ export function ReportTab({ businessName, txs, people, currency }: Props) {
 
   function generate() {
     let f = [...txs];
+    // Always exclude feed-usage and egg-collection logs from the report tables
+    f = f.filter(t => !['feed-usage', 'egg-collection'].includes(t.type));
     if (from)          f = f.filter(t => t.date >= from);
     if (to)            f = f.filter(t => t.date <= to);
     if (pId !== 'all') f = f.filter(t => t.person === pId);
@@ -176,13 +178,13 @@ export function ReportTab({ businessName, txs, people, currency }: Props) {
       }
     }
 
-    // ── Build balance breakdown by person (ALL txs — same as dashboard) ───
-    // Uses ALL transactions (txs), NOT the filtered period set (f).
-    // This matches the dashboard's balance logic exactly.
+    // ── Build balance breakdown by person ───────────────────────────────
+    // Final balances at the END of the selected period: all txs up to 'to' date
+    const balanceTxs = to ? txs.filter(t => t.date <= to) : txs;
 
-    // Compute biz balance using ALL txs
+    // Compute biz balance using txs up to end of period
     let bizBalance = 0;
-    for (const t of txs) {
+    for (const t of balanceTxs) {
       if (t.type === 'transfer') {
         if (t.transferTo   === 'biz') bizBalance += t.amount;
         if (t.transferFrom === 'biz') bizBalance -= t.amount;
@@ -210,22 +212,24 @@ export function ReportTab({ businessName, txs, people, currency }: Props) {
     // Biz account
     balRows.push({ name: 'Biz Saving', balance: bizBalance, isBiz: true });
 
-    // Each person — using ALL txs (same as dashboard)
+    // Each person — using txs up to end of period
     for (const p of people) {
       if (p.id === 'biz') continue;
-      const { pBal } = pStats(p.id, txs);
+      const { pBal } = pStats(p.id, balanceTxs);
       balRows.push({ name: p.name, balance: pBal, isBiz: false });
     }
 
     // Remove entries with zero balance (they don't add info)
     const nonZeroBalRows = balRows.filter(r => Math.abs(r.balance) > 0.005);
 
-    // ── Total balance available = net profit + balance brought forward ──
-    const totalCashAvail = profit + balanceBroughtForward;
+    // ── Total cash available = sum of all positive balances (neglect negatives) ──
+    const totalCashAvail = balRows
+      .filter(r => r.balance > 0.005)
+      .reduce((s, r) => s + r.balance, 0);
 
-    // Member balances for summary (non-zero only, min 1)
+    // All balances for summary (non-zero only, min 1) — including Biz
     const memberBalances: { name: string; balance: number }[] = balRows
-      .filter(r => !r.isBiz && Math.abs(r.balance) >= 1)
+      .filter(r => Math.abs(r.balance) >= 1)
       .map(r => ({ name: r.name, balance: r.balance }));
 
     // ── Balance breakdown HTML table ─────────────────────────────────────
@@ -234,7 +238,7 @@ export function ReportTab({ businessName, txs, people, currency }: Props) {
 
       return `<div class="pdf-section">
         <div class="pdf-section-title">Balance Breakdown by Account / Person</div>
-        <div class="pdf-section-sub">Current balances (all-time)</div>
+        <div class="pdf-section-sub">Final balances as of ${esc(fmtDate(to || new Date().toISOString().split('T')[0]))}</div>
         <table class="pdf-table"><thead><tr>
           <th>Account / Person</th>
           <th style="width:22%">Balance (${esc(currency)})</th>
@@ -259,7 +263,12 @@ export function ReportTab({ businessName, txs, people, currency }: Props) {
         <table class="pdf-table"><thead><tr>
           <th style="width:18%">Date</th><th>Description</th><th style="width:22%">Amount (${esc(currency)})</th>
         </tr></thead><tbody>
-        ${rows.map(t => `<tr><td>${esc(fmtDate(t.date))}</td><td>${esc(t.desc)}${t.note ? '<br><span style="font-size:0.7em;color:#9a9fb8;">' + esc(t.note) + '</span>' : ''}</td><td>${fmtN(t.amount || 0)}</td></tr>`).join('')}
+        ${rows.map(t => {
+          // Strip "Expense by X" prefix — show only the category/description
+          let displayDesc = t.desc || '';
+          displayDesc = displayDesc.replace(/^Expense\s+by\s+[^—\-]+\s*—\s*/i, '').replace(/^Expense\s+by\s+[^—\-]+\s*-\s*/i, '').replace(/^Expense\s+by\s+/i, '');
+          return `<tr><td>${esc(fmtDate(t.date))}</td><td>${esc(displayDesc)}${t.note ? '<br><span style="font-size:0.7em;color:#9a9fb8;">' + esc(t.note) + '</span>' : ''}</td><td>${fmtN(t.amount || 0)}</td></tr>`;
+        }).join('')}
         </tbody><tfoot><tr class="pdf-total"><td></td><td>TOTAL</td><td>${fmtN(total)}</td></tr></tfoot></table>
       </div>`;
     }
@@ -423,9 +432,6 @@ export function ReportTab({ businessName, txs, people, currency }: Props) {
       bullets.push(`• No recorded expenses — full ${currency} ${fmtN(totalSales)} is available income`);
     }
 
-    // Total cash available
-    bullets.push(`• Total balance available: ${currency} ${fmtN(totalCashAvail)}`);
-
     if (totalCrates > 0) {
       bullets.push(`• Egg crates sold: ${totalCrates} crate${totalCrates !== 1 ? 's' : ''}`);
     }
@@ -438,17 +444,15 @@ export function ReportTab({ businessName, txs, people, currency }: Props) {
       bullets.push(eggBullet);
     }
 
-    // ── Team member balances (non-zero only, min 1) ──────────────────────
+    // ── All balances (Biz + team members, non-zero only, min 1) ───────────
     if (memberBalances.length > 0) {
-      const owed = memberBalances.filter(m => m.balance < 0);
       const positive = memberBalances.filter(m => m.balance > 0);
+      const owed = memberBalances.filter(m => m.balance < 0);
 
-      if (positive.length > 0) {
-        bullets.push('');
-        bullets.push(`Team member balances:`);
-        for (const m of positive) {
-          bullets.push(`  → ${m.name}: ${currency} ${fmtN(m.balance)}`);
-        }
+      bullets.push('');
+      bullets.push(`Available balances:`);
+      for (const m of positive) {
+        bullets.push(`  → ${m.name}: ${currency} ${fmtN(m.balance)}`);
       }
 
       if (owed.length > 0) {
@@ -458,6 +462,9 @@ export function ReportTab({ businessName, txs, people, currency }: Props) {
           bullets.push(`  → ${m.name}: ${currency} ${fmtN(Math.abs(m.balance))}`);
         }
       }
+
+      bullets.push('');
+      bullets.push(`Total balance available: ${currency} ${fmtN(totalCashAvail)}`);
     }
 
     // ── Assemble final text ───────────────────────────────────────────────
