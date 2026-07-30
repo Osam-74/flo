@@ -83,7 +83,9 @@ export function ReportTab({ businessName, txs, people, currency }: Props) {
     profit: number; totalCrates: number;
     totalEggs: number; totalBrokenEggs: number;
     balanceBroughtForward: number;
-    weekStartDate: string;
+    periodStartDate: string;
+    periodLabel: 'month' | 'week';
+    teamDebts: { name: string; amount: number }[];
   } | null>(null);
 
   function generate() {
@@ -131,19 +133,17 @@ export function ReportTab({ businessName, txs, people, currency }: Props) {
 
     const dateLabel = (from && to) ? fmtDate(from) + ' – ' + fmtDate(to) : 'All Dates';
 
-    // ── Balance brought forward (into the start of the week containing 'from') ──
-    function getWeekStart(dateStr: string): string {
-      const d = new Date(dateStr + 'T00:00:00');
-      const day = d.getDay(); // 0 = Sunday
-      d.setDate(d.getDate() - day); // walk back to Sunday
-      return d.toISOString().split('T')[0];
-    }
-    const weekStartDate = from ? getWeekStart(from) : getWeekStart(today);
+    // ── Balance brought forward (into the start date of the report) ──
+    // If 'from' is the 1st of a month → "balance brought into the month"
+    // Otherwise → "balance brought into the week"
+    const periodStartDate = from || today;
+    const fromDateObj = new Date(periodStartDate + 'T00:00:00');
+    const periodLabel: 'month' | 'week' = fromDateObj.getDate() === 1 ? 'month' : 'week';
 
-    // Compute net balance from ALL transactions before weekStartDate
+    // Compute net balance from ALL transactions before periodStartDate
     let balanceBroughtForward = 0;
     for (const t of txs) {
-      if (!t.date || t.date >= weekStartDate) continue;
+      if (!t.date || t.date >= periodStartDate) continue;
       if (t.type === 'income')         balanceBroughtForward += (t.amount || 0);
       if (t.type === 'expense')        balanceBroughtForward -= (t.amount || 0);
       if (t.type === 'salary')         balanceBroughtForward -= (t.amount || 0);
@@ -154,11 +154,23 @@ export function ReportTab({ businessName, txs, people, currency }: Props) {
       if (t.type === 'credit') {
         if (Array.isArray(t.payments) && t.payments.length > 0) {
           for (const p of t.payments) {
-            if (p.date < weekStartDate) balanceBroughtForward += (p.amount || 0);
+            if (p.date < periodStartDate) balanceBroughtForward += (p.amount || 0);
           }
-        } else if ((t.creditPaid || 0) > 0 && (t.date || '') < weekStartDate) {
+        } else if ((t.creditPaid || 0) > 0 && (t.date || '') < periodStartDate) {
           balanceBroughtForward += (t.creditPaid || 0);
         }
+      }
+    }
+
+    // ── Team member debts (negative balance = we owe them) ──
+    const teamDebts: { name: string; amount: number }[] = [];
+    for (const p of people) {
+      if (p.id === 'biz') continue;
+      const role = (p.role || '').toLowerCase();
+      if (role.includes('owner')) continue;
+      const { pBal } = pStats(p.id, txs);
+      if (pBal < -0.005) {
+        teamDebts.push({ name: p.name, amount: Math.abs(pBal) });
       }
     }
 
@@ -337,7 +349,9 @@ export function ReportTab({ businessName, txs, people, currency }: Props) {
       totalEggs,
       totalBrokenEggs,
       balanceBroughtForward,
-      weekStartDate,
+      periodStartDate,
+      periodLabel,
+      teamDebts,
     });
     showToast('Report ready', 'success');
     setTimeout(() => document.getElementById('report-preview')?.scrollIntoView({ behavior: 'smooth' }), 100);
@@ -351,82 +365,88 @@ export function ReportTab({ businessName, txs, people, currency }: Props) {
       totalExpenses, hasSalary, totalSalary, totalOtherExpenses,
       profit, totalCrates,
       totalEggs, totalBrokenEggs,
-      balanceBroughtForward, weekStartDate,
+      balanceBroughtForward, periodStartDate, periodLabel, teamDebts,
     } = reportStats;
 
     // ── Date range label ──────────────────────────────────────────────────
     let datePhrase = '';
     if (fromDate && toDate) {
-      const fromDay  = dayOf(fromDate);
-      const toDay    = dayOf(toDate);
-      const fromMon  = fmtMonth(fromDate);
-      const toMon    = fmtMonth(toDate);
-      if (fromMon === toMon) {
-        datePhrase = `From day ${fromDay} to day ${toDay} of ${fromMon}`;
-      } else {
-        datePhrase = `From ${fmtDate(fromDate)} to ${fmtDate(toDate)}`;
-      }
+      datePhrase = `${fmtDate(fromDate)} to ${fmtDate(toDate)}`;
     } else {
-      datePhrase = 'For this period';
+      datePhrase = 'this period';
     }
 
-    // ── Build smart sentences ─────────────────────────────────────────────
-    const parts: string[] = [];
+    // ── Determine "month" vs "week" label ───────────────────────────────
+    const periodWord = periodLabel; // 'month' or 'week'
 
-    // Balance brought forward sentence
+    // ── Build intro paragraph + bullet list ──────────────────────────────
+    const introParts: string[] = [];
+    const bullets: string[] = [];
+
+    // Intro: "Here is a report between X and Y."
+    introParts.push(`Here is a report for ${esc(businessName || 'the business')} covering the period from ${datePhrase}.`);
+
+    // Balance brought forward line
     if (balanceBroughtForward !== 0 || totalSales > 0 || totalExpenses > 0) {
-      const weekDate = new Date(weekStartDate + 'T00:00:00');
-      const weekLabel = weekDate.toLocaleDateString('en-GB', { weekday: 'long', day: '2-digit', month: 'short' });
       const balSign = balanceBroughtForward >= 0 ? '' : '–';
-      parts.push(`Balance brought into ${weekLabel} (start of the week) was ${currency} ${balSign}${fmtN(Math.abs(balanceBroughtForward))}.`);
+      introParts.push(`A balance of ${currency} ${balSign}${fmtN(Math.abs(balanceBroughtForward))} was brought into the ${periodWord}.`);
     }
 
-    // Sales sentence (only if there were sales)
+    // Bullets for the breakdown
     if (totalSales > 0) {
-      let salesSentence = `${datePhrase}, we've recorded total sales and dispatch of ${currency} ${fmtN(totalSales)}`;
+      let salesBullet = `• Total sales and dispatch: ${currency} ${fmtN(totalSales)}`;
       if (totalOutstanding > 0.005) {
-        salesSentence += `, with an additional ${currency} ${fmtN(totalOutstanding)} in outstanding credit sales`;
+        salesBullet += ` (with ${currency} ${fmtN(totalOutstanding)} in outstanding credit)`;
       }
-      salesSentence += '.';
-      parts.push(salesSentence);
+      bullets.push(salesBullet);
     }
 
-    // Expenses sentence — smart about salary
     if (totalExpenses > 0) {
-      let expSentence = `We've accounted for total expenses of ${currency} ${fmtN(totalExpenses)}`;
+      let expBullet = `• Total expenses: ${currency} ${fmtN(totalExpenses)}`;
       if (hasSalary && totalSalary > 0 && totalOtherExpenses > 0) {
-        expSentence += ` (including ${currency} ${fmtN(totalSalary)} in salary)`;
+        expBullet += ` (including ${currency} ${fmtN(totalSalary)} in salary payments)`;
       } else if (hasSalary && totalSalary > 0 && totalOtherExpenses <= 0) {
-        expSentence += `, which covers salary payments`;
+        expBullet += ` (salary payments only)`;
       }
-      expSentence += '.';
-      parts.push(expSentence);
+      bullets.push(expBullet);
     }
 
-    // Profit sentence (only if we have both sales and expenses)
     if (totalSales > 0 && totalExpenses > 0) {
-      const profitWord = profit >= 0 ? 'total profit' : 'net loss';
-      parts.push(`From this, we've achieved a ${profitWord} of ${currency} ${fmtN(Math.abs(profit))}.`);
+      const profitWord = profit >= 0 ? 'profit' : 'loss';
+      bullets.push(`• Net ${profitWord}: ${currency} ${fmtN(Math.abs(profit))}`);
     } else if (totalSales > 0 && totalExpenses === 0) {
-      parts.push(`With no recorded expenses in this period, the full ${currency} ${fmtN(totalSales)} represents available income.`);
+      bullets.push(`• No recorded expenses — full ${currency} ${fmtN(totalSales)} is available income`);
     }
 
-    // Crates sentence (only if any crates were recorded)
     if (totalCrates > 0) {
-      parts.push(`The total number of egg crates sold is ${totalCrates} crate${totalCrates !== 1 ? 's' : ''}.`);
+      bullets.push(`• Egg crates sold: ${totalCrates} crate${totalCrates !== 1 ? 's' : ''}`);
     }
+
     if (totalEggs > 0) {
       const netEggs = totalEggs - totalBrokenEggs;
-      let eggSentence = `Egg collection for this period totalled ${totalEggs} egg${totalEggs !== 1 ? 's' : ''}`;
-      if (totalBrokenEggs > 0) eggSentence += `, of which ${totalBrokenEggs} were broken, giving a net of ${netEggs} good egg${netEggs !== 1 ? 's' : ''}`;
-      eggSentence += '.';
-      parts.push(eggSentence);
+      let eggBullet = `• Eggs collected: ${totalEggs} (${netEggs} good`;
+      if (totalBrokenEggs > 0) eggBullet += `, ${totalBrokenEggs} broken`;
+      eggBullet += ')';
+      bullets.push(eggBullet);
     }
 
-    if (parts.length === 0) {
+    // ── Team member debts ─────────────────────────────────────────────────
+    if (teamDebts.length > 0) {
+      bullets.push('');
+      bullets.push(`⚠ Team members owed money:`);
+      for (const d of teamDebts) {
+        bullets.push(`  → ${d.name}: ${currency} ${fmtN(d.amount)}`);
+      }
+    }
+
+    // ── Assemble final text ───────────────────────────────────────────────
+    const introText = introParts.join(' ');
+    const bulletsText = bullets.join('\n');
+
+    if (bullets.length === 0 && introParts.length <= 1) {
       setSummaryText('No data to summarise for the selected period.');
     } else {
-      setSummaryText(parts.join(' '));
+      setSummaryText(introText + '\n\n' + bulletsText);
     }
     setShowSummary(true);
   }
@@ -538,9 +558,9 @@ export function ReportTab({ businessName, txs, people, currency }: Props) {
             <Sparkles size={16} color="#16a34a" />
             <span style={{ fontSize: '0.72rem', fontWeight: 800, letterSpacing: '0.1em', textTransform: 'uppercase', color: '#16a34a' }}>Report Summary</span>
           </div>
-          <p style={{ fontSize: '0.88rem', lineHeight: 1.65, color: '#14532d', margin: 0, fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
+          <div style={{ fontSize: '0.88rem', lineHeight: 1.65, color: '#14532d', margin: 0, fontFamily: "'Plus Jakarta Sans', sans-serif", whiteSpace: 'pre-line' }}>
             {summaryText}
-          </p>
+          </div>
           <button
             onClick={() => setShowSummary(false)}
             style={{ position: 'absolute', top: 12, right: 12, background: 'none', border: 'none', cursor: 'pointer', color: '#16a34a', fontSize: '1rem', lineHeight: 1, padding: 2 }}
