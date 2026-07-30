@@ -176,13 +176,13 @@ export function ReportTab({ businessName, txs, people, currency }: Props) {
       }
     }
 
-    // ── Build balance breakdown by person (selected period only) ─────────
-    // Use filtered txs (f) — only transactions within the selected date range
-    const periodTxs = f;
+    // ── Build balance breakdown by person (ALL txs — same as dashboard) ───
+    // Uses ALL transactions (txs), NOT the filtered period set (f).
+    // This matches the dashboard's balance logic exactly.
 
-    // Compute biz balance using period txs only
+    // Compute biz balance using ALL txs
     let bizBalance = 0;
-    for (const t of periodTxs) {
+    for (const t of txs) {
       if (t.type === 'transfer') {
         if (t.transferTo   === 'biz') bizBalance += t.amount;
         if (t.transferFrom === 'biz') bizBalance -= t.amount;
@@ -210,20 +210,18 @@ export function ReportTab({ businessName, txs, people, currency }: Props) {
     // Biz account
     balRows.push({ name: 'Biz Saving', balance: bizBalance, isBiz: true });
 
-    // Each person — using period txs only
+    // Each person — using ALL txs (same as dashboard)
     for (const p of people) {
       if (p.id === 'biz') continue;
-      const { pBal } = pStats(p.id, periodTxs);
+      const { pBal } = pStats(p.id, txs);
       balRows.push({ name: p.name, balance: pBal, isBiz: false });
     }
 
     // Remove entries with zero balance (they don't add info)
     const nonZeroBalRows = balRows.filter(r => Math.abs(r.balance) > 0.005);
 
-    // ── Total cash available (like dashboard: ignore negative member balances) ──
-    const totalCashAvail = Math.max(0, bizBalance) + balRows
-      .filter(r => !r.isBiz && r.balance > 0.005)
-      .reduce((s, r) => s + r.balance, 0);
+    // ── Total balance available = net profit + balance brought forward ──
+    const totalCashAvail = profit + balanceBroughtForward;
 
     // Member balances for summary (non-zero only, min 1)
     const memberBalances: { name: string; balance: number }[] = balRows
@@ -236,7 +234,7 @@ export function ReportTab({ businessName, txs, people, currency }: Props) {
 
       return `<div class="pdf-section">
         <div class="pdf-section-title">Balance Breakdown by Account / Person</div>
-        <div class="pdf-section-sub">For the period ${esc(dateLabel)}</div>
+        <div class="pdf-section-sub">Current balances (all-time)</div>
         <table class="pdf-table"><thead><tr>
           <th>Account / Person</th>
           <th style="width:22%">Balance (${esc(currency)})</th>
@@ -246,7 +244,7 @@ export function ReportTab({ businessName, txs, people, currency }: Props) {
           <td>${r.balance < 0 ? '–' : ''}${fmtN(Math.abs(r.balance))}</td>
         </tr>`).join('')}
         </tbody><tfoot>
-          <tr class="pdf-total"><td>TOTAL CASH AVAILABLE</td><td>${fmtN(totalCashAvail)}</td></tr>
+          <tr class="pdf-total"><td>TOTAL BALANCE AVAILABLE</td><td>${fmtN(totalCashAvail)}</td></tr>
         </tfoot></table>
       </div>`;
     }
