@@ -114,6 +114,8 @@ interface Props {
   onFetchPeople?: (bizId: string) => Promise<Person[]>;
   onSaveViewUsers?: (bizId: string, viewUsers: ViewUser[]) => Promise<void>;
   isMasterAdmin: boolean;
+  authRef?: React.MutableRefObject<any>;
+  authInst?: React.MutableRefObject<any>;
 }
 
 /* ── Secret tap ── */
@@ -608,7 +610,7 @@ export function BusinessSelector({
   businesses, onCreateBusiness, onDeleteBusiness, onResetPin, onRenameBusiness,
   onExport, onImport, onClearData, onPull, onPush,
   onFetchPeople, onSaveViewUsers,
-  isMasterAdmin,
+  isMasterAdmin, authRef, authInst,
 }: Props) {
   const [selected, setSelected] = useState<string>(businesses[0]?.id ?? '');
 
@@ -618,12 +620,20 @@ export function BusinessSelector({
   });
   const [adminHash, setAdminHash] = useState(() => getAdminHash());
 
-  // Admin PIN
+  // Admin PIN (legacy fallback)
   const [showAdmin, setShowAdmin]   = useState(false);
   const [adminPin, setAdminPin]     = useState('');
   const [adminErr, setAdminErr]     = useState('');
   const [checking, setChecking]     = useState(false);
   const [adminShake, setAdminShake] = useState(false);
+
+  // Email/password login (primary)
+  const [loginMode, setLoginMode]   = useState<'email' | 'pin'>('email');
+  const [email, setEmail]           = useState('');
+  const [password, setPassword]     = useState('');
+  const [emailErr, setEmailErr]     = useState('');
+  const [emailLoading, setEmailLoading] = useState(false);
+  const [resetSent, setResetSent]   = useState(false);
 
   // Modals
   const [showCreate, setShowCreate]           = useState(false);
@@ -653,6 +663,60 @@ export function BusinessSelector({
       setAdminErr('Incorrect master PIN');
       setAdminShake(true);
       setTimeout(() => { setAdminShake(false); setAdminPin(''); setAdminErr(''); }, 900);
+    }
+  };
+
+  // Email/password sign-in via Firebase Auth
+  const handleEmailLogin = async () => {
+    if (!authRef?.current || !authInst?.current) {
+      setEmailErr('Firebase Auth not available. Use PIN login instead.');
+      setLoginMode('pin');
+      return;
+    }
+    if (!email || !password) { setEmailErr('Enter email and password'); return; }
+    setEmailLoading(true); setEmailErr('');
+    try {
+      const fa = authRef.current;
+      await fa.signInWithEmailAndPassword(authInst.current, email, password);
+      setEmailLoading(false);
+      setShowAdmin(false); setEmail(''); setPassword('');
+      onMasterAdmin();
+    } catch (e: any) {
+      setEmailLoading(false);
+      const code = e?.code || '';
+      if (code === 'auth/invalid-credential' || code === 'auth/wrong-password' || code === 'auth/user-not-found') {
+        setEmailErr('Invalid email or password');
+      } else if (code === 'auth/too-many-requests') {
+        setEmailErr('Too many attempts. Try again later or reset your password.');
+      } else if (code === 'auth/invalid-email') {
+        setEmailErr('Invalid email address');
+      } else {
+        setEmailErr(e?.message || 'Login failed');
+      }
+    }
+  };
+
+  // Send password reset email via Firebase
+  const handleForgotPassword = async () => {
+    if (!authRef?.current || !authInst?.current) {
+      setEmailErr('Firebase Auth not available.');
+      return;
+    }
+    if (!email) { setEmailErr('Enter your email first'); return; }
+    setEmailLoading(true); setEmailErr('');
+    try {
+      const fa = authRef.current;
+      await fa.sendPasswordResetEmail(authInst.current, email);
+      setEmailLoading(false);
+      setResetSent(true);
+    } catch (e: any) {
+      setEmailLoading(false);
+      const code = e?.code || '';
+      if (code === 'auth/user-not-found') {
+        setResetSent(true);
+      } else {
+        setEmailErr(e?.message || 'Failed to send reset email');
+      }
     }
   };
 
@@ -847,37 +911,142 @@ export function BusinessSelector({
         </div>
       )}
 
-      {/* ══ ADMIN PIN KEYPAD OVERLAY ══ */}
+      {/* ⠨ ADMIN LOGIN OVERLAY ⠨ */}
       {showAdmin && (
         <div style={overlayStyle}>
-          <div style={{ ...cardStyle, maxWidth: 300 }}>
+          <div style={{ ...cardStyle, maxWidth: 320 }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}><ShieldCheck size={20} color="#3D6BDF" /><span style={{ fontWeight: 800, fontSize: '0.95rem', color: '#1A1D2E' }}>Master Admin</span></div>
-              <button onClick={() => { setShowAdmin(false); setAdminPin(''); setAdminErr(''); }} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#9A9FB8' }}><X size={18} /></button>
+              <button onClick={() => { setShowAdmin(false); setAdminPin(''); setAdminErr(''); setEmail(''); setPassword(''); setEmailErr(''); setResetSent(false); }} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#9A9FB8' }}><X size={18} /></button>
             </div>
-            <div className={adminShake ? 'admin-shake' : ''}>
-              <PinKeypad value={adminPin} onChange={setAdminPin} label="Enter master PIN" maxLen={6} />
-            </div>
-            {adminErr && <div style={{ color: '#E83E5C', fontSize: '0.73rem', fontWeight: 700, textAlign: 'center', marginTop: 10 }}>{adminErr}</div>}
-            {checking && <div style={{ color: '#9A9FB8', fontSize: '0.72rem', textAlign: 'center', marginTop: 10 }}>Checking…</div>}
-            <button
-              onClick={() => {
-                try { localStorage.setItem('cb_admin_force_reset', 'true'); } catch {}
-                setAdminResetPending(true);
-              }}
-              style={{
-                width: '100%', marginTop: 16, padding: '9px',
-                background: 'none', border: '1.5px dashed rgba(61,107,223,0.25)',
-                borderRadius: 10, cursor: 'pointer',
-                fontSize: '0.72rem', fontWeight: 600, color: '#9A9FB8',
-                fontFamily: "'Plus Jakarta Sans', sans-serif",
-                transition: 'all 0.15s',
-              }}
-              onMouseEnter={e => { e.currentTarget.style.borderColor = '#3D6BDF'; e.currentTarget.style.color = '#3D6BDF'; }}
-              onMouseLeave={e => { e.currentTarget.style.borderColor = 'rgba(61,107,223,0.25)'; e.currentTarget.style.color = '#9A9FB8'; }}
-            >
-              Forgot PIN? Reset master admin
-            </button>
+
+            {/* ── Email/password login (primary) ── */}
+            {loginMode === 'email' && (
+              <div>
+                {!resetSent ? (
+                  <>
+                    <div style={{ marginBottom: 14 }}>
+                      <label style={{ fontSize: '0.6rem', fontWeight: 700, letterSpacing: '0.1em', textTransform: 'uppercase', color: '#9A9FB8', display: 'block', marginBottom: 6 }}>Admin Email</label>
+                      <input
+                        type="email" placeholder="admin@example.com"
+                        value={email} onChange={e => setEmail(e.target.value)}
+                        onKeyDown={e => { if (e.key === 'Enter' && password) handleEmailLogin(); }}
+                        style={{ width: '100%', padding: '12px 14px', borderRadius: 12, border: '1.5px solid #E0E4F0', fontSize: '0.85rem', fontFamily: "'Plus Jakarta Sans', sans-serif", outline: 'none', boxSizing: 'border-box', transition: 'border 0.15s' }}
+                        onFocus={e => e.currentTarget.style.borderColor = '#3D6BDF'}
+                        onBlur={e => e.currentTarget.style.borderColor = '#E0E4F0'}
+                      />
+                    </div>
+                    <div style={{ marginBottom: 14 }}>
+                      <label style={{ fontSize: '0.6rem', fontWeight: 700, letterSpacing: '0.1em', textTransform: 'uppercase', color: '#9A9FB8', display: 'block', marginBottom: 6 }}>Password</label>
+                      <input
+                        type="password" placeholder="••••••••"
+                        value={password} onChange={e => setPassword(e.target.value)}
+                        onKeyDown={e => { if (e.key === 'Enter' && email) handleEmailLogin(); }}
+                        style={{ width: '100%', padding: '12px 14px', borderRadius: 12, border: '1.5px solid #E0E4F0', fontSize: '0.85rem', fontFamily: "'Plus Jakarta Sans', sans-serif", outline: 'none', boxSizing: 'border-box', transition: 'border 0.15s' }}
+                        onFocus={e => e.currentTarget.style.borderColor = '#3D6BDF'}
+                        onBlur={e => e.currentTarget.style.borderColor = '#E0E4F0'}
+                      />
+                    </div>
+                    {emailErr && <div style={{ color: '#E83E5C', fontSize: '0.73rem', fontWeight: 700, textAlign: 'center', marginTop: 8, marginBottom: 8 }}>{emailErr}</div>}
+                    <button
+                      onClick={handleEmailLogin}
+                      disabled={emailLoading || !email || !password}
+                      style={{
+                        width: '100%', padding: '13px', borderRadius: 12,
+                        background: emailLoading || !email || !password ? '#D4D8E8' : 'linear-gradient(135deg, #1A2FA8, #3D6BDF)',
+                        color: '#fff', border: 'none', cursor: emailLoading || !email || !password ? 'not-allowed' : 'pointer',
+                        fontWeight: 800, fontSize: '0.85rem', transition: 'all 0.15s',
+                      }}
+                    >
+                      {emailLoading ? 'Signing in…' : 'Sign In'}
+                    </button>
+                    <button
+                      onClick={handleForgotPassword}
+                      disabled={!email || emailLoading}
+                      style={{
+                        width: '100%', marginTop: 10, padding: '8px',
+                        background: 'none', border: 'none', cursor: !email || emailLoading ? 'not-allowed' : 'pointer',
+                        fontSize: '0.72rem', fontWeight: 600, color: !email ? '#C4C8D8' : '#3D6BDF',
+                        fontFamily: "'Plus Jakarta Sans', sans-serif",
+                      }}
+                    >
+                      Forgot password?
+                    </button>
+                  </>
+                ) : (
+                  <div style={{ textAlign: 'center', padding: '16px 4px' }}>
+                    <div style={{ fontSize: '2rem', marginBottom: 12 }}>📧</div>
+                    <div style={{ fontSize: '0.85rem', fontWeight: 700, color: '#1A1D2E', marginBottom: 6 }}>Password reset sent!</div>
+                    <div style={{ fontSize: '0.75rem', color: '#5A5F7A', lineHeight: 1.5 }}>
+                      Check <strong>{email}</strong> for a password reset link from Firebase.
+                    </div>
+                    <button
+                      onClick={() => { setResetSent(false); setPassword(''); }}
+                      style={{ marginTop: 14, background: 'none', border: '1.5px solid #E0E4F0', borderRadius: 10, padding: '8px 16px', cursor: 'pointer', fontSize: '0.75rem', fontWeight: 600, color: '#3D6BDF', fontFamily: "'Plus Jakarta Sans', sans-serif" }}
+                    >
+                      ← Back to login
+                    </button>
+                  </div>
+                )}
+                <button
+                  onClick={() => { setLoginMode('pin'); setEmailErr(''); setResetSent(false); }}
+                  style={{
+                    width: '100%', marginTop: 14, padding: '8px',
+                    background: 'none', border: '1.5px dashed rgba(61,107,223,0.2)',
+                    borderRadius: 10, cursor: 'pointer',
+                    fontSize: '0.68rem', fontWeight: 600, color: '#9A9FB8',
+                    fontFamily: "'Plus Jakarta Sans', sans-serif", transition: 'all 0.15s',
+                  }}
+                  onMouseEnter={e => { e.currentTarget.style.borderColor = '#3D6BDF'; e.currentTarget.style.color = '#3D6BDF'; }}
+                  onMouseLeave={e => { e.currentTarget.style.borderColor = 'rgba(61,107,223,0.2)'; e.currentTarget.style.color = '#9A9FB8'; }}
+                >
+                  Use PIN instead
+                </button>
+              </div>
+            )}
+
+            {/* ── Legacy PIN login (fallback) ── */}
+            {loginMode === 'pin' && (
+              <div>
+                <div className={adminShake ? 'admin-shake' : ''}>
+                  <PinKeypad value={adminPin} onChange={setAdminPin} label="Enter master PIN" maxLen={6} />
+                </div>
+                {adminErr && <div style={{ color: '#E83E5C', fontSize: '0.73rem', fontWeight: 700, textAlign: 'center', marginTop: 10 }}>{adminErr}</div>}
+                {checking && <div style={{ color: '#9A9FB8', fontSize: '0.72rem', textAlign: 'center', marginTop: 10 }}>Checking…</div>}
+                <button
+                  onClick={() => {
+                    try { localStorage.setItem('cb_admin_force_reset', 'true'); } catch {}
+                    setAdminResetPending(true);
+                  }}
+                  style={{
+                    width: '100%', marginTop: 16, padding: '9px',
+                    background: 'none', border: '1.5px dashed rgba(61,107,223,0.25)',
+                    borderRadius: 10, cursor: 'pointer',
+                    fontSize: '0.72rem', fontWeight: 600, color: '#9A9FB8',
+                    fontFamily: "'Plus Jakarta Sans', sans-serif",
+                    transition: 'all 0.15s',
+                  }}
+                  onMouseEnter={e => { e.currentTarget.style.borderColor = '#3D6BDF'; e.currentTarget.style.color = '#3D6BDF'; }}
+                  onMouseLeave={e => { e.currentTarget.style.borderColor = 'rgba(61,107,223,0.25)'; e.currentTarget.style.color = '#9A9FB8'; }}
+                >
+                  Forgot PIN? Reset master admin
+                </button>
+                <button
+                  onClick={() => { setLoginMode('email'); setAdminPin(''); setAdminErr(''); }}
+                  style={{
+                    width: '100%', marginTop: 10, padding: '8px',
+                    background: 'none', border: '1.5px dashed rgba(61,107,223,0.2)',
+                    borderRadius: 10, cursor: 'pointer',
+                    fontSize: '0.68rem', fontWeight: 600, color: '#9A9FB8',
+                    fontFamily: "'Plus Jakarta Sans', sans-serif", transition: 'all 0.15s',
+                  }}
+                  onMouseEnter={e => { e.currentTarget.style.borderColor = '#3D6BDF'; e.currentTarget.style.color = '#3D6BDF'; }}
+                  onMouseLeave={e => { e.currentTarget.style.borderColor = 'rgba(61,107,223,0.2)'; e.currentTarget.style.color = '#9A9FB8'; }}
+                >
+                  Use email instead
+                </button>
+              </div>
+            )}
           </div>
         </div>
       )}

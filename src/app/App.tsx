@@ -79,6 +79,8 @@ export default function App() {
   /* ── Refs ──────────────────────────────────────── */
   const dbRef    = useRef<any>(null);
   const fsRef    = useRef<any>(null);
+  const authRef  = useRef<any>(null);     // firebase-auth module
+  const authInstRef = useRef<any>(null);  // Auth instance
   const syncRef  = useRef<ReturnType<typeof setTimeout>>();
   const promptRef = useRef<any>(null);
   const bizUnsubRef = useRef<any>(null); // unsubscribe for biz data listener
@@ -169,9 +171,21 @@ export default function App() {
     try {
       const { initializeApp, getApps } = await import('https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js' as any);
       const fs = await import('https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js' as any);
+      const fa = await import('https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js' as any);
       fsRef.current = fs;
+      authRef.current = fa;
       const app = getApps().length === 0 ? initializeApp(FB) : getApps()[0];
       dbRef.current = fs.getFirestore(app);
+      const authInstance = fa.getAuth(app);
+      authInstRef.current = authInstance;
+
+      // Listen to Firebase Auth state — auto-restore admin session
+      fa.onAuthStateChanged(authInstance, (user: any) => {
+        if (user) {
+          setIsMasterAdmin(true);
+          sessionStorage.setItem('cb_master', '1');
+        }
+      });
 
       // Listen to business registry
       const regRef = fs.doc(dbRef.current, REGISTRY_DOC[0], REGISTRY_DOC[1]);
@@ -797,6 +811,8 @@ export default function App() {
         <BusinessSelector
           businesses={businesses}
           isMasterAdmin={isMasterAdmin}
+          authRef={authRef}
+          authInst={authInstRef}
           onMasterAdmin={() => {
             setIsMasterAdmin(true);
             sessionStorage.setItem('cb_master', '1');
@@ -804,6 +820,10 @@ export default function App() {
           onLogoutMasterAdmin={() => {
             setIsMasterAdmin(false);
             sessionStorage.removeItem('cb_master');
+            // Sign out from Firebase Auth too
+            if (authRef.current && authInstRef.current) {
+              authRef.current.signOut(authInstRef.current).catch(() => {});
+            }
           }}
           onSelectBusiness={(biz) => {
             setSelectedBiz(biz);
