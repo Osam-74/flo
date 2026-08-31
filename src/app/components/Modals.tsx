@@ -110,7 +110,7 @@ export function ToastContainer() {
 /* ══════════════════════════════════════════════════════════════════
    SHARED PRIMITIVES  (mirrors AddEntrySheet exactly)
 ══════════════════════════════════════════════════════════════════ */
-const CATS = ['', 'Feed & Supplies', 'Transport', 'Utilities', 'Equipment', 'Medical / Vet', 'Labour', 'Sales Revenue', 'Loan / Advance', 'Salary', 'Other'];
+const CATS = ['', 'Feed', 'Feed & Supplies', 'Transport', 'Utilities', 'Equipment', 'Medical / Vet', 'Labour', 'Sales Revenue', 'Loan / Advance', 'Salary', 'Tray Stock', 'Other'];
 const today = () => new Date().toISOString().split('T')[0];
 const nonOwners = (people: Person[]) => people.filter(p => !p.role?.toLowerCase().includes('owner'));
 const owners    = (people: Person[]) => people.filter(p =>  p.role?.toLowerCase().includes('owner'));
@@ -301,6 +301,14 @@ export function EditModal({ open, tx, people, currency, onClose, onSave }: EditM
   const [frSender,   setFrSender]   = useState('');
   const [frReceiver, setFrReceiver] = useState('');
 
+  // Crates (income & credit)
+  const [crates,    setCrates]    = useState('');
+  const [crCrates,  setCrCrates]  = useState('');
+  // Tray Stock & Feed (expense conditional fields)
+  const [trayPacks,         setTrayPacks]         = useState('');
+  const [trayPiecesPerPack, setTrayPiecesPerPack] = useState('100');
+  const [feedTons,          setFeedTons]          = useState('');
+  const [feedBags,          setFeedBags]          = useState('');
   // Egg collection
   const [eggPieces,  setEggPieces]  = useState('');
   const [brokenEggs, setBrokenEggs] = useState('');
@@ -350,6 +358,14 @@ export function EditModal({ open, tx, people, currency, onClose, onSave }: EditM
     setFrNote(t.note || '');
     setFrSender(t.frSender || t.person || '');
     setFrReceiver(t.frReceiver || '');
+    // crates (income & credit)
+    setCrates(t.crates ? String(t.crates) : '');
+    setCrCrates(t.crates ? String(t.crates) : '');
+    // tray stock & feed (expense)
+    setTrayPacks(t.trayPacks ? String(t.trayPacks) : '');
+    setTrayPiecesPerPack(t.trayPiecesPerPack ? String(t.trayPiecesPerPack) : '100');
+    setFeedTons(t.feedTons ? String(t.feedTons) : '');
+    setFeedBags(t.feedBags ? String(Math.abs(t.feedBags || 0)) : '');
     // egg-collection
     setEggPieces(String(t.eggPieces || 0));
     setBrokenEggs(String(t.brokenEggs || 0));
@@ -378,14 +394,21 @@ export function EditModal({ open, tx, people, currency, onClose, onSave }: EditM
       if (amt <= 0) { showToast('Enter a valid amount', 'error'); return; }
       const sellerName = people.find(p => p.id === person)?.name || '';
       const desc = `Sale${buyer ? ' — to ' + buyer : ''}${sellerName ? ' by ' + sellerName : ''}${cat ? ' — ' + cat : ''}`;
-      onSave(tx.id, { amount: amt, date, note, cat, source, buyer: buyer || undefined, seller: person, sellerName, person: receiver, desc });
+      const cratesNum = parseFloat(crates) || undefined;
+      onSave(tx.id, { amount: amt, date, note, cat, source, buyer: buyer || undefined, seller: person, sellerName, person: receiver, crates: cratesNum, desc });
     }
     else if (type === 'expense') {
       const amt = parseFloat(amount) || 0;
       if (amt <= 0) { showToast('Enter a valid amount', 'error'); return; }
       const pn = people.find(p => p.id === person)?.name || '';
-      const desc = `Expense${pn ? ' by ' + pn : ''}`;
-      onSave(tx.id, { amount: amt, date, note, cat, person, desc });
+      const packs = cat === 'Tray Stock' ? (parseFloat(trayPacks) || 0) : undefined;
+      const ppp   = cat === 'Tray Stock' ? (parseFloat(trayPiecesPerPack) || 100) : undefined;
+      const fTons = cat === 'Feed' ? (parseFloat(feedTons) || 0) || undefined : undefined;
+      const fBags = cat === 'Feed' ? (parseFloat(feedBags) || 0) || undefined : undefined;
+      const trayInfo = packs ? ` \u2014 ${packs} pack${packs !== 1 ? 's' : ''} \u00d7 ${ppp} trays` : '';
+      const feedInfo = fBags ? ` \u2014 ${fTons ? fTons + 't ' : ''}${fBags} bag${fBags !== 1 ? 's' : ''}` : '';
+      const desc = `Expense${pn ? ' by ' + pn : ''}${cat ? ' \u2014 ' + cat : ''}${trayInfo}${feedInfo}`;
+      onSave(tx.id, { amount: amt, date, note, cat, person, trayPacks: packs, trayPiecesPerPack: ppp, feedTons: fTons, feedBags: fBags, desc });
     }
     else if (type === 'salary') {
       const amt = parseFloat(amount) || 0;
@@ -411,11 +434,13 @@ export function EditModal({ open, tx, people, currency, onClose, onSave }: EditM
       const alreadyPaid = tx.creditPaid || 0;
       if (!isCreditSettled && total < alreadyPaid) { showToast(`Total cannot be less than already paid (${alreadyPaid.toFixed(2)})`, 'error'); return; }
       const desc = isPickup ? `Egg Pickup Scheduled — ${crBuyer} on ${crDate}` : `Credit sale — ${crBuyer}`;
+      const crCratesNum = parseFloat(crCrates) || undefined;
       onSave(tx.id, {
         date: crDate, note: crNote, cat: crCat, source: crSource,
         creditBuyer: crBuyer, creditSeller: crSeller, person: crSeller,
         creditReceiver: paid > 0 ? crReceiver : tx.creditReceiver,
         creditTotal: isCreditSettled ? tx.creditTotal : total,
+        crates: crCratesNum,
         desc,
       });
     }
@@ -531,6 +556,10 @@ export function EditModal({ open, tx, people, currency, onClose, onSave }: EditM
               <input style={inp} type="text" placeholder="e.g. Receipt #007" value={note} onChange={e => setNote(e.target.value)} />
             </Field>
           </Row>
+          <Field label="Crates">
+            <input style={inp} type="number" placeholder="Number of crates" min="0" step="1"
+              value={crates} onChange={e => setCrates(e.target.value)} />
+          </Field>
         </div>
       )}
 
@@ -569,6 +598,47 @@ export function EditModal({ open, tx, people, currency, onClose, onSave }: EditM
               <input style={inp} type="text" placeholder="e.g. Receipt #007" value={note} onChange={e => setNote(e.target.value)} />
             </Field>
           </Row>
+          {cat === 'Tray Stock' && (
+            <>
+              <Row>
+                <Field label="Number of Packs *">
+                  <input style={{ ...inp, fontSize: '1.2rem', fontFamily: "'DM Mono',monospace" }}
+                    type="number" placeholder="e.g. 5" min="1" step="1"
+                    value={trayPacks} onChange={e => setTrayPacks(e.target.value)} />
+                </Field>
+                <Field label="Trays per Pack (default 100)">
+                  <input style={inp} type="number" placeholder="100" min="1" step="1"
+                    value={trayPiecesPerPack} onChange={e => setTrayPiecesPerPack(e.target.value)} />
+                </Field>
+              </Row>
+              {trayPacks && Number(trayPacks) > 0 && (
+                <div style={{ ...infoBox, color: '#7C3AED', marginBottom: 10 }}>
+                  📦 {Number(trayPacks)} pack{Number(trayPacks) !== 1 ? 's' : ''} × {Number(trayPiecesPerPack) || 100} = <strong>{Number(trayPacks) * (Number(trayPiecesPerPack) || 100)} trays</strong> incoming
+                </div>
+              )}
+            </>
+          )}
+          {cat === 'Feed' && (
+            <>
+              <Row>
+                <Field label="How Many Tons?">
+                  <input style={{ ...inp, fontSize: '1.2rem', fontFamily: "'DM Mono',monospace" }}
+                    type="number" placeholder="e.g. 2" min="0" step="0.5"
+                    value={feedTons} onChange={e => setFeedTons(e.target.value)} />
+                </Field>
+                <Field label="How Many Bags? *">
+                  <input style={{ ...inp, fontSize: '1.2rem', fontFamily: "'DM Mono',monospace" }}
+                    type="number" placeholder="e.g. 40" min="1" step="1"
+                    value={feedBags} onChange={e => setFeedBags(e.target.value)} />
+                </Field>
+              </Row>
+              {feedBags && Number(feedBags) > 0 && (
+                <div style={{ ...infoBox, color: '#B45309', marginBottom: 10 }}>
+                  🌾 {Number(feedTons) > 0 ? `${Number(feedTons)}t — ` : ''}<strong>{Number(feedBags)} bag{Number(feedBags) !== 1 ? 's' : ''}</strong> of feed incoming
+                </div>
+              )}
+            </>
+          )}
         </div>
       )}
 

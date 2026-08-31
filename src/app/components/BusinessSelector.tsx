@@ -860,6 +860,24 @@ export function BusinessSelector({
             </div>
             {adminErr && <div style={{ color: '#E83E5C', fontSize: '0.73rem', fontWeight: 700, textAlign: 'center', marginTop: 10 }}>{adminErr}</div>}
             {checking && <div style={{ color: '#9A9FB8', fontSize: '0.72rem', textAlign: 'center', marginTop: 10 }}>Checking…</div>}
+            <button
+              onClick={() => {
+                try { localStorage.setItem('cb_admin_force_reset', 'true'); } catch {}
+                setAdminResetPending(true);
+              }}
+              style={{
+                width: '100%', marginTop: 16, padding: '9px',
+                background: 'none', border: '1.5px dashed rgba(61,107,223,0.25)',
+                borderRadius: 10, cursor: 'pointer',
+                fontSize: '0.72rem', fontWeight: 600, color: '#9A9FB8',
+                fontFamily: "'Plus Jakarta Sans', sans-serif",
+                transition: 'all 0.15s',
+              }}
+              onMouseEnter={e => { e.currentTarget.style.borderColor = '#3D6BDF'; e.currentTarget.style.color = '#3D6BDF'; }}
+              onMouseLeave={e => { e.currentTarget.style.borderColor = 'rgba(61,107,223,0.25)'; e.currentTarget.style.color = '#9A9FB8'; }}
+            >
+              Forgot PIN? Reset master admin
+            </button>
           </div>
         </div>
       )}
