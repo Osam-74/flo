@@ -14,6 +14,10 @@ interface Props {
   currency: string;
 }
 
+// ── constants ──────────────────────────────────────────────────────────────────
+
+const EGGS_PER_CRATE = 30; // standard crate size (30 eggs)
+
 // ── helpers ──────────────────────────────────────────────────────────────────
 
 function esc(s: any): string {
@@ -68,6 +72,8 @@ export function ReportTab({ businessName, txs, people, currency }: Props) {
     teamDebts: { name: string; amount: number }[];
     totalCashAvail: number;
     memberBalances: { name: string; balance: number }[];
+    costPerEgg: number;
+    costPerCrate: number;
   } | null>(null);
 
   function generate() {
@@ -123,6 +129,13 @@ export function ReportTab({ businessName, txs, people, currency }: Props) {
     const totalCrates = f
       .filter(t => ['income', 'credit'].includes(t.type))
       .reduce((s, t) => s + (t.crates || 0), 0);
+
+    // ── Cost of production ──────────────────────────────────────────────
+    // Total expenses ÷ total eggs recorded during the period.
+    // Two results: cost per egg and cost per crate (30 eggs per crate).
+    const costPerEgg   = totalEggs > 0 ? totalExpenses / totalEggs : 0;
+    const totalEggCrates = totalEggs > 0 ? totalEggs / EGGS_PER_CRATE : 0;
+    const costPerCrate = totalEggCrates > 0 ? totalExpenses / totalEggCrates : 0;
 
     const dateLabel = (from && to) ? fmtDate(from) + ' – ' + fmtDate(to) : 'All Dates';
 
@@ -385,6 +398,11 @@ export function ReportTab({ businessName, txs, people, currency }: Props) {
       if (cashInjection > 0)    entries.push({ label: 'Cash Injection', value: '+ ' + fmtN(cashInjection) });
       // Crates are a count, not money — render as a whole number.
       if (totalCrates > 0)      entries.push({ label: 'Total Crates Sold', value: `${totalCrates} crates` });
+      if (totalEggs > 0 && totalExpenses > 0) {
+        entries.push({ label: 'Eggs Collected', value: `${totalEggs} eggs (${totalEggCrates.toFixed(1)} crates)` });
+        entries.push({ label: 'Cost of Production (per egg)', value: fmtN(costPerEgg) });
+        entries.push({ label: 'Cost of Production (per crate)', value: fmtN(costPerCrate) });
+      }
       add(makeSummaryTable(entries));
     }
     if (rType === 'owner-fund' && ownerFunds.length) {
@@ -453,6 +471,8 @@ export function ReportTab({ businessName, txs, people, currency }: Props) {
       teamDebts,
       totalCashAvail,
       memberBalances,
+      costPerEgg,
+      costPerCrate,
     });
     showToast('Report ready', 'success');
     setTimeout(() => document.getElementById('report-preview')?.scrollIntoView({ behavior: 'smooth' }), 100);
@@ -468,6 +488,7 @@ export function ReportTab({ businessName, txs, people, currency }: Props) {
       totalEggs, totalBrokenEggs,
       balanceBroughtForward, periodStartDate, periodLabel, teamDebts,
       totalCashAvail, memberBalances,
+      costPerEgg, costPerCrate,
     } = reportStats;
 
     // ── Date range label ──────────────────────────────────────────────────
@@ -530,6 +551,11 @@ export function ReportTab({ businessName, txs, people, currency }: Props) {
       if (totalBrokenEggs > 0) eggBullet += `, ${totalBrokenEggs} reported broken`;
       eggBullet += ')';
       bullets.push(eggBullet);
+    }
+
+    // ── Cost of production ─────────────────────────────────────────────
+    if (totalEggs > 0 && totalExpenses > 0) {
+      bullets.push(`• Cost of production: ${currency} ${fmtN(costPerEgg)} per egg (${currency} ${fmtN(costPerCrate)} per crate)`);
     }
 
     // ── All balances (Biz + team members, non-zero only, min 1) ───────────
