@@ -317,7 +317,7 @@ export function ReportTab({ businessName, txs, people, currency }: Props) {
 
     function makeSalesTable(rows: Transaction[], title: string, subtitle: string, showOutstanding: boolean): PdfTableSection | null {
       if (!rows.length) return null;
-      let shopTotal = 0, farmTotal = 0, outstanding = 0, crates = 0;
+      let shopTotal = 0, farmTotal = 0, outstanding = 0, totalCratesSold = 0;
       rows.forEach(t => {
         const src = t.source || (t.type === 'income' ? 'shop' : 'farm');
         if (t.type === 'income') {
@@ -328,23 +328,48 @@ export function ReportTab({ businessName, txs, people, currency }: Props) {
           if (src === 'shop') shopTotal += collected; else farmTotal += collected;
           outstanding += owe;
         }
-        crates += (t.crates || 0);
+        totalCratesSold += (t.crates || 0);
       });
       const grandTotal = shopTotal + farmTotal;
 
-      const bodyRows: PdfRow[] = [];
-      if (shopTotal > 0) bodyRows.push({ cells: [{ text: 'Shop Sales' }, { text: fmtN(shopTotal) }] });
-      if (farmTotal > 0) bodyRows.push({ cells: [{ text: 'Farm Dispatch' }, { text: fmtN(farmTotal) }] });
-      if (crates > 0) bodyRows.push({ cells: [{ text: 'Total Crates' }, { text: `${crates} crates` }] });
+      // ── List every individual sale as its own row (like the expense table) ──
+      const bodyRows: PdfRow[] = rows.map((t): PdfRow => {
+        const src = t.source || (t.type === 'income' ? 'shop' : 'farm');
+        const srcLabel = src === 'shop' ? 'Shop' : 'Farm';
+        let displayDesc = t.desc || '';
+        let amount = 0;
+        if (t.type === 'income') {
+          amount = t.amount || 0;
+        } else if (t.type === 'credit') {
+          amount = t.creditPaid || 0;
+          const owe = Math.max(0, (t.creditTotal || 0) - (t.creditPaid || 0));
+          if (owe > 0.005) {
+            displayDesc += ` (outstanding: ${fmtN(owe)})`;
+          }
+        }
+        const crateNote = t.crates ? `${t.crates} crate${t.crates !== 1 ? 's' : ''}` : undefined;
+        return {
+          cells: [
+            { text: fmtDate(t.date) },
+            { text: displayDesc, note: crateNote },
+            { text: fmtN(amount), tag: srcLabel },
+          ],
+        };
+      });
 
-      const footRows: PdfRow[] = [{
+      // ── Footer: shop/farm breakdown + outstanding + grand total ──
+      const footRows: PdfRow[] = [];
+      if (shopTotal > 0)   footRows.push({ cells: [{ text: 'Shop Sales' }, { text: '' }, { text: fmtN(shopTotal) }] });
+      if (farmTotal > 0)   footRows.push({ cells: [{ text: 'Farm Dispatch' }, { text: '' }, { text: fmtN(farmTotal) }] });
+      if (totalCratesSold > 0) footRows.push({ cells: [{ text: `Total Crates: ${totalCratesSold} crate${totalCratesSold !== 1 ? 's' : ''}` }, { text: '' }, { text: '' }] });
+      footRows.push({
         variant: 'total',
-        cells: [{ text: 'TOTAL COLLECTED' }, { text: fmtN(grandTotal) }],
-      }];
+        cells: [{ text: 'TOTAL COLLECTED' }, { text: '' }, { text: fmtN(grandTotal) }],
+      });
       if (showOutstanding && outstanding > 0.005) {
         footRows.push({
           variant: 'outstanding',
-          cells: [{ text: 'Outstanding - Credit Sales' }, { text: fmtN(outstanding) }],
+          cells: [{ text: 'Outstanding - Credit Sales' }, { text: '' }, { text: fmtN(outstanding) }],
         });
       }
 
@@ -353,8 +378,9 @@ export function ReportTab({ businessName, txs, people, currency }: Props) {
         title,
         subtitle,
         columns: [
-          { header: 'Source', width: 0.7 },
-          { header: `Amount (${CUR})`, width: 0.3, align: 'right', numeric: true },
+          { header: 'Date', width: 0.17 },
+          { header: 'Description', width: 0.57 },
+          { header: `Amount (${CUR})`, width: 0.26, align: 'right', numeric: true },
         ],
         rows: bodyRows,
         footer: footRows,
