@@ -535,6 +535,205 @@ function LiveClock() {
   );
 }
 
+
+/* ── Reset Master PIN Modal: verify email → set new PIN ── */
+function ResetMasterPinModal({
+  authRef, authInst, adminHashKey, onClose, onSuccess,
+}: {
+  authRef?: React.MutableRefObject<any>;
+  authInst?: React.MutableRefObject<any>;
+  adminHashKey: string;
+  onClose: () => void;
+  onSuccess: (newHash: string) => void;
+}) {
+  type Step = 'verify' | 'newPin' | 'confirmPin' | 'done';
+  const [step, setStep] = useState<Step>('verify');
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [newPin, setNewPin] = useState('');
+  const [confirmPin, setConfirmPin] = useState('');
+  const [error, setError] = useState('');
+  const [loading, setLoading] = useState(false);
+
+  const overlayStyle: React.CSSProperties = { position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.55)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 10001, padding: 16 };
+  const cardStyle: React.CSSProperties = { background: '#fff', borderRadius: 22, padding: '24px 20px', width: '100%', maxWidth: 320, boxShadow: '0 12px 48px rgba(0,0,0,0.22)', fontFamily: 'Plus Jakarta Sans, sans-serif' };
+  const inputStyle: React.CSSProperties = { width: '100%', padding: '12px 14px', borderRadius: 12, border: '1.5px solid #E0E4F0', fontSize: '0.85rem', fontFamily: "'Plus Jakarta Sans', sans-serif", outline: 'none', boxSizing: 'border-box', transition: 'border 0.15s' };
+  const labelStyle: React.CSSProperties = { fontSize: '0.6rem', fontWeight: 700, letterSpacing: '0.1em', textTransform: 'uppercase', color: '#9A9FB8', display: 'block', marginBottom: 6 };
+  const btnPrimary: React.CSSProperties = { width: '100%', padding: '13px', borderRadius: 12, background: 'linear-gradient(135deg, #1A2FA8, #3D6BDF)', color: '#fff', border: 'none', cursor: 'pointer', fontWeight: 800, fontSize: '0.85rem' };
+  const btnBack: React.CSSProperties = { width: '100%', marginTop: 10, padding: '8px', background: 'none', border: '1.5px dashed rgba(61,107,223,0.2)', borderRadius: 10, cursor: 'pointer', fontSize: '0.68rem', fontWeight: 600, color: '#9A9FB8', fontFamily: "'Plus Jakarta Sans', sans-serif" };
+
+  // Verify email/password with Firebase Auth
+  const handleVerify = async () => {
+    if (!authRef?.current || !authInst?.current) {
+      setError('Firebase Auth is not available. Cannot verify identity.');
+      return;
+    }
+    if (!email || !password) { setError('Enter your email and password'); return; }
+    setLoading(true); setError('');
+    try {
+      const fa = authRef.current;
+      await fa.signInWithEmailAndPassword(authInst.current, email, password);
+      setLoading(false);
+      setStep('newPin');
+    } catch (e: any) {
+      setLoading(false);
+      const code = e?.code || '';
+      if (code === 'auth/invalid-credential' || code === 'auth/wrong-password' || code === 'auth/user-not-found') {
+        setError('Invalid email or password');
+      } else if (code === 'auth/invalid-email') {
+        setError('Invalid email address');
+      } else {
+        setError(e?.message || 'Verification failed');
+      }
+    }
+  };
+
+  // Save the new PIN
+  const handleSavePin = async () => {
+    if (newPin.length < 4) { setError('PIN must be at least 4 digits'); return; }
+    if (newPin !== confirmPin) { setError('PINs do not match'); return; }
+    const h = await sha256(newPin);
+    try { localStorage.setItem(adminHashKey, h); } catch {}
+    setStep('done');
+  };
+
+  // Auto-advance: newPin at 6 digits → confirm
+  useEffect(() => {
+    if (step === 'newPin' && newPin.length >= 6) {
+      setStep('confirmPin');
+    }
+  }, [step, newPin]);
+
+  // Auto-advance: confirmPin at 6 digits → save
+  useEffect(() => {
+    if (step === 'confirmPin' && confirmPin.length >= 6) {
+      handleSavePin();
+    }
+  }, [step, confirmPin]); // eslint-disable-line
+
+  return (
+    <div style={overlayStyle}>
+      <div style={cardStyle}>
+        {/* Header */}
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 18 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <ShieldCheck size={20} color="#3D6BDF" />
+            <span style={{ fontWeight: 800, fontSize: '0.95rem', color: '#1A1D2E' }}>Reset Master PIN</span>
+          </div>
+          <button onClick={onClose} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#9A9FB8' }}><X size={18} /></button>
+        </div>
+
+        {/* Step 1: Verify identity */}
+        {step === 'verify' && (
+          <div>
+            <div style={{ fontSize: '0.72rem', fontWeight: 700, color: '#5A5F7A', marginBottom: 14, textAlign: 'center' }}>
+              Verify your identity to reset the master PIN
+            </div>
+            <div style={{ marginBottom: 14 }}>
+              <label style={labelStyle}>Admin Email</label>
+              <input
+                type="email" placeholder="admin@example.com"
+                value={email} onChange={e => setEmail(e.target.value)}
+                onKeyDown={e => { if (e.key === 'Enter' && password) handleVerify(); }}
+                style={inputStyle}
+                onFocus={e => e.currentTarget.style.borderColor = '#3D6BDF'}
+                onBlur={e => e.currentTarget.style.borderColor = '#E0E4F0'}
+              />
+            </div>
+            <div style={{ marginBottom: 14 }}>
+              <label style={labelStyle}>Password</label>
+              <input
+                type="password" placeholder="••••••••"
+                value={password} onChange={e => setPassword(e.target.value)}
+                onKeyDown={e => { if (e.key === 'Enter' && email) handleVerify(); }}
+                style={inputStyle}
+                onFocus={e => e.currentTarget.style.borderColor = '#3D6BDF'}
+                onBlur={e => e.currentTarget.style.borderColor = '#E0E4F0'}
+              />
+            </div>
+            {error && <div style={{ color: '#E83E5C', fontSize: '0.73rem', fontWeight: 700, textAlign: 'center', marginTop: 8, marginBottom: 8 }}>{error}</div>}
+            <button
+              onClick={handleVerify}
+              disabled={loading || !email || !password}
+              style={{
+                ...btnPrimary,
+                background: loading || !email || !password ? '#D4D8E8' : btnPrimary.background,
+                cursor: loading || !email || !password ? 'not-allowed' : 'pointer',
+              }}
+            >
+              {loading ? 'Verifying…' : 'Verify Identity'}
+            </button>
+            <button onClick={onClose} style={btnBack}>← Cancel</button>
+          </div>
+        )}
+
+        {/* Step 2: Enter new PIN */}
+        {step === 'newPin' && (
+          <div>
+            <div style={{ fontSize: '0.72rem', fontWeight: 700, color: '#1A8A4A', marginBottom: 10, textAlign: 'center' }}>
+              ✓ Identity verified
+            </div>
+            <div style={{ fontSize: '0.72rem', color: '#5A5F7A', marginBottom: 14, textAlign: 'center' }}>
+              Enter your new master PIN
+            </div>
+            <PinKeypad value={newPin} onChange={setNewPin} label="New PIN" maxLen={6} />
+            {error && <div style={{ color: '#E83E5C', fontSize: '0.73rem', fontWeight: 700, textAlign: 'center', marginTop: 10 }}>{error}</div>}
+            {newPin.length >= 4 && (
+              <button
+                onClick={() => { setError(''); setStep('confirmPin'); }}
+                style={btnPrimary}
+              >
+                Continue
+              </button>
+            )}
+            <button onClick={() => { setStep('verify'); setNewPin(''); setError(''); }} style={btnBack}>← Back</button>
+          </div>
+        )}
+
+        {/* Step 3: Confirm new PIN */}
+        {step === 'confirmPin' && (
+          <div>
+            <div style={{ fontSize: '0.72rem', color: '#5A5F7A', marginBottom: 14, textAlign: 'center' }}>
+              Confirm your new PIN
+            </div>
+            <PinKeypad value={confirmPin} onChange={setConfirmPin} label="Confirm PIN" maxLen={6} />
+            {error && <div style={{ color: '#E83E5C', fontSize: '0.73rem', fontWeight: 700, textAlign: 'center', marginTop: 10 }}>{error}</div>}
+            {confirmPin.length >= 4 && (
+              <button
+                onClick={handleSavePin}
+                style={{ ...btnPrimary, background: 'linear-gradient(135deg, #1A8A4A, #2DB36A)' }}
+              >
+                Save New PIN
+              </button>
+            )}
+            <button onClick={() => { setStep('newPin'); setConfirmPin(''); setError(''); }} style={btnBack}>← Back</button>
+          </div>
+        )}
+
+        {/* Step 4: Success */}
+        {step === 'done' && (
+          <div style={{ textAlign: 'center', padding: '16px 4px' }}>
+            <div style={{ fontSize: '2rem', marginBottom: 12 }}>✅</div>
+            <div style={{ fontSize: '0.85rem', fontWeight: 700, color: '#1A1D2E', marginBottom: 6 }}>PIN Updated!</div>
+            <div style={{ fontSize: '0.75rem', color: '#5A5F7A', lineHeight: 1.5, marginBottom: 16 }}>
+              Your master PIN has been updated. You can now use both email and PIN to log in.
+            </div>
+            <button
+              onClick={() => {
+                const h = localStorage.getItem(adminHashKey) || '';
+                onSuccess(h);
+              }}
+              style={btnPrimary}
+            >
+              Continue to Admin
+            </button>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
 /* ══════════════════════════════════════════════════
    MAIN COMPONENT
 ══════════════════════════════════════════════════ */
@@ -558,19 +757,15 @@ export function BusinessSelector({
   const [adminShake, setAdminShake] = useState(false);
 
   // Email/password login (primary)
-  const [loginMode, setLoginMode]   = useState<'email' | 'pin'>('email'); // reset-pin is handled by resetPinStep
+  const [loginMode, setLoginMode]   = useState<'email' | 'pin'>('email');
   const [email, setEmail]           = useState('');
   const [password, setPassword]     = useState('');
   const [emailErr, setEmailErr]     = useState('');
   const [emailLoading, setEmailLoading] = useState(false);
   const [resetSent, setResetSent]   = useState(false);
 
-  // Reset PIN flow: verify email → set new PIN → confirm
-  const [resetPinStep, setResetPinStep] = useState<0 | 1 | 2 | 3>(0); // 0=off, 1=verify, 2=new pin, 3=confirm
-  const [newPin, setNewPin]         = useState('');
-  const [confirmNewPin, setConfirmNewPin] = useState('');
-  const [resetPinMsg, setResetPinMsg] = useState('');
-  const [resetPinErr, setResetPinErr] = useState('');
+  // Reset PIN flow — now handled by ResetMasterPinModal component
+  const [showResetMasterPin, setShowResetMasterPin] = useState(false);
 
   // Modals
   const [showCreate, setShowCreate]           = useState(false);
@@ -633,51 +828,6 @@ export function BusinessSelector({
     }
   };
 
-  // ── Reset PIN flow: verify identity then set a new PIN ──
-  const handleVerifyForPinReset = async () => {
-    if (!authRef?.current || !authInst?.current) {
-      setResetPinErr('Firebase Auth not available.');
-      return;
-    }
-    if (!email || !password) { setResetPinErr('Enter email and password'); return; }
-    setEmailLoading(true); setResetPinErr('');
-    try {
-      const fa = authRef.current;
-      await fa.signInWithEmailAndPassword(authInst.current, email, password);
-      setEmailLoading(false);
-      setResetPinStep(2); // advance to new PIN entry
-      setNewPin(''); setConfirmNewPin('');
-    } catch (e: any) {
-      setEmailLoading(false);
-      const code = e?.code || '';
-      if (code === 'auth/invalid-credential' || code === 'auth/wrong-password' || code === 'auth/user-not-found') {
-        setResetPinErr('Invalid email or password');
-      } else {
-        setResetPinErr(e?.message || 'Verification failed');
-      }
-    }
-  };
-
-  const handleSaveNewPin = async () => {
-    if (newPin.length < 4) { setResetPinErr('PIN must be at least 4 digits'); return; }
-    if (newPin !== confirmNewPin) { setResetPinErr('PINs do not match'); return; }
-    const h = await sha256(newPin);
-    try { localStorage.setItem(ADMIN_HASH_KEY, h); } catch {}
-    setAdminHash(h); // update the state so PIN login works immediately
-    setResetPinStep(3); // success screen
-    setResetPinErr('');
-    setResetPinMsg('PIN updated successfully! You can now use both email and PIN to log in.');
-  };
-
-  // Start the reset PIN flow from the email login screen
-  const startResetPinFlow = () => {
-    setResetPinStep(1);
-    setResetPinErr('');
-    setResetPinMsg('');
-    setNewPin(''); setConfirmNewPin('');
-    setEmail(''); setPassword('');
-  };
-
   // Send password reset email via Firebase
   const handleForgotPassword = async () => {
     if (!authRef?.current || !authInst?.current) {
@@ -703,9 +853,6 @@ export function BusinessSelector({
   };
 
   useEffect(() => { if (adminPin.length >= 6) handleAdminLogin(); }, [adminPin, adminHash]); // eslint-disable-line
-  // Auto-advance reset PIN flow
-  useEffect(() => { if (resetPinStep === 2 && newPin.length >= 6) { setResetPinStep(3); setResetPinErr(''); } }, [resetPinStep, newPin]); // eslint-disable-line
-  useEffect(() => { if (resetPinStep === 3 && !resetPinMsg && confirmNewPin.length >= 6) handleSaveNewPin(); }, [resetPinStep, confirmNewPin, resetPinMsg]); // eslint-disable-line
 
   const overlayStyle: React.CSSProperties = { position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 10000, padding: 16 };
   const cardStyle: React.CSSProperties = { background: '#fff', borderRadius: 20, padding: 24, width: '100%', maxWidth: 340, boxShadow: '0 8px 40px rgba(0,0,0,0.2)', fontFamily: 'Plus Jakarta Sans, sans-serif' };
@@ -890,11 +1037,11 @@ export function BusinessSelector({
           <div style={{ ...cardStyle, maxWidth: 320 }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}><ShieldCheck size={20} color="#3D6BDF" /><span style={{ fontWeight: 800, fontSize: '0.95rem', color: '#1A1D2E' }}>Master Admin</span></div>
-              <button onClick={() => { setShowAdmin(false); setAdminPin(''); setAdminErr(''); setEmail(''); setPassword(''); setEmailErr(''); setResetSent(false); setResetPinStep(0); setResetPinErr(''); setResetPinMsg(''); setNewPin(''); setConfirmNewPin(''); }} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#9A9FB8' }}><X size={18} /></button>
+              <button onClick={() => { setShowAdmin(false); setAdminPin(''); setAdminErr(''); setEmail(''); setPassword(''); setEmailErr(''); setResetSent(false); }} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#9A9FB8' }}><X size={18} /></button>
             </div>
 
             {/* ── Email/password login (primary) ── */}
-            {loginMode === 'email' && resetPinStep === 0 && (
+            {loginMode === 'email' && (
               <div>
                 {!resetSent ? (
                   <>
@@ -946,7 +1093,7 @@ export function BusinessSelector({
                       Forgot password?
                     </button>
                     <button
-                      onClick={startResetPinFlow}
+                      onClick={() => setShowResetMasterPin(true)}
                       style={{
                         width: '100%', marginTop: 6, padding: '8px',
                         background: 'none', border: 'none', cursor: 'pointer',
@@ -992,173 +1139,9 @@ export function BusinessSelector({
               </div>
             )}
 
-            {/* ── Reset PIN flow (verify email → set new PIN) ── */}
-            {resetPinStep > 0 && (
-              <div>
-                {/* Step 1: Verify identity with email/password */}
-                {resetPinStep === 1 && (
-                  <div>
-                    <div style={{ fontSize: '0.72rem', fontWeight: 700, color: '#5A5F7A', marginBottom: 14, textAlign: 'center' }}>
-                      Verify your identity to reset PIN
-                    </div>
-                    <div style={{ marginBottom: 14 }}>
-                      <label style={{ fontSize: '0.6rem', fontWeight: 700, letterSpacing: '0.1em', textTransform: 'uppercase', color: '#9A9FB8', display: 'block', marginBottom: 6 }}>Admin Email</label>
-                      <input
-                        type="email" placeholder="admin@example.com"
-                        value={email} onChange={e => setEmail(e.target.value)}
-                        onKeyDown={e => { if (e.key === 'Enter' && password) handleVerifyForPinReset(); }}
-                        style={{ width: '100%', padding: '12px 14px', borderRadius: 12, border: '1.5px solid #E0E4F0', fontSize: '0.85rem', fontFamily: "'Plus Jakarta Sans', sans-serif", outline: 'none', boxSizing: 'border-box', transition: 'border 0.15s' }}
-                        onFocus={e => e.currentTarget.style.borderColor = '#3D6BDF'}
-                        onBlur={e => e.currentTarget.style.borderColor = '#E0E4F0'}
-                      />
-                    </div>
-                    <div style={{ marginBottom: 14 }}>
-                      <label style={{ fontSize: '0.6rem', fontWeight: 700, letterSpacing: '0.1em', textTransform: 'uppercase', color: '#9A9FB8', display: 'block', marginBottom: 6 }}>Password</label>
-                      <input
-                        type="password" placeholder="••••••••"
-                        value={password} onChange={e => setPassword(e.target.value)}
-                        onKeyDown={e => { if (e.key === 'Enter' && email) handleVerifyForPinReset(); }}
-                        style={{ width: '100%', padding: '12px 14px', borderRadius: 12, border: '1.5px solid #E0E4F0', fontSize: '0.85rem', fontFamily: "'Plus Jakarta Sans', sans-serif", outline: 'none', boxSizing: 'border-box', transition: 'border 0.15s' }}
-                        onFocus={e => e.currentTarget.style.borderColor = '#3D6BDF'}
-                        onBlur={e => e.currentTarget.style.borderColor = '#E0E4F0'}
-                      />
-                    </div>
-                    {resetPinErr && <div style={{ color: '#E83E5C', fontSize: '0.73rem', fontWeight: 700, textAlign: 'center', marginTop: 8, marginBottom: 8 }}>{resetPinErr}</div>}
-                    <button
-                      onClick={handleVerifyForPinReset}
-                      disabled={emailLoading || !email || !password}
-                      style={{
-                        width: '100%', padding: '13px', borderRadius: 12,
-                        background: emailLoading || !email || !password ? '#D4D8E8' : 'linear-gradient(135deg, #1A2FA8, #3D6BDF)',
-                        color: '#fff', border: 'none', cursor: emailLoading || !email || !password ? 'not-allowed' : 'pointer',
-                        fontWeight: 800, fontSize: '0.85rem', transition: 'all 0.15s',
-                      }}
-                    >
-                      {emailLoading ? 'Verifying…' : 'Verify Identity'}
-                    </button>
-                    <button
-                      onClick={() => { setResetPinStep(0); setResetPinErr(''); setEmail(''); setPassword(''); }}
-                      style={{
-                        width: '100%', marginTop: 10, padding: '8px',
-                        background: 'none', border: '1.5px dashed rgba(61,107,223,0.2)',
-                        borderRadius: 10, cursor: 'pointer',
-                        fontSize: '0.68rem', fontWeight: 600, color: '#9A9FB8',
-                        fontFamily: "'Plus Jakarta Sans', sans-serif", transition: 'all 0.15s',
-                      }}
-                      onMouseEnter={e => { e.currentTarget.style.borderColor = '#3D6BDF'; e.currentTarget.style.color = '#3D6BDF'; }}
-                      onMouseLeave={e => { e.currentTarget.style.borderColor = 'rgba(61,107,223,0.2)'; e.currentTarget.style.color = '#9A9FB8'; }}
-                    >
-                      ← Back to login
-                    </button>
-                  </div>
-                )}
-
-                {/* Step 2: Enter new PIN */}
-                {resetPinStep === 2 && (
-                  <div>
-                    <div style={{ fontSize: '0.72rem', fontWeight: 700, color: '#1A8A4A', marginBottom: 10, textAlign: 'center' }}>
-                      ✓ Identity verified
-                    </div>
-                    <div style={{ fontSize: '0.72rem', color: '#5A5F7A', marginBottom: 14, textAlign: 'center' }}>
-                      Enter your new master PIN
-                    </div>
-                    <PinKeypad value={newPin} onChange={setNewPin} label="New PIN" maxLen={6} />
-                    {resetPinErr && <div style={{ color: '#E83E5C', fontSize: '0.73rem', fontWeight: 700, textAlign: 'center', marginTop: 10 }}>{resetPinErr}</div>}
-                    {newPin.length >= 4 && (
-                      <button
-                        onClick={() => { setResetPinStep(3); setResetPinErr(''); }}
-                        style={{
-                          width: '100%', marginTop: 14, padding: '13px', borderRadius: 12,
-                          background: 'linear-gradient(135deg, #1A2FA8, #3D6BDF)',
-                          color: '#fff', border: 'none', cursor: 'pointer',
-                          fontWeight: 800, fontSize: '0.85rem',
-                        }}
-                      >
-                        Continue
-                      </button>
-                    )}
-                    <button
-                      onClick={() => { setResetPinStep(1); setNewPin(''); setResetPinErr(''); }}
-                      style={{
-                        width: '100%', marginTop: 10, padding: '8px',
-                        background: 'none', border: '1.5px dashed rgba(61,107,223,0.2)',
-                        borderRadius: 10, cursor: 'pointer',
-                        fontSize: '0.68rem', fontWeight: 600, color: '#9A9FB8',
-                        fontFamily: "'Plus Jakarta Sans', sans-serif",
-                      }}
-                    >
-                      ← Back
-                    </button>
-                  </div>
-                )}
-
-                {/* Step 3: Confirm new PIN */}
-                {resetPinStep === 3 && !resetPinMsg && (
-                  <div>
-                    <div style={{ fontSize: '0.72rem', color: '#5A5F7A', marginBottom: 14, textAlign: 'center' }}>
-                      Confirm your new PIN
-                    </div>
-                    <PinKeypad value={confirmNewPin} onChange={setConfirmNewPin} label="Confirm PIN" maxLen={6} />
-                    {resetPinErr && <div style={{ color: '#E83E5C', fontSize: '0.73rem', fontWeight: 700, textAlign: 'center', marginTop: 10 }}>{resetPinErr}</div>}
-                    {confirmNewPin.length >= 4 && (
-                      <button
-                        onClick={handleSaveNewPin}
-                        style={{
-                          width: '100%', marginTop: 14, padding: '13px', borderRadius: 12,
-                          background: 'linear-gradient(135deg, #1A8A4A, #2DB36A)',
-                          color: '#fff', border: 'none', cursor: 'pointer',
-                          fontWeight: 800, fontSize: '0.85rem',
-                        }}
-                      >
-                        Save New PIN
-                      </button>
-                    )}
-                    <button
-                      onClick={() => { setResetPinStep(2); setConfirmNewPin(''); setResetPinErr(''); }}
-                      style={{
-                        width: '100%', marginTop: 10, padding: '8px',
-                        background: 'none', border: '1.5px dashed rgba(61,107,223,0.2)',
-                        borderRadius: 10, cursor: 'pointer',
-                        fontSize: '0.68rem', fontWeight: 600, color: '#9A9FB8',
-                        fontFamily: "'Plus Jakarta Sans', sans-serif",
-                      }}
-                    >
-                      ← Back
-                    </button>
-                  </div>
-                )}
-
-                {/* Success: PIN saved */}
-                {resetPinStep === 3 && resetPinMsg && (
-                  <div style={{ textAlign: 'center', padding: '16px 4px' }}>
-                    <div style={{ fontSize: '2rem', marginBottom: 12 }}>✅</div>
-                    <div style={{ fontSize: '0.85rem', fontWeight: 700, color: '#1A1D2E', marginBottom: 6 }}>PIN Updated!</div>
-                    <div style={{ fontSize: '0.75rem', color: '#5A5F7A', lineHeight: 1.5, marginBottom: 16 }}>
-                      {resetPinMsg}
-                    </div>
-                    <button
-                      onClick={() => {
-                        setShowAdmin(false);
-                        setResetPinStep(0); setResetPinMsg(''); setNewPin(''); setConfirmNewPin('');
-                        setEmail(''); setPassword('');
-                        onMasterAdmin();
-                      }}
-                      style={{
-                        width: '100%', padding: '13px', borderRadius: 12,
-                        background: 'linear-gradient(135deg, #1A2FA8, #3D6BDF)',
-                        color: '#fff', border: 'none', cursor: 'pointer',
-                        fontWeight: 800, fontSize: '0.85rem',
-                      }}
-                    >
-                      Continue to Admin
-                    </button>
-                  </div>
-                )}
-              </div>
-            )}
 
             {/* ── Legacy PIN login (fallback) ── */}
-            {loginMode === 'pin' && resetPinStep === 0 && (
+            {loginMode === 'pin' && (
               <div>
                 <div className={adminShake ? 'admin-shake' : ''}>
                   <PinKeypad value={adminPin} onChange={setAdminPin} label="Enter master PIN" maxLen={6} />
@@ -1190,6 +1173,22 @@ export function BusinessSelector({
 
       {/* ══ RESET PIN MODAL ══ */}
       {resetPinBiz && <ResetPinModal biz={resetPinBiz} onClose={() => setResetPinBiz(null)} onSubmit={onResetPin} />}
+
+      {/* ══ RESET MASTER PIN MODAL ══ */}
+      {showResetMasterPin && (
+        <ResetMasterPinModal
+          authRef={authRef}
+          authInst={authInst}
+          adminHashKey={ADMIN_HASH_KEY}
+          onClose={() => setShowResetMasterPin(false)}
+          onSuccess={(newHash) => {
+            setAdminHash(newHash);
+            setShowResetMasterPin(false);
+            setShowAdmin(false);
+            onMasterAdmin();
+          }}
+        />
+      )}
 
       {/* ══ BIZ SETTINGS MODAL ══ */}
       {settingsBiz && (
