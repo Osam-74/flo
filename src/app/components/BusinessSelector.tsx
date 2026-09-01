@@ -1092,20 +1092,6 @@ export function BusinessSelector({
                     >
                       Forgot password?
                     </button>
-                    <button
-                      onClick={() => setShowResetMasterPin(true)}
-                      style={{
-                        width: '100%', marginTop: 6, padding: '8px',
-                        background: 'none', border: 'none', cursor: 'pointer',
-                        fontSize: '0.72rem', fontWeight: 600, color: '#9A9FB8',
-                        fontFamily: "'Plus Jakarta Sans', sans-serif",
-                        transition: 'all 0.15s',
-                      }}
-                      onMouseEnter={e => { e.currentTarget.style.color = '#3D6BDF'; }}
-                      onMouseLeave={e => { e.currentTarget.style.color = '#9A9FB8'; }}
-                    >
-                      Reset PIN
-                    </button>
                   </>
                 ) : (
                   <div style={{ textAlign: 'center', padding: '16px 4px' }}>
@@ -1148,6 +1134,20 @@ export function BusinessSelector({
                 </div>
                 {adminErr && <div style={{ color: '#E83E5C', fontSize: '0.73rem', fontWeight: 700, textAlign: 'center', marginTop: 10 }}>{adminErr}</div>}
                 {checking && <div style={{ color: '#9A9FB8', fontSize: '0.72rem', textAlign: 'center', marginTop: 10 }}>Checking…</div>}
+                <button
+                      onClick={() => setShowResetMasterPin(true)}
+                      style={{
+                        width: '100%', marginTop: 10, padding: '8px',
+                        background: 'none', border: 'none', cursor: 'pointer',
+                        fontSize: '0.72rem', fontWeight: 600, color: '#9A9FB8',
+                        fontFamily: "'Plus Jakarta Sans', sans-serif",
+                        transition: 'all 0.15s',
+                      }}
+                      onMouseEnter={e => { e.currentTarget.style.color = '#3D6BDF'; }}
+                      onMouseLeave={e => { e.currentTarget.style.color = '#9A9FB8'; }}
+                    >
+                      Reset PIN
+                    </button>
                 <button
                   onClick={() => { setLoginMode('email'); setAdminPin(''); setAdminErr(''); }}
                   style={{
