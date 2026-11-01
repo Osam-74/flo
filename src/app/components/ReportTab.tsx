@@ -60,13 +60,13 @@ export function ReportTab({ businessId, businessName, txs, people, currency }: P
   const [showSummary, setShowSummary] = useState(false);
 
   // ── Prorated profit ────────────────────────────────────────────────────
-  // The owner enters how much feed the birds actually NEEDED (tons) and the
-  // cost per ton. Feed purchased in the period (detected from expenses) is
+  // The owner enters how much feed the birds actually NEEDED (tons). The price
+  // per ton is NOT typed: it is the weighted average of the feed purchases
+  // recorded in expenses (total feed cost / total tons bought). Feed purchased in the period (detected from expenses) is
   // swapped out for feed actually consumed, so surplus stock bought is not
   // treated as a cost of this period.
   const feedStoreKey = `prorated_feed_${businessId || 'default'}`;
   const [feedNeededTons, setFeedNeededTons] = useState('');
-  const [feedCostPerTon, setFeedCostPerTon] = useState('');
   const [proratedText, setProratedText]     = useState('');
   const [showProrated, setShowProrated]     = useState(false);
 
@@ -76,19 +76,17 @@ export function ReportTab({ businessId, businessName, txs, people, currency }: P
       if (raw) {
         const v = JSON.parse(raw);
         setFeedNeededTons(v.tons ?? '');
-        setFeedCostPerTon(v.cost ?? '');
       } else {
         setFeedNeededTons('');
-        setFeedCostPerTon('');
       }
     } catch { /* ignore corrupt storage */ }
     setShowProrated(false);
   }, [feedStoreKey]);
 
   React.useEffect(() => {
-    try { localStorage.setItem(feedStoreKey, JSON.stringify({ tons: feedNeededTons, cost: feedCostPerTon })); }
+    try { localStorage.setItem(feedStoreKey, JSON.stringify({ tons: feedNeededTons })); }
     catch { /* storage unavailable */ }
-  }, [feedStoreKey, feedNeededTons, feedCostPerTon]);
+  }, [feedStoreKey, feedNeededTons]);
 
   // Stores computed numbers for the summary narrative (set during generate())
   const [reportStats, setReportStats] = useState<{
@@ -109,6 +107,12 @@ export function ReportTab({ businessId, businessName, txs, people, currency }: P
     feedPurchased: number;       // money spent on feed purchases in the period
     feedPurchaseCount: number;   // how many feed purchase entries were found
     feedPurchasedTons: number;   // tons bought (only from entries that recorded tons)
+    avgPricePerTon: number;      // weighted average price of 1 ton (0 = unknown)
+    avgPriceSource: 'period' | 'history' | 'none';
+    avgPriceBasisTons: number;   // tons the average is based on
+    salaryCounted: number;       // salary regarded as expense (one payment per employee)
+    salaryExcluded: number;      // extra salary payments left out
+    salaryExcludedList: { name: string; amount: number; date: string }[];
   } | null>(null);
 
   function generate() {
@@ -156,6 +160,47 @@ export function ReportTab({ businessId, businessName, txs, people, currency }: P
     const feedPurchaseTxs   = expenseTxs.filter(isFeedPurchase);
     const feedPurchased     = feedPurchaseTxs.reduce((s, t) => s + (t.amount || 0), 0);
     const feedPurchasedTons = feedPurchaseTxs.reduce((s, t) => s + (t.feedTons || 0), 0);
+
+    // Average price of ONE ton = total cost / total tons, using only purchases
+    // that recorded tons (a purchase with no tons can't tell us a price).
+    // Falls back to all earlier purchases if the period has none with tons.
+    const avgFrom = (list: Transaction[]) => {
+      const withTons = list.filter(t => (t.feedTons || 0) > 0);
+      const tons = withTons.reduce((s, t) => s + (t.feedTons || 0), 0);
+      const cost = withTons.reduce((s, t) => s + (t.amount || 0), 0);
+      return { tons, price: tons > 0 ? cost / tons : 0 };
+    };
+    let avgPricePerTon = 0, avgPriceBasisTons = 0;
+    let avgPriceSource: 'period' | 'history' | 'none' = 'none';
+    const periodAvg = avgFrom(feedPurchaseTxs);
+    if (periodAvg.price > 0) {
+      avgPricePerTon = periodAvg.price; avgPriceBasisTons = periodAvg.tons; avgPriceSource = 'period';
+    } else {
+      const histAvg = avgFrom(txs.filter(t => (!to || t.date <= to) && isFeedPurchase(t) && !isFeedUsageEntry(t)));
+      if (histAvg.price > 0) {
+        avgPricePerTon = histAvg.price; avgPriceBasisTons = histAvg.tons; avgPriceSource = 'history';
+      }
+    }
+
+    // Salary rule for the prorated view: if the same employee was paid more
+    // than once in the period, only ONE payment counts as an expense (the
+    // largest, so a part-payment/advance never understates it).
+    const salaryByEmp = new Map<string, Transaction[]>();
+    for (const t of salaryTxs) {
+      const key = (t.employee || t.employeeName || t.desc || 'unknown').toString();
+      if (!salaryByEmp.has(key)) salaryByEmp.set(key, []);
+      salaryByEmp.get(key)!.push(t);
+    }
+    let salaryCounted = 0, salaryExcluded = 0;
+    const salaryExcludedList: { name: string; amount: number; date: string }[] = [];
+    salaryByEmp.forEach((list, key) => {
+      const sorted = [...list].sort((a, b) => (b.amount || 0) - (a.amount || 0));
+      salaryCounted += sorted[0].amount || 0;
+      for (const extra of sorted.slice(1)) {
+        salaryExcluded += extra.amount || 0;
+        salaryExcludedList.push({ name: extra.employeeName || key, amount: extra.amount || 0, date: extra.date });
+      }
+    });
     const hasSalary       = salaryTxs.length > 0;
 
     // Shop / Farm split
@@ -551,6 +596,12 @@ export function ReportTab({ businessId, businessName, txs, people, currency }: P
       feedPurchased,
       feedPurchaseCount: feedPurchaseTxs.length,
       feedPurchasedTons,
+      avgPricePerTon,
+      avgPriceSource,
+      avgPriceBasisTons,
+      salaryCounted,
+      salaryExcluded,
+      salaryExcludedList,
     });
     setProratedText('');
     setShowProrated(false);
@@ -676,52 +727,68 @@ export function ReportTab({ businessId, businessName, txs, people, currency }: P
   function generateProrated() {
     if (!reportStats) return;
     const tons = parseFloat(feedNeededTons);
-    const cost = parseFloat(feedCostPerTon);
     if (!(tons >= 0) || isNaN(tons)) { showToast('Enter the tons of feed the birds needed', 'error'); return; }
-    if (!(cost >= 0) || isNaN(cost)) { showToast('Enter the cost per ton of feed', 'error'); return; }
 
     const {
       fromDate, toDate, totalSales, totalOutstanding, totalExpenses, profit,
       feedPurchased, feedPurchaseCount, feedPurchasedTons,
+      avgPricePerTon, avgPriceSource, avgPriceBasisTons,
+      salaryExcluded, salaryExcludedList,
     } = reportStats;
 
-    const feedNeededCost   = tons * cost;
-    const otherExpenses    = totalExpenses - feedPurchased;
+    if (avgPricePerTon <= 0) {
+      showToast('No feed purchase with tons recorded, so the price per ton is unknown. Log feed purchases with tons.', 'error');
+      return;
+    }
+
+    const feedNeededCost = tons * avgPricePerTon;
+    // Extra salary payments are not regarded as expenses in the prorated view.
+    const recordedExpenses = totalExpenses - salaryExcluded;
+    const otherExpenses    = recordedExpenses - feedPurchased;
     const proratedExpenses = otherExpenses + feedNeededCost;
     const proratedProfit   = totalSales - proratedExpenses;
-    const difference       = proratedProfit - profit; // = feedPurchased - feedNeededCost
 
     const range = fromDate && toDate ? `${fmtDate(fromDate)} to ${fmtDate(toDate)}` : 'this period';
+    const T = (n: number) => `${+n.toFixed(2)} ton${n !== 1 ? 's' : ''}`;
     const lines: string[] = [];
     lines.push(`Prorated profit for ${esc(businessName || 'the business')}, ${range}.`);
-    lines.push('Only the feed the birds actually needed is counted as a cost, not everything that was bought.');
+    lines.push('Only the feed the birds actually needed is counted as a cost, and only one salary per employee.');
     lines.push('');
     lines.push(`• Total sales and dispatch: ${currency} ${fmtN(totalSales)}`);
-    if (totalOutstanding > 0.005) lines.push(`  (includes only cash collected; ${currency} ${fmtN(totalOutstanding)} still outstanding)`);
+    if (totalOutstanding > 0.005) lines.push(`  (cash collected only; ${currency} ${fmtN(totalOutstanding)} still outstanding)`);
     lines.push(`• Total expenses (as recorded): ${currency} ${fmtN(totalExpenses)}`);
+    if (salaryExcluded > 0.005) {
+      lines.push(`• Less extra salary payments: ${currency} ${fmtN(salaryExcluded)}`);
+      for (const e of salaryExcludedList) {
+        lines.push(`  → ${e.name}, ${fmtDate(e.date)}: ${currency} ${fmtN(e.amount)}`);
+      }
+    }
     if (feedPurchaseCount > 0) {
-      const tonsBit = feedPurchasedTons > 0 ? `${feedPurchasedTons} ton${feedPurchasedTons !== 1 ? 's' : ''}, ` : '';
-      lines.push(`• Feed purchased: ${currency} ${fmtN(feedPurchased)} (${tonsBit}${feedPurchaseCount} purchase${feedPurchaseCount !== 1 ? 's' : ''} found in expenses)`);
+      const tonsBit = feedPurchasedTons > 0 ? `${T(feedPurchasedTons)}, ` : '';
+      lines.push(`• Less feed purchased: ${currency} ${fmtN(feedPurchased)} (${tonsBit}${feedPurchaseCount} purchase${feedPurchaseCount !== 1 ? 's' : ''} found in expenses)`);
     } else {
       lines.push(`• Feed purchased: none found in expenses for this period`);
     }
-    lines.push(`• Other expenses (excluding feed): ${currency} ${fmtN(otherExpenses)}`);
-    lines.push(`• Feed actually needed: ${tons} ton${tons !== 1 ? 's' : ''} × ${currency} ${fmtN(cost)} = ${currency} ${fmtN(feedNeededCost)}`);
+    lines.push(`• Other expenses: ${currency} ${fmtN(otherExpenses)}`);
+    const srcNote = avgPriceSource === 'history' ? ', from earlier purchases' : '';
+    lines.push(`• Average price of 1 ton: ${currency} ${fmtN(avgPricePerTon)} (based on ${T(avgPriceBasisTons)} bought${srcNote})`);
+    lines.push(`• Feed actually needed: ${T(tons)} × ${currency} ${fmtN(avgPricePerTon)} = ${currency} ${fmtN(feedNeededCost)}`);
     lines.push(`• Prorated expenses: ${currency} ${fmtN(proratedExpenses)}`);
     lines.push('');
     const word = proratedProfit >= 0 ? 'profit' : 'loss';
     lines.push(`Prorated ${word}: ${currency} ${fmtN(Math.abs(proratedProfit))}`);
-    lines.push(`Actual ${profit >= 0 ? 'profit' : 'loss'} (all purchases counted): ${currency} ${fmtN(Math.abs(profit))}`);
-    if (Math.abs(difference) > 0.005) {
-      if (difference > 0) {
-        lines.push(`Feed bought beyond what was needed: ${currency} ${fmtN(difference)} (stock carried forward, not lost)`);
+    lines.push(`Actual ${profit >= 0 ? 'profit' : 'loss'} (everything counted): ${currency} ${fmtN(Math.abs(profit))}`);
+    const feedDiff = feedPurchased - feedNeededCost;
+    if (Math.abs(feedDiff) > 0.005) {
+      if (feedDiff > 0) {
+        lines.push(`Feed bought beyond what was needed: ${currency} ${fmtN(feedDiff)} (stock carried forward, not lost)`);
       } else {
-        lines.push(`Feed needed exceeds feed bought by ${currency} ${fmtN(Math.abs(difference))} (stock drawn down from earlier purchases)`);
+        lines.push(`Feed needed exceeds feed bought by ${currency} ${fmtN(Math.abs(feedDiff))} (stock drawn down from earlier purchases)`);
       }
     }
-    if (feedPurchaseCount === 0 && tons > 0) {
+    if (feedPurchaseCount > 0 && feedPurchasedTons <= 0) {
       lines.push('');
-      lines.push('Note: no feed purchase was found in this period, so the needed feed is added on top of recorded expenses.');
+      lines.push('Note: the feed purchases in this period have no tons recorded.');
     }
     setProratedText(lines.join('\n'));
     setShowProrated(true);
@@ -807,11 +874,17 @@ export function ReportTab({ businessId, businessName, txs, people, currency }: P
               <input style={inp} type="number" inputMode="decimal" min="0" step="any" placeholder="e.g. 3"
                 value={feedNeededTons} onChange={e => setFeedNeededTons(e.target.value)} />
             </Field>
-            <Field label={`Cost per ton (${safeCurrency(currency)})`}>
-              <input style={inp} type="number" inputMode="decimal" min="0" step="any" placeholder="e.g. 450000"
-                value={feedCostPerTon} onChange={e => setFeedCostPerTon(e.target.value)} />
+            <Field label={`Avg price / ton (${safeCurrency(currency)})`}>
+              <div style={{ ...inp, background: '#FFFBEB', borderColor: 'rgba(180,83,9,0.25)', color: '#92400E', fontWeight: 700, minHeight: 41, display: 'flex', alignItems: 'center' }}>
+                {!generated ? 'Auto' : reportStats && reportStats.avgPricePerTon > 0 ? fmtN(reportStats.avgPricePerTon) : 'No tons logged'}
+              </div>
             </Field>
           </div>
+          {generated && reportStats && reportStats.avgPricePerTon > 0 && (
+            <div style={{ fontSize: '0.64rem', color: '#B45309', marginBottom: 10 }}>
+              Worked out from {+reportStats.avgPriceBasisTons.toFixed(2)} ton{reportStats.avgPriceBasisTons !== 1 ? 's' : ''} of feed purchases{reportStats.avgPriceSource === 'history' ? ' (earlier than this period)' : ''}.
+            </div>
+          )}
           <button
             onClick={generateProrated}
             disabled={!generated}
