@@ -4,6 +4,7 @@ import { X } from 'lucide-react';
 import { showToast } from './Modals';
 import type { Transaction, Person, TxType } from '../types';
 import { stripUndefined } from '../utils';
+import { MissingDayPicker } from './MissingDayPicker';
 
 interface Props {
   open: boolean;
@@ -13,6 +14,8 @@ interface Props {
   onSave: (tx: Omit<Transaction, 'id' | 'ts'> & { id: string; ts: number }) => void;
   initialType?: TxType;
   isReadOnly?: boolean;
+  /** Existing transactions — used to highlight days with no egg / feed log */
+  txs?: Transaction[];
 }
 
 const nonOwners = (people: Person[]) => people.filter(p => !p.role?.toLowerCase().includes('owner'));
@@ -39,8 +42,10 @@ const TYPE_OPTS: { id: TxType; emoji: string; label: string; color: string }[] =
 
 const CATS = ['', 'Feed', 'Feed & Supplies', 'Transport', 'Utilities', 'Equipment', 'Medical / Vet', 'Labour', 'Sales Revenue', 'Loan / Advance', 'Salary', 'Tray Stock', 'Other'];
 
-export function AddEntrySheet({ open, onClose, people, currency, onSave, initialType = 'income', isReadOnly = false }: Props) {
+export function AddEntrySheet({ open, onClose, people, currency, onSave, initialType = 'income', isReadOnly = false, txs = [] }: Props) {
   const [type, setType] = useState<TxType>(initialType);
+  const eggLoggedDates  = React.useMemo(() => [...new Set(txs.filter(t => t.type === 'egg-collection').map(t => t.date))], [txs]);
+  const feedLoggedDates = React.useMemo(() => [...new Set(txs.filter(t => t.type === 'feed-usage').map(t => t.date))], [txs]);
   const [amount, setAmount]     = useState('');
   const [person, setPerson]     = useState('');
   const [date, setDate]         = useState(today());
@@ -711,7 +716,7 @@ export function AddEntrySheet({ open, onClose, people, currency, onSave, initial
                 </Row>
                 <Row>
                   <Field label="Date *">
-                    <input style={inp} type="date" value={date} max={today()} onChange={e => setDate(e.target.value)} />
+                    <MissingDayPicker value={date} onChange={setDate} loggedDates={eggLoggedDates} accent="#D97706" label="egg log" />
                   </Field>
                 </Row>
                 <Row>
@@ -738,13 +743,7 @@ export function AddEntrySheet({ open, onClose, people, currency, onSave, initial
               <div style={card}>
                 <div style={{ marginBottom: 14 }}>
                   <Field label="Date *">
-                    <input
-                      style={{ ...inp, fontSize: '0.95rem' }}
-                      type="date"
-                      value={fuDate}
-                      max={today()}
-                      onChange={e => setFuDate(e.target.value)}
-                    />
+                    <MissingDayPicker value={fuDate} onChange={setFuDate} loggedDates={feedLoggedDates} accent="#B45309" label="feed log" />
                   </Field>
                 </div>
                 <div style={{ marginBottom: 14 }}>

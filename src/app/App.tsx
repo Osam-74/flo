@@ -976,6 +976,7 @@ export default function App() {
           people={people}
           currency={currency}
           initialType={addInitType}
+          txs={txs}
           onSave={saveTx}
           isReadOnly={isReadOnly}
         />
