@@ -8,6 +8,7 @@ import { reportToHtml, reportPreviewStyles } from '../pdf/reportToHtml';
 import { downloadReportPdf, safeCurrency } from '../pdf/renderReportPdf';
 
 interface Props {
+  businessId?: string;
   businessName: string;
   txs: Transaction[];
   people: Person[];
@@ -45,7 +46,7 @@ const printStyles = reportPreviewStyles;
 
 // ── ReportTab component ───────────────────────────────────────────────────────
 
-export function ReportTab({ businessName, txs, people, currency }: Props) {
+export function ReportTab({ businessId, businessName, txs, people, currency }: Props) {
   const today = new Date().toISOString().split('T')[0];
   const [from, setFrom]       = useState(today.slice(0, 7) + '-01');
   const [to, setTo]           = useState(today);
@@ -57,6 +58,37 @@ export function ReportTab({ businessName, txs, people, currency }: Props) {
   const [downloading, setDownloading] = useState(false);
   const [summaryText, setSummaryText] = useState('');
   const [showSummary, setShowSummary] = useState(false);
+
+  // ── Prorated profit ────────────────────────────────────────────────────
+  // The owner enters how much feed the birds actually NEEDED (tons) and the
+  // cost per ton. Feed purchased in the period (detected from expenses) is
+  // swapped out for feed actually consumed, so surplus stock bought is not
+  // treated as a cost of this period.
+  const feedStoreKey = `prorated_feed_${businessId || 'default'}`;
+  const [feedNeededTons, setFeedNeededTons] = useState('');
+  const [feedCostPerTon, setFeedCostPerTon] = useState('');
+  const [proratedText, setProratedText]     = useState('');
+  const [showProrated, setShowProrated]     = useState(false);
+
+  React.useEffect(() => {
+    try {
+      const raw = localStorage.getItem(feedStoreKey);
+      if (raw) {
+        const v = JSON.parse(raw);
+        setFeedNeededTons(v.tons ?? '');
+        setFeedCostPerTon(v.cost ?? '');
+      } else {
+        setFeedNeededTons('');
+        setFeedCostPerTon('');
+      }
+    } catch { /* ignore corrupt storage */ }
+    setShowProrated(false);
+  }, [feedStoreKey]);
+
+  React.useEffect(() => {
+    try { localStorage.setItem(feedStoreKey, JSON.stringify({ tons: feedNeededTons, cost: feedCostPerTon })); }
+    catch { /* storage unavailable */ }
+  }, [feedStoreKey, feedNeededTons, feedCostPerTon]);
 
   // Stores computed numbers for the summary narrative (set during generate())
   const [reportStats, setReportStats] = useState<{
@@ -74,6 +106,9 @@ export function ReportTab({ businessName, txs, people, currency }: Props) {
     memberBalances: { name: string; balance: number }[];
     costPerEgg: number;
     costPerCrate: number;
+    feedPurchased: number;       // money spent on feed purchases in the period
+    feedPurchaseCount: number;   // how many feed purchase entries were found
+    feedPurchasedTons: number;   // tons bought (only from entries that recorded tons)
   } | null>(null);
 
   function generate() {
@@ -107,6 +142,20 @@ export function ReportTab({ businessName, txs, people, currency }: Props) {
 
     const totalExpenses   = expenseTxs.reduce((s, t) => s + (t.amount || 0), 0);
     const totalSalary     = salaryTxs.reduce((s, t) => s + (t.amount || 0), 0);
+
+    // Feed purchases: expense entries categorised 'Feed', or whose description
+    // clearly says feed (but never the 'Feed & Supplies' catch-all, which mixes
+    // non-feed items). Usage logs were already filtered out above.
+    const isFeedPurchase = (t: Transaction) => {
+      if (t.type !== 'expense') return false;
+      const cat = (t.cat || '').trim().toLowerCase();
+      if (cat === 'feed') return true;
+      if (cat === 'feed & supplies') return false;
+      return !cat && /\bfeeds?\b/i.test(t.desc || '');
+    };
+    const feedPurchaseTxs   = expenseTxs.filter(isFeedPurchase);
+    const feedPurchased     = feedPurchaseTxs.reduce((s, t) => s + (t.amount || 0), 0);
+    const feedPurchasedTons = feedPurchaseTxs.reduce((s, t) => s + (t.feedTons || 0), 0);
     const hasSalary       = salaryTxs.length > 0;
 
     // Shop / Farm split
@@ -499,7 +548,12 @@ export function ReportTab({ businessName, txs, people, currency }: Props) {
       memberBalances,
       costPerEgg,
       costPerCrate,
+      feedPurchased,
+      feedPurchaseCount: feedPurchaseTxs.length,
+      feedPurchasedTons,
     });
+    setProratedText('');
+    setShowProrated(false);
     showToast('Report ready', 'success');
     setTimeout(() => document.getElementById('report-preview')?.scrollIntoView({ behavior: 'smooth' }), 100);
   }
@@ -619,6 +673,61 @@ export function ReportTab({ businessName, txs, people, currency }: Props) {
     setShowSummary(true);
   }
 
+  function generateProrated() {
+    if (!reportStats) return;
+    const tons = parseFloat(feedNeededTons);
+    const cost = parseFloat(feedCostPerTon);
+    if (!(tons >= 0) || isNaN(tons)) { showToast('Enter the tons of feed the birds needed', 'error'); return; }
+    if (!(cost >= 0) || isNaN(cost)) { showToast('Enter the cost per ton of feed', 'error'); return; }
+
+    const {
+      fromDate, toDate, totalSales, totalOutstanding, totalExpenses, profit,
+      feedPurchased, feedPurchaseCount, feedPurchasedTons,
+    } = reportStats;
+
+    const feedNeededCost   = tons * cost;
+    const otherExpenses    = totalExpenses - feedPurchased;
+    const proratedExpenses = otherExpenses + feedNeededCost;
+    const proratedProfit   = totalSales - proratedExpenses;
+    const difference       = proratedProfit - profit; // = feedPurchased - feedNeededCost
+
+    const range = fromDate && toDate ? `${fmtDate(fromDate)} to ${fmtDate(toDate)}` : 'this period';
+    const lines: string[] = [];
+    lines.push(`Prorated profit for ${esc(businessName || 'the business')}, ${range}.`);
+    lines.push('Only the feed the birds actually needed is counted as a cost, not everything that was bought.');
+    lines.push('');
+    lines.push(`• Total sales and dispatch: ${currency} ${fmtN(totalSales)}`);
+    if (totalOutstanding > 0.005) lines.push(`  (includes only cash collected; ${currency} ${fmtN(totalOutstanding)} still outstanding)`);
+    lines.push(`• Total expenses (as recorded): ${currency} ${fmtN(totalExpenses)}`);
+    if (feedPurchaseCount > 0) {
+      const tonsBit = feedPurchasedTons > 0 ? `${feedPurchasedTons} ton${feedPurchasedTons !== 1 ? 's' : ''}, ` : '';
+      lines.push(`• Feed purchased: ${currency} ${fmtN(feedPurchased)} (${tonsBit}${feedPurchaseCount} purchase${feedPurchaseCount !== 1 ? 's' : ''} found in expenses)`);
+    } else {
+      lines.push(`• Feed purchased: none found in expenses for this period`);
+    }
+    lines.push(`• Other expenses (excluding feed): ${currency} ${fmtN(otherExpenses)}`);
+    lines.push(`• Feed actually needed: ${tons} ton${tons !== 1 ? 's' : ''} × ${currency} ${fmtN(cost)} = ${currency} ${fmtN(feedNeededCost)}`);
+    lines.push(`• Prorated expenses: ${currency} ${fmtN(proratedExpenses)}`);
+    lines.push('');
+    const word = proratedProfit >= 0 ? 'profit' : 'loss';
+    lines.push(`Prorated ${word}: ${currency} ${fmtN(Math.abs(proratedProfit))}`);
+    lines.push(`Actual ${profit >= 0 ? 'profit' : 'loss'} (all purchases counted): ${currency} ${fmtN(Math.abs(profit))}`);
+    if (Math.abs(difference) > 0.005) {
+      if (difference > 0) {
+        lines.push(`Feed bought beyond what was needed: ${currency} ${fmtN(difference)} (stock carried forward, not lost)`);
+      } else {
+        lines.push(`Feed needed exceeds feed bought by ${currency} ${fmtN(Math.abs(difference))} (stock drawn down from earlier purchases)`);
+      }
+    }
+    if (feedPurchaseCount === 0 && tons > 0) {
+      lines.push('');
+      lines.push('Note: no feed purchase was found in this period, so the needed feed is added on top of recorded expenses.');
+    }
+    setProratedText(lines.join('\n'));
+    setShowProrated(true);
+    setTimeout(() => document.getElementById('prorated-card')?.scrollIntoView({ behavior: 'smooth', block: 'nearest' }), 100);
+  }
+
   async function downloadPDF() {
     if (!reportDoc) return;
     setDownloading(true);
@@ -687,6 +796,33 @@ export function ReportTab({ businessName, txs, people, currency }: Props) {
             <Sparkles size={15} /> Summary
           </button>
         </div>
+
+        {/* Prorated profit — feed actually consumed vs feed bought */}
+        <div style={{ marginTop: 14, paddingTop: 14, borderTop: '1.5px dashed rgba(180,83,9,0.25)' }}>
+          <div style={{ fontSize: '0.62rem', fontWeight: 800, letterSpacing: '0.1em', textTransform: 'uppercase', color: '#B45309', marginBottom: 8 }}>
+            🌾 Prorated Profit (feed actually needed)
+          </div>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 10 }}>
+            <Field label="Feed needed (tons)">
+              <input style={inp} type="number" inputMode="decimal" min="0" step="any" placeholder="e.g. 3"
+                value={feedNeededTons} onChange={e => setFeedNeededTons(e.target.value)} />
+            </Field>
+            <Field label={`Cost per ton (${safeCurrency(currency)})`}>
+              <input style={inp} type="number" inputMode="decimal" min="0" step="any" placeholder="e.g. 450000"
+                value={feedCostPerTon} onChange={e => setFeedCostPerTon(e.target.value)} />
+            </Field>
+          </div>
+          <button
+            onClick={generateProrated}
+            disabled={!generated}
+            style={{ ...primaryBtn, width: '100%', background: generated ? 'linear-gradient(135deg, #B45309, #D97706)' : '#ccc', boxShadow: generated ? '0 4px 16px rgba(180,83,9,0.30)' : 'none', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, cursor: generated ? 'pointer' : 'not-allowed' }}
+          >
+            <Sparkles size={15} /> Prorated Profit
+          </button>
+          {!generated && (
+            <div style={{ fontSize: '0.64rem', color: '#9A9FB8', marginTop: 6 }}>Generate the report first, then tap Prorated Profit.</div>
+          )}
+        </div>
       </div>
 
       {/* Smart Summary Card */}
@@ -717,6 +853,37 @@ export function ReportTab({ businessName, txs, people, currency }: Props) {
           </div>
           <div style={{ fontSize: '0.88rem', lineHeight: 1.65, color: '#14532d', margin: 0, fontFamily: "'Plus Jakarta Sans', sans-serif", whiteSpace: 'pre-line' }}>
             {summaryText}
+          </div>
+        </div>
+      )}
+
+      {/* Prorated Profit Card */}
+      {showProrated && proratedText && (
+        <div id="prorated-card" style={{
+          background: 'linear-gradient(135deg, #FFFBEB, #FEF3C7)',
+          border: '1.5px solid #FCD34D',
+          borderRadius: 16,
+          padding: '16px 18px',
+          marginBottom: 14,
+        }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
+            <span style={{ fontSize: '1rem' }}>🌾</span>
+            <span style={{ fontSize: '0.72rem', fontWeight: 800, letterSpacing: '0.1em', textTransform: 'uppercase', color: '#B45309' }}>Prorated Profit</span>
+            <button
+              onClick={() => { navigator.clipboard?.writeText(proratedText).then(() => showToast('Prorated summary copied', 'success')).catch(() => showToast('Copy failed', 'error')); }}
+              style={{ marginLeft: 'auto', background: 'rgba(180,83,9,0.1)', border: '1px solid rgba(180,83,9,0.3)', borderRadius: 7, cursor: 'pointer', padding: 5, display: 'flex', alignItems: 'center', color: '#B45309' }}
+              aria-label="Copy prorated summary"
+            >
+              <Copy size={14} />
+            </button>
+            <button
+              onClick={() => setShowProrated(false)}
+              style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#B45309', fontSize: '1rem', lineHeight: 1, padding: '4px 2px', display: 'flex', alignItems: 'center' }}
+              aria-label="Dismiss"
+            >✕</button>
+          </div>
+          <div style={{ fontSize: '0.88rem', lineHeight: 1.65, color: '#78350F', margin: 0, fontFamily: "'Plus Jakarta Sans', sans-serif", whiteSpace: 'pre-line' }}>
+            {proratedText}
           </div>
         </div>
       )}

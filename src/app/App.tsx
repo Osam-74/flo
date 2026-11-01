@@ -946,7 +946,7 @@ export default function App() {
             />
           )}
           {activeTab === 'report' && (
-            <ReportTab txs={txs} people={people} currency={currency} businessName={selectedBiz?.name ?? ''} />
+            <ReportTab businessId={selectedBiz?.id} txs={txs} people={people} currency={currency} businessName={selectedBiz?.name ?? ''} />
           )}
           {activeTab === 'settings' && (
             <SettingsTab
