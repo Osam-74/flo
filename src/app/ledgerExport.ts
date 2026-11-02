@@ -206,7 +206,7 @@ export async function exportLedgerExcel(input: LedgerExportInput): Promise<void>
   const CUR = safeCurrency(input.currency);
 
   const head = (value: string, align: 'left' | 'right' = 'left') => ({
-    value, fontWeight: 'bold' as const, color: '#FFFFFF', backgroundColor: '#1A2FA8', align,
+    value, fontWeight: 'bold' as const, textColor: '#FFFFFF', backgroundColor: '#1A2FA8', align,
   });
   const money = (n: number) => (n > 0 ? { value: n, type: Number, format: '#,##0.00' } : { value: '' as any });
   const bold = (value: any, extra: any = {}) => ({ value, fontWeight: 'bold' as const, ...extra });

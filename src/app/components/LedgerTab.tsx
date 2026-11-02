@@ -130,7 +130,7 @@ export function LedgerTab({
   const rangeText = from || to
     ? `${from ? fmtDate(from) : 'Start'} - ${to ? fmtDate(to) : fmtDate(todayStr())}`
     : undefined;
-  const filterLabel = [typeLabel, personLabel, SORT_OPTIONS.find(o => o.id === sortKey)?.label, query.trim() ? `"${query.trim()}"` : '']
+  const filterLabel = [typeLabel, personLabel, query.trim() ? `"${query.trim()}"` : '']
     .filter(Boolean).join(' · ');
 
   async function runExport(kind: 'pdf' | 'xlsx') {
