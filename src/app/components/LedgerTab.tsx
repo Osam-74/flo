@@ -5,7 +5,7 @@ import type { Transaction, Person, TxType } from '../types';
 import { fmtDate, fmtN } from '../utils';
 import { exportLedgerPdf, exportLedgerExcel, buildLedgerRows, totals, TYPE_LABEL } from '../ledgerExport';
 import { showToast } from './Modals';
-import { reconcile } from '../reconcile';
+import { reconcile, accountBalances } from '../reconcile';
 
 interface Props {
   businessName?: string;
@@ -70,6 +70,16 @@ export function LedgerTab({
   const [detailTx, setDetailTx]         = useState<Transaction | null>(null);
   const [exporting, setExporting]       = useState<'pdf' | 'xlsx' | null>(null);
   const [showRecon, setShowRecon]       = useState(false);
+  // Cash check: what is really in each account (typed by the user), kept on this device only.
+  const cashKey = `cash_check_${businessName || 'default'}`;
+  const [realCash, setRealCash] = useState<Record<string, string>>(() => {
+    try { return JSON.parse(localStorage.getItem(cashKey) || '{}'); } catch { return {}; }
+  });
+  const setReal = (id: string, v: string) => setRealCash(prev => {
+    const next = { ...prev, [id]: v };
+    try { localStorage.setItem(cashKey, JSON.stringify(next)); } catch { /* storage unavailable */ }
+    return next;
+  });
 
   // ── Filter + sort ─────────────────────────────────────────────────────────
   const filtered = useMemo(() => {
@@ -116,6 +126,24 @@ export function LedgerTab({
   const rows = useMemo(() => buildLedgerRows(filtered, people, true), [filtered, people]);
   const sums = useMemo(() => totals(rows), [rows]);
   const recon = useMemo(() => reconcile(filtered, txs, people), [filtered, txs, people]);
+  const balances = useMemo(() => accountBalances(txs, people), [txs, people]);
+  // Per account: books vs the real amount the user typed. Only accounts with a real amount are compared.
+  const cashRows = useMemo(() => balances.map(b => {
+    const raw = realCash[b.id];
+    const real = raw !== undefined && raw.trim() !== '' && !isNaN(parseFloat(raw)) ? parseFloat(raw) : null;
+    const gap = real === null ? null : Math.round((b.balance - real) * 100) / 100; // + = books say more than you have
+    // Entries that could explain this gap: money in/out through this account of exactly that size.
+    const sizes = gap === null || Math.abs(gap) < 0.005 ? [] : txs.filter(t => {
+      const g = Math.abs(gap);
+      const involves = t.person === b.id || t.transferFrom === b.id || t.transferTo === b.id ||
+        t.creditReceiver === b.id || t.ownerReceiver === b.id || t.ownerSender === b.id ||
+        t.frSender === b.id || t.salaryPaidBy === b.id || (t as any).receiver === b.id ||
+        (t.payments || []).some(p => p.receiver === b.id);
+      const amt = t.type === 'credit' ? (t.creditPaid || 0) : (t.amount || 0);
+      return involves && Math.abs(amt - g) < 0.005 && ['income', 'credit', 'expense', 'salary', 'transfer', 'owner-fund', 'fund-return'].includes(t.type);
+    }).sort((x, y) => ((y.date || '') < (x.date || '') ? -1 : 1));
+    return { ...b, real, gap, sizes };
+  }), [balances, realCash, txs]);
   const txById = useMemo(() => new Map(filtered.map(t => [t.id, t])), [filtered]);
 
   const filtersActive =
@@ -243,6 +271,44 @@ export function LedgerTab({
             <div className="lg-rc-row"><span>Ledger net (as shown)</span><b>{fmtN(recon.ledgerNet)}</b></div>
             <div className="lg-rc-row"><span>Dashboard total cash available</span><b>{fmtN(recon.dashboardCash)}</b></div>
             <div className="lg-rc-row lg-rc-total"><span>Difference</span><b style={{ color: Math.abs(recon.difference) < 0.01 ? '#15803D' : '#C81E43' }}>{recon.difference < 0 ? '-' : ''}{fmtN(recon.difference)}</b></div>
+
+            <div className="lg-rc-h">Cash check: what is really in each account?</div>
+            <div className="lg-rc-item" style={{ background: '#fff' }}>
+              Type the cash you actually hold for each account. The account that is off shows how much, and which entries of exactly that size could be the cause.
+              {cashRows.map(r => (
+                <div key={r.id} style={{ marginTop: 9 }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <b>{r.name}</b>
+                      <div className="lg-rc-sub">Books say {currency} {r.balance < 0 ? '-' : ''}{fmtN(r.balance)}</div>
+                    </div>
+                    <input
+                      className="lg-inp" style={{ width: 120, textAlign: 'right' }} type="number" inputMode="decimal"
+                      placeholder="Real cash" value={realCash[r.id] ?? ''} onChange={e => setReal(r.id, e.target.value)}
+                    />
+                  </div>
+                  {r.gap !== null && (
+                    <div className="lg-rc-sub" style={{ marginTop: 4, color: Math.abs(r.gap) < 0.005 ? '#15803D' : '#C81E43', fontWeight: 700 }}>
+                      {Math.abs(r.gap) < 0.005
+                        ? 'Matches.'
+                        : r.gap > 0
+                          ? `Books show ${currency} ${fmtN(r.gap)} MORE than you have. Money is recorded as received, or an expense/payout is missing.`
+                          : `Books show ${currency} ${fmtN(r.gap)} LESS than you have. Money is missing from the records.`}
+                    </div>
+                  )}
+                  {r.sizes.length > 0 && (
+                    <div style={{ marginTop: 4 }}>
+                      <div className="lg-rc-sub">Entries of exactly {currency} {fmtN(r.gap as number)} on this account (tap to open):</div>
+                      {r.sizes.map((t, i) => (
+                        <div key={t.id + i} className="lg-rc-sus" onClick={() => setDetailTx(t)}>
+                          <b>{fmtDate(t.date)}</b> · {t.desc || t.type}
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
 
             <div className="lg-rc-h">Where the difference comes from</div>
             {Math.abs(recon.outsideRange) > 0.005 && (
