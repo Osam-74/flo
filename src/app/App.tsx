@@ -919,6 +919,7 @@ export default function App() {
           )}
           {activeTab === 'ledger' && (
             <LedgerTab
+              businessName={selectedBiz?.name ?? ''}
               txs={isViewer ? viewerTxs : txs}
               people={isViewer ? viewerPeople : people}
               currency={currency}

@@ -3,8 +3,12 @@ import { TxDetailModal } from './TxDetailModal';
 import type { Transaction, Person, TxType } from '../types';
 import { fmtDate, pColor } from '../utils';
 import { TxItem } from './TxItem';
+import { FileSpreadsheet, FileText } from 'lucide-react';
+import { exportLedgerPdf, exportLedgerExcel, TYPE_LABEL } from '../ledgerExport';
+import { showToast } from './Modals';
 
 interface Props {
+  businessName?: string;
   txs: Transaction[];
   people: Person[];
   currency: string;
@@ -30,10 +34,11 @@ const TYPE_FILTERS: { id: FilterType; label: string }[] = [
   { id: 'fund-return', label: 'Fund Return' },
 ];
 
-export function LedgerTab({ txs, people, currency, initialPersonFilter = 'all', isReadOnly, viewerId, onEdit, onDelete }: Props) {
+export function LedgerTab({ businessName = '', txs, people, currency, initialPersonFilter = 'all', isReadOnly, viewerId, onEdit, onDelete }: Props) {
   const [typeFilter, setTypeFilter]     = useState<FilterType>('all');
   const [personFilter, setPersonFilter] = useState(initialPersonFilter);
   const [detailTx, setDetailTx] = useState<import('../types').Transaction | null>(null);
+  const [exporting, setExporting] = useState<'pdf' | 'xlsx' | null>(null);
 
   let filtered = [...txs];
   if (typeFilter !== 'all') filtered = filtered.filter(t => t.type === typeFilter);
@@ -48,6 +53,34 @@ export function LedgerTab({ txs, people, currency, initialPersonFilter = 'all', 
   filtered.sort((a, b) => {
     if (a.date && b.date && a.date !== b.date) return a.date < b.date ? 1 : -1;
     return (b.ts || 0) - (a.ts || 0);
+  });
+
+  const filterLabel =
+    (typeFilter === 'all' ? 'All types' : (TYPE_LABEL[typeFilter] || typeFilter)) + ' · ' +
+    (personFilter === 'all' ? 'All people' : (people.find(p => p.id === personFilter)?.name || 'All people'));
+
+  async function runExport(kind: 'pdf' | 'xlsx') {
+    if (filtered.length === 0) { showToast('Nothing to export for this filter', 'error'); return; }
+    setExporting(kind);
+    try {
+      const input = { txs: filtered, people, businessName, currency, filterLabel };
+      if (kind === 'pdf') await exportLedgerPdf(input); else await exportLedgerExcel(input);
+      showToast(kind === 'pdf' ? 'Ledger PDF downloaded' : 'Ledger Excel downloaded', 'success');
+    } catch (err) {
+      console.error('Ledger export failed', err);
+      showToast('Export failed - try again', 'error');
+    } finally {
+      setExporting(null);
+    }
+  }
+
+  const exportBtn = (kind: 'pdf' | 'xlsx'): React.CSSProperties => ({
+    flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
+    padding: '9px 8px', borderRadius: 11, border: 'none', fontSize: '0.68rem', fontWeight: 700,
+    letterSpacing: '0.05em', textTransform: 'uppercase', color: '#fff', fontFamily: 'inherit',
+    cursor: exporting || filtered.length === 0 ? 'not-allowed' : 'pointer',
+    opacity: filtered.length === 0 ? 0.5 : exporting && exporting !== kind ? 0.6 : 1,
+    background: kind === 'pdf' ? 'linear-gradient(135deg, #2a4a9a, #3d6bdf)' : 'linear-gradient(135deg, #16803c, #22c55e)',
   });
 
   const groups: Record<string, Transaction[]> = {};
@@ -122,6 +155,16 @@ export function LedgerTab({ txs, people, currency, initialPersonFilter = 'all', 
         })}
       </div>
       )}
+
+      {/* Export — exports exactly what the filters above are showing */}
+      <div style={{ display: 'flex', gap: 8, marginBottom: 10 }}>
+        <button onClick={() => runExport('pdf')} disabled={!!exporting || filtered.length === 0} style={exportBtn('pdf')}>
+          <FileText size={14} /> {exporting === 'pdf' ? 'Preparing…' : 'Export PDF'}
+        </button>
+        <button onClick={() => runExport('xlsx')} disabled={!!exporting || filtered.length === 0} style={exportBtn('xlsx')}>
+          <FileSpreadsheet size={14} /> {exporting === 'xlsx' ? 'Preparing…' : 'Export Excel'}
+        </button>
+      </div>
 
       {filtered.length === 0 ? (
         <div style={{ textAlign: 'center', padding: '48px 20px', fontSize: '0.78rem', color: '#9A9FB8', lineHeight: 1.8 }}>
