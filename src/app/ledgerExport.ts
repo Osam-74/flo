@@ -18,6 +18,8 @@ export const TYPE_LABEL: Record<string, string> = {
 };
 
 export interface LedgerRow {
+  id: string;          // transaction id, so a row can be traced back to its entry
+  sortKey: string;     // transaction type key (for styling)
   date: string;        // YYYY-MM-DD
   type: string;        // human label
   description: string;
@@ -28,6 +30,10 @@ export interface LedgerRow {
 }
 
 export interface LedgerExportInput {
+  /** Keep `txs` in the order given (the on-screen sort) instead of oldest-first. */
+  keepOrder?: boolean;
+  /** Human description of the date range, e.g. "01 Oct 26 - 31 Oct 26". */
+  rangeText?: string;
   txs: Transaction[];          // already filtered the way the Ledger shows them
   people: Person[];
   businessName: string;
@@ -47,9 +53,10 @@ function cleanDesc(desc: string): string {
     .trim();
 }
 
-export function buildLedgerRows(txs: Transaction[], people: Person[]): LedgerRow[] {
-  // Oldest first reads like a ledger / bank statement.
-  const sorted = [...txs].sort((a, b) => {
+export function buildLedgerRows(txs: Transaction[], people: Person[], keepOrder = false): LedgerRow[] {
+  // Oldest first reads like a ledger / bank statement, unless the caller
+  // wants the on-screen order preserved.
+  const sorted = keepOrder ? [...txs] : [...txs].sort((a, b) => {
     if (a.date !== b.date) return (a.date || '') < (b.date || '') ? -1 : 1;
     return (a.ts || 0) - (b.ts || 0);
   });
@@ -100,6 +107,8 @@ export function buildLedgerRows(txs: Transaction[], people: Person[]): LedgerRow
     }
 
     return {
+      id: t.id,
+      sortKey: t.type,
       date: t.date,
       type: TYPE_LABEL[t.type] || t.type,
       description,
@@ -111,7 +120,7 @@ export function buildLedgerRows(txs: Transaction[], people: Person[]): LedgerRow
   });
 }
 
-function totals(rows: LedgerRow[]) {
+export function totals(rows: LedgerRow[]) {
   const moneyIn = rows.reduce((s, r) => s + r.moneyIn, 0);
   const moneyOut = rows.reduce((s, r) => s + r.moneyOut, 0);
   return { moneyIn, moneyOut, net: moneyIn - moneyOut };
@@ -131,10 +140,10 @@ const safeName = (s: string) => (s || 'ledger').replace(/[^a-z0-9]/gi, '_').toLo
 // ── PDF ──────────────────────────────────────────────────────────────────────
 
 export async function exportLedgerPdf(input: LedgerExportInput): Promise<void> {
-  const rows = buildLedgerRows(input.txs, input.people);
+  const rows = buildLedgerRows(input.txs, input.people, !!input.keepOrder);
   const CUR = safeCurrency(input.currency);
   const { moneyIn, moneyOut, net } = totals(rows);
-  const period = rangeLabel(rows);
+  const period = input.rangeText || rangeLabel(rows);
   const now = new Date();
 
   const body: PdfRow[] = rows.map((r): PdfRow => ({
@@ -192,7 +201,7 @@ export async function exportLedgerPdf(input: LedgerExportInput): Promise<void> {
 
 export async function exportLedgerExcel(input: LedgerExportInput): Promise<void> {
   const { default: writeXlsxFile } = await import('write-excel-file/browser');
-  const rows = buildLedgerRows(input.txs, input.people);
+  const rows = buildLedgerRows(input.txs, input.people, !!input.keepOrder);
   const { moneyIn, moneyOut, net } = totals(rows);
   const CUR = safeCurrency(input.currency);
 
