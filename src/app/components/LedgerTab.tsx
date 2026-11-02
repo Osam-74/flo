@@ -1,10 +1,11 @@
 import React, { useMemo, useState } from 'react';
-import { FileSpreadsheet, FileText, Search, RotateCcw, SlidersHorizontal } from 'lucide-react';
+import { FileSpreadsheet, FileText, Search, RotateCcw, SlidersHorizontal, Scale } from 'lucide-react';
 import { TxDetailModal } from './TxDetailModal';
 import type { Transaction, Person, TxType } from '../types';
 import { fmtDate, fmtN } from '../utils';
 import { exportLedgerPdf, exportLedgerExcel, buildLedgerRows, totals, TYPE_LABEL } from '../ledgerExport';
 import { showToast } from './Modals';
+import { reconcile } from '../reconcile';
 
 interface Props {
   businessName?: string;
@@ -68,6 +69,7 @@ export function LedgerTab({
   const [query, setQuery]               = useState('');
   const [detailTx, setDetailTx]         = useState<Transaction | null>(null);
   const [exporting, setExporting]       = useState<'pdf' | 'xlsx' | null>(null);
+  const [showRecon, setShowRecon]       = useState(false);
 
   // ── Filter + sort ─────────────────────────────────────────────────────────
   const filtered = useMemo(() => {
@@ -113,6 +115,7 @@ export function LedgerTab({
 
   const rows = useMemo(() => buildLedgerRows(filtered, people, true), [filtered, people]);
   const sums = useMemo(() => totals(rows), [rows]);
+  const recon = useMemo(() => reconcile(filtered, txs, people), [filtered, txs, people]);
   const txById = useMemo(() => new Map(filtered.map(t => [t.id, t])), [filtered]);
 
   const filtersActive =
@@ -226,6 +229,57 @@ export function LedgerTab({
       </div>
       <div style={{ fontSize: '0.6rem', color: '#9A9FB8', margin: '-2px 2px 8px', textAlign: 'right' }}>
         Amounts in {currency}
+      </div>
+
+      {/* ── Reconcile with dashboard ── */}
+      <div style={{ marginBottom: 10 }}>
+        <button onClick={() => setShowRecon(v => !v)} className="lg-recon-btn">
+          <Scale size={13} />
+          {Math.abs(recon.difference) < 0.01 ? 'Net matches the dashboard cash' : `Net differs from dashboard cash by ${currency} ${fmtN(recon.difference)}`}
+          <span style={{ marginLeft: 'auto', fontSize: '0.6rem' }}>{showRecon ? 'Hide' : 'Why?'}</span>
+        </button>
+        {showRecon && (
+          <div style={{ ...card, marginTop: 8, marginBottom: 0 }}>
+            <div className="lg-rc-row"><span>Ledger net (as shown)</span><b>{fmtN(recon.ledgerNet)}</b></div>
+            <div className="lg-rc-row"><span>Dashboard total cash available</span><b>{fmtN(recon.dashboardCash)}</b></div>
+            <div className="lg-rc-row lg-rc-total"><span>Difference</span><b style={{ color: Math.abs(recon.difference) < 0.01 ? '#15803D' : '#C81E43' }}>{recon.difference < 0 ? '-' : ''}{fmtN(recon.difference)}</b></div>
+
+            <div className="lg-rc-h">Where the difference comes from</div>
+            {Math.abs(recon.outsideRange) > 0.005 && (
+              <div className="lg-rc-item">
+                <b>Filters / dates:</b> the dashboard counts every entry ever recorded. Your filters hide entries worth {currency} {fmtN(recon.outsideRange)} of net movement. Clear the filters to compare like for like.
+              </div>
+            )}
+            {recon.negativeTotal > 0.005 && (
+              <div className="lg-rc-item">
+                <b>Negative balances ({currency} {fmtN(recon.negativeTotal)}):</b> the dashboard counts only positive balances and ignores anyone who is overdrawn, but the ledger net subtracts it. This makes the dashboard higher than the ledger by this amount.
+                {recon.negativeBalances.map(n => (
+                  <div key={n.name} className="lg-rc-sub">{n.name} is overdrawn by {currency} {fmtN(n.amount)}</div>
+                ))}
+              </div>
+            )}
+            {recon.suspects.length > 0 && (
+              <div className="lg-rc-item">
+                <b>Entries counted differently ({recon.suspects.length}):</b> tap one to open and fix it.
+                {recon.suspects.map((x, i) => (
+                  <div key={x.tx.id + i} className="lg-rc-sus" onClick={() => setDetailTx(x.tx)}>
+                    <div><b>{fmtDate(x.tx.date)}</b> · {x.tx.desc || x.tx.type}</div>
+                    <div className="lg-rc-sub">{x.reason}</div>
+                    <div className="lg-rc-sub">Pushes ledger {x.effect >= 0 ? 'above' : 'below'} dashboard by {currency} {fmtN(x.effect)}</div>
+                  </div>
+                ))}
+              </div>
+            )}
+            {Math.abs(recon.unexplained) > 0.005 && (
+              <div className="lg-rc-item" style={{ background: 'rgba(232,62,92,0.07)', borderColor: 'rgba(232,62,92,0.25)' }}>
+                <b>Still unexplained: {currency} {fmtN(recon.unexplained)}.</b> Some entries are counted differently but don't match a known pattern. Check recent edits to sales, credit payments and transfers.
+              </div>
+            )}
+            {Math.abs(recon.outsideRange) <= 0.005 && recon.negativeTotal <= 0.005 && recon.suspects.length === 0 && Math.abs(recon.unexplained) <= 0.005 && (
+              <div className="lg-rc-item">Nothing to explain. The two figures agree.</div>
+            )}
+          </div>
+        )}
       </div>
 
       {/* ── Table ── */}
@@ -352,6 +406,15 @@ const CSS = `
 .lg-export--pdf  { background:linear-gradient(135deg,#2a4a9a,#3d6bdf); }
 .lg-export--xlsx { background:linear-gradient(135deg,#16803c,#22c55e); }
 
+.lg-recon-btn { width:100%; display:flex; align-items:center; gap:8px; padding:9px 12px; border-radius:11px; border:1.5px solid rgba(217,119,6,0.35); background:rgba(245,158,11,0.10); color:#92400E; font-size:0.68rem; font-weight:700; cursor:pointer; font-family:inherit; text-align:left; }
+.lg-rc-row { display:flex; justify-content:space-between; gap:10px; font-size:0.74rem; padding:5px 0; color:#1A1D2E; }
+.lg-rc-row b { font-family:'DM Mono',monospace; }
+.lg-rc-total { border-top:1.5px solid rgba(0,0,0,0.1); margin-top:4px; padding-top:8px; font-weight:800; }
+.lg-rc-h { font-size:0.58rem; font-weight:800; letter-spacing:0.1em; text-transform:uppercase; color:#9A9FB8; margin:12px 0 6px; }
+.lg-rc-item { font-size:0.7rem; line-height:1.5; color:#3B3F55; background:#F8F9FF; border:1px solid rgba(0,0,0,0.07); border-radius:10px; padding:9px 10px; margin-bottom:7px; }
+.lg-rc-sub { font-size:0.64rem; color:#7A7F98; margin-top:2px; }
+.lg-rc-sus { margin-top:7px; padding:7px 9px; border-radius:8px; background:#fff; border:1px solid rgba(217,119,6,0.3); cursor:pointer; }
+.lg-rc-sus:hover { background:rgba(245,158,11,0.08); }
 .lg-totals { display:grid; grid-template-columns:repeat(4,1fr); gap:8px; margin-bottom:10px; }
 .lg-stat { background:#fff; border-radius:12px; padding:9px 8px; text-align:center; border:1px solid rgba(0,0,0,0.05); box-shadow:0 1px 3px rgba(0,0,0,0.05); min-width:0; }
 .lg-stat-l { font-size:0.52rem; font-weight:700; letter-spacing:0.08em; text-transform:uppercase; color:#9A9FB8; }
