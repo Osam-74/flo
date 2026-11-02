@@ -10,7 +10,7 @@
 // Dashboard.tsx, then explains any gap by finding the entries behind it.
 // ─────────────────────────────────────────────────────────────────────────────
 import type { Transaction, Person } from './types';
-import { pStats } from './utils';
+import { pStats, saleReceiver } from './utils';
 import { buildLedgerRows, totals } from './ledgerExport';
 
 const r2 = (n: number) => Math.round(n * 100) / 100;
@@ -23,7 +23,7 @@ export function bizBalanceOf(txs: Transaction[]): number {
       if (t.transferTo === 'biz') bal += t.amount;
       if (t.transferFrom === 'biz') bal -= t.amount;
     }
-    if (t.type === 'income' && (t as any).receiver === 'biz') bal += t.amount;
+    if (t.type === 'income' && saleReceiver(t as any) === 'biz') bal += t.amount;
     if (t.type === 'salary' && t.salaryPaidBy === 'biz') bal -= t.amount;
     if (t.type === 'expense' && t.person === 'biz') bal -= t.amount;
     if (t.type === 'owner-fund' && t.ownerReceiver === 'biz') bal += t.amount;
@@ -113,6 +113,11 @@ export function reconcile(shown: Transaction[], all: Transaction[], people: Pers
     // Sale with nobody recorded as the receiver.
     if (t.type === 'income' && !t.person && !(t as any).receiver) {
       suspects.push({ tx: t, effect: t.amount || 0, reason: 'Sale has no receiver, so no account gets the cash' });
+    }
+    // Sale whose `person` and `receiver` disagree: it was edited after being created. Older
+    // versions of the app left `receiver` stale, which made the dashboard drop or double-count it.
+    if (t.type === 'income' && t.person && (t as any).receiver && t.person !== (t as any).receiver) {
+      suspects.push({ tx: t, effect: 0, reason: 'Sale was edited and its receiver fields disagree (now counted by the person shown). Open and re-save it to tidy it up.' });
     }
     // Sale recorded against a person who no longer exists.
     if (t.type === 'income' && t.person && t.person !== 'biz' && !personIds.has(t.person)) {

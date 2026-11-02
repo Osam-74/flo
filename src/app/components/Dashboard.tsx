@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Eye, EyeOff } from 'lucide-react';
 import type { Transaction, Person } from '../types';
-import { fmtAmt, pStats, fmtDate } from '../utils';
+import { fmtAmt, pStats, fmtDate, saleReceiver } from '../utils';
 import { TxItem } from './TxItem';
 import { TxDetailModal } from './TxDetailModal';
 
@@ -76,7 +76,7 @@ export function Dashboard({
       if (t.transferTo   === 'biz') bizBalance += t.amount;
       if (t.transferFrom === 'biz') bizBalance -= t.amount;
     }
-    if (t.type === 'income'      && (t as any).receiver === 'biz') bizBalance += t.amount;
+    if (t.type === 'income'      && saleReceiver(t as any) === 'biz') bizBalance += t.amount;
     if (t.type === 'salary'      && t.salaryPaidBy      === 'biz') bizBalance -= t.amount;
     if (t.type === 'expense'     && t.person            === 'biz') bizBalance -= t.amount;
     if (t.type === 'owner-fund'  && t.ownerReceiver     === 'biz') bizBalance += t.amount;
@@ -207,7 +207,7 @@ export function Dashboard({
           if (t.transferTo   === 'biz') bizIn  += t.amount;
           if (t.transferFrom === 'biz') bizOut += t.amount;
         }
-        if (t.type === 'income'      && (t as any).receiver === 'biz') bizIn  += t.amount;
+        if (t.type === 'income'      && saleReceiver(t as any) === 'biz') bizIn  += t.amount;
         if (t.type === 'salary'      && t.salaryPaidBy      === 'biz') bizOut += t.amount;
         if (t.type === 'expense'     && t.person            === 'biz') bizOut += t.amount;
         if (t.type === 'owner-fund'  && t.ownerReceiver     === 'biz') bizIn  += t.amount;

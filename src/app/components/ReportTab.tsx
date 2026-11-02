@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { FileText, Download, Sparkles, Sun, Copy } from 'lucide-react';
 import { showToast } from './Modals';
 import type { Transaction, Person } from '../types';
-import { fmtDate, fmtN, pStats } from '../utils';
+import { fmtDate, fmtN, pStats, saleReceiver } from '../utils';
 import type { PdfRow, PdfSection, PdfTableSection, ReportDocument } from '../pdf/reportModel';
 import { reportToHtml, reportPreviewStyles } from '../pdf/reportToHtml';
 import { downloadReportPdf, safeCurrency } from '../pdf/renderReportPdf';
@@ -253,7 +253,7 @@ export function ReportTab({ businessId, businessName, txs, people, currency }: P
         if (t.transferTo   === 'biz') preBizBalance += t.amount;
         if (t.transferFrom === 'biz') preBizBalance -= t.amount;
       }
-      if (t.type === 'income' && (t as any).receiver === 'biz') preBizBalance += t.amount;
+      if (t.type === 'income' && saleReceiver(t as any) === 'biz') preBizBalance += t.amount;
       if (t.type === 'salary' && t.salaryPaidBy === 'biz') preBizBalance -= t.amount;
       if (t.type === 'expense' && t.person === 'biz') preBizBalance -= t.amount;
       if (t.type === 'owner-fund' && t.ownerReceiver === 'biz') preBizBalance += t.amount;
@@ -302,7 +302,7 @@ export function ReportTab({ businessId, businessName, txs, people, currency }: P
         if (t.transferTo   === 'biz') bizBalance += t.amount;
         if (t.transferFrom === 'biz') bizBalance -= t.amount;
       }
-      if (t.type === 'income' && (t as any).receiver === 'biz') bizBalance += t.amount;
+      if (t.type === 'income' && saleReceiver(t as any) === 'biz') bizBalance += t.amount;
       if (t.type === 'salary' && t.salaryPaidBy === 'biz') bizBalance -= t.amount;
       if (t.type === 'expense' && t.person === 'biz') bizBalance -= t.amount;
       if (t.type === 'owner-fund' && t.ownerReceiver === 'biz') bizBalance += t.amount;

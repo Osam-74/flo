@@ -50,6 +50,7 @@ export interface Transaction {
   note?: string;
   crates?: number;
   source?: string;
+  receiver?: string;   // sale (income): who received the money. `person` is the source of truth; see saleReceiver()
   buyer?: string;
   transferFrom?: string;
   transferTo?: string;

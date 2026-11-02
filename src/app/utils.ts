@@ -166,3 +166,14 @@ export function stripUndefined<T>(val: T): T {
   }
   return val;
 }
+
+/**
+ * Who actually received the money for a sale (income) entry.
+ * `person` is the source of truth: it is what member balances, the Ledger and the
+ * edit form all use. `receiver` is only a fallback for older entries that have no
+ * `person`. (Editing a sale used to update `person` but leave `receiver` stale,
+ * so reading `receiver` alone made Biz Saving drop or double-count that money.)
+ */
+export function saleReceiver(t: Pick<Transaction, 'person'> & { receiver?: string }): string {
+  return t.person || t.receiver || '';
+}

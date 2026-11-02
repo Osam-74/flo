@@ -395,7 +395,7 @@ export function EditModal({ open, tx, people, currency, onClose, onSave }: EditM
       const sellerName = people.find(p => p.id === person)?.name || '';
       const desc = `Sale${buyer ? ' — to ' + buyer : ''}${sellerName ? ' by ' + sellerName : ''}${cat ? ' — ' + cat : ''}`;
       const cratesNum = parseFloat(crates) || undefined;
-      onSave(tx.id, { amount: amt, date, note, cat, source, buyer: buyer || undefined, seller: person, sellerName, person: receiver, crates: cratesNum, desc });
+      onSave(tx.id, { amount: amt, date, note, cat, source, buyer: buyer || undefined, seller: person, sellerName, person: receiver, receiver: receiver || undefined, crates: cratesNum, desc });
     }
     else if (type === 'expense') {
       const amt = parseFloat(amount) || 0;
